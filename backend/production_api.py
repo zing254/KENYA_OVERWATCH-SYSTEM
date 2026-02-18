@@ -26,7 +26,7 @@ from production_system import (
     KenyaOverwatchProduction, DetectionEvent, RiskAssessment, 
     EvidencePackage, ProductionIncident, RiskLevel, IncidentStatus,
     EvidenceStatus, SeverityLevel, Coordinates, Milestone,
-    MilestoneStatus, MilestoneType
+    MilestoneStatus, MilestoneType, RiskFactors
 )
 
 def serialize_for_json(obj: Any) -> Any:
@@ -573,9 +573,9 @@ async def get_incidents(status: Optional[str] = None, severity: Optional[str] = 
     
     # Apply filters
     if status:
-        incidents = [inc for inc in incidents if (isinstance(inc, dict) and inc.get("status") == status) or (hasattr(inc, 'status') and inc.status.value == status)]
+        incidents = [inc for inc in incidents if getattr(inc, 'status', None) and getattr(inc, 'status').value == status]
     if severity:
-        incidents = [inc for inc in incidents if (isinstance(inc, dict) and inc.get("severity") == severity) or (hasattr(inc, 'severity') and inc.severity.value == severity)]
+        incidents = [inc for inc in incidents if getattr(inc, 'severity', None) and getattr(inc, 'severity').value == severity]
     
     return incidents
 
@@ -602,7 +602,20 @@ async def create_incident(incident_data: Dict[str, Any]):
         coordinates=Coordinates(**incident_data.get('coordinates', {'lat': 0.0, 'lng': 0.0})),
         severity=SeverityLevel(incident_data.get('severity', 'medium')),
         status=IncidentStatus(incident_data.get('status', 'active')),
-        risk_assessment=None,  # Will be calculated
+        risk_assessment=RiskAssessment(
+            risk_score=0.0,
+            risk_level=RiskLevel.LOW,
+            factors=RiskFactors(
+                temporal_risk=0.0,
+                spatial_risk=0.0,
+                behavioral_risk=0.0,
+                contextual_risk=0.0,
+                reason_codes=[]
+            ),
+            recommended_action="Pending assessment",
+            confidence=0.0,
+            timestamp=datetime.utcnow()
+        ),
         evidence_packages=[],
         created_at=datetime.utcnow(),
         updated_at=None,
@@ -1581,7 +1594,7 @@ async def update_milestone(milestone_id: str, update_data: Dict[str, Any]):
     
     await ws_manager.broadcast({
         "type": "milestone_updated",
-        "data": asdict(updated_milestone)
+        "data": asdict(updated_milestone) if updated_milestone else None
     })
     
     return serialize_for_json(updated_milestone)
@@ -1613,7 +1626,7 @@ async def update_milestone_status(milestone_id: str, status_data: Dict[str, Any]
     
     await ws_manager.broadcast({
         "type": "milestone_status_updated",
-        "data": asdict(updated_milestone)
+        "data": asdict(updated_milestone) if updated_milestone else None
     })
     
     return serialize_for_json(updated_milestone)
