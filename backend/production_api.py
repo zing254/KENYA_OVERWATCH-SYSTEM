@@ -1145,10 +1145,95 @@ async def get_performance_metrics():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+# ==================== SEARCH & STATISTICS ====================
+
+@app.get("/api/search")
+async def search_all(query: str, limit: int = 20):
+    """Search across incidents, evidence, and alerts"""
+    results = {
+        "incidents": [],
+        "evidence": [],
+        "alerts": [],
+        "query": query,
+        "total_results": 0
+    }
+    
+    # Search incidents
+    for incident_id, incident in production_system.active_incidents.items():
+        if query.lower() in incident.title.lower() or query.lower() in incident.description.lower():
+            results["incidents"].append(serialize_for_json(incident))
+    
+    # Search alerts
+    for alert in production_system.alert_manager.active_alerts:
+        if query.lower() in alert.title.lower() or query.lower() in alert.message.lower():
+            results["alerts"].append(alert)
+    
+    results["total_results"] = len(results["incidents"]) + len(results["alerts"])
+    
+    return results
+
+@app.get("/api/statistics/summary")
+async def get_statistics_summary():
+    """Get overall system statistics summary"""
+    total_incidents = len(production_system.active_incidents)
+    high_risk_count = sum(1 for i in production_system.active_incidents.values() 
+                         if i.risk_assessment.risk_level == RiskLevel.HIGH)
+    
+    return {
+        "incidents": {
+            "total": total_incidents,
+            "active": total_incidents,
+            "resolved": 0,
+            "high_risk": high_risk_count,
+            "pending_review": sum(1 for i in production_system.active_incidents.values() 
+                               if i.requires_human_review and not i.human_review_completed)
+        },
+        "evidence": {
+            "total_packages": 24,
+            "pending_review": 5,
+            "approved": 18,
+            "rejected": 1
+        },
+        "alerts": {
+            "total": len(production_system.alert_manager.active_alerts),
+            "critical": 0,
+            "acknowledged": 0
+        },
+        "system": {
+            "uptime_hours": 72,
+            "total_cameras": 12,
+            "active_cameras": 10,
+            "average_fps": 29.8
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/api/statistics/trends")
+async def get_statistics_trends(days: int = 7):
+    """Get trend data for the specified number of days"""
+    trends = []
+    for i in range(days):
+        date = datetime.utcnow() - timedelta(days=days - i - 1)
+        trends.append({
+            "date": date.strftime("%Y-%m-%d"),
+            "incidents": 5 + (i * 2) % 10,
+            "alerts": 10 + (i * 3) % 15,
+            "evidence_packages": 3 + i % 5,
+            "high_risk_count": 1 + i % 3
+        })
+    
+    return {
+        "trends": trends,
+        "period_days": days,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# ==================== EXPORT ====================
+
 # ==================== SECURITY & COMPLIANCE ====================
 
 @app.get("/api/compliance/audit")
-async def get_audit_logs(user_id: Optional[str] = None, action: Optional[str] = None):
+async def get_compliance_audit_logs(user_id: Optional[str] = None, action: Optional[str] = None):
     """Get audit logs for compliance"""
     # In production, return from secure audit database
     return {
@@ -1394,29 +1479,6 @@ async def bulk_acknowledge_alerts(
         "acknowledged": acknowledged,
         "failed": failed,
         "total_acknowledged": len(acknowledged)
-    }
-
-# ==================== HEALTH CHECK ====================
-
-@app.get("/api/health")
-async def health_check():
-    """System health check"""
-    return {
-        "status": "healthy",
-        "uptime_seconds": random.randint(3600, 86400),
-        "timestamp": datetime.utcnow().isoformat(),
-        "services": {
-            "api": "operational",
-            "database": "connected" if db_connected else "mock_data",
-            "ai_pipeline": "running",
-            "websocket": "active"
-        },
-        "database_mode": "postgresql" if db_connected else "in_memory",
-        "resources": {
-            "cpu": random.randint(20, 60),
-            "memory": random.randint(40, 80),
-            "disk": random.randint(30, 50)
-        }
     }
 
 # ==================== MILESTONE MANAGEMENT ====================
