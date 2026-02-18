@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+frontend/control_center/node_modules/
+backend/venv/
+backend/venv_new/
+backend/test_env/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test reports
+test_report_*.json
+
+# Temporary files
+*.tmp
+temp/

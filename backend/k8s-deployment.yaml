@@ -1,0 +1,385 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kenya-overwatch-backend
+  labels:
+    app: kenya-overwatch
+    component: backend
+    version: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kenya-overwatch
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: kenya-overwatch
+        component: backend
+        version: production
+    spec:
+      serviceAccountName: overwatch-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: api
+        image: kenya-overwatch/backend:2.0.0
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8080
+          name: websocket
+        env:
+        - name: OVERWATCH_ENV
+          value: "production"
+        - name: OVERWATCH_LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: overwatch-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: overwatch-secrets
+              key: redis-url
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: overwatch-secrets
+              key: minio-endpoint
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: overwatch-secrets
+              key: minio-access-key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: overwatch-secrets
+              key: minio-secret-key
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: evidence
+          mountPath: /app/evidence
+        - name: audit
+          mountPath: /app/audit
+        - name: models
+          mountPath: /app/models
+          readOnly: true
+        - name: config
+          mountPath: /app/config
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: overwatch-logs-pvc
+      - name: evidence
+        persistentVolumeClaim:
+          claimName: overwatch-evidence-pvc
+      - name: audit
+        persistentVolumeClaim:
+          claimName: overwatch-audit-pvc
+      - name: models
+        persistentVolumeClaim:
+          claimName: overwatch-models-pvc
+      - name: config
+        configMap:
+          name: overwatch-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kenya-overwatch-backend-service
+  labels:
+    app: kenya-overwatch
+    component: backend
+spec:
+  selector:
+    app: kenya-overwatch
+    component: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: websocket
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Ingress
+metadata:
+  name: kenya-overwatch-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - api.overwatch.go.ke
+    - overwatch.go.ke
+    secretName: overwatch-tls
+  rules:
+  - host: api.overwatch.go.ke
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kenya-overwatch-backend-service
+            port:
+              number: 80
+  - host: overwatch.go.ke
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kenya-overwatch-backend-service
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: overwatch-config
+data:
+  production.yaml: |
+    # Kenya Overwatch Production Configuration
+    app:
+      name: "Kenya Overwatch Production System"
+      version: "2.0.0"
+      environment: "production"
+      debug: false
+    
+    database:
+      host: "postgres.postgres.svc.cluster.local"
+      port: 5432
+      name: "overwatch_production"
+      pool_size: 20
+      max_overflow: 30
+      echo: false
+    
+    redis:
+      host: "redis-master.redis.svc.cluster.local"
+      port: 6379
+      db: 0
+      decode_responses: true
+    
+    storage:
+      evidence_bucket: "overwatch-evidence"
+      models_bucket: "overwatch-models"
+      backup_bucket: "overwatch-backups"
+      retention_days:
+        non_offence: 3
+        offence_evidence: 365
+        appeals: 2555
+        audit_logs: 1825
+    
+    ai_models:
+      yolo_weights_path: "/app/models/yolo/yolov8n.pt"
+      anpr_model_path: "/app/models/anpr/license_plate_recognition.pt"
+      confidence_thresholds:
+        person: 0.6
+        vehicle: 0.7
+        weapon: 0.9  # Hard-gated
+        license_plate: 0.8
+    
+    risk_scoring:
+      weights:
+        behavioral: 0.4
+        spatial: 0.3
+        temporal: 0.2
+        contextual: 0.1
+      thresholds:
+        low: 0.3
+        medium: 0.6
+        high: 0.8
+        critical: 0.8
+    
+    security:
+      jwt_secret_key: "${JWT_SECRET}"
+      jwt_algorithm: "HS256"
+      jwt_expiration_hours: 24
+      password_hash_rounds: 12
+      encryption_key: "${ENCRYPTION_KEY}"
+    
+    monitoring:
+      prometheus_port: 9090
+      health_check_interval: 30
+      log_level: "INFO"
+      audit_retention_days: 1825
+    
+    compliance:
+      gdpr_enabled: true
+      audit_log_enabled: true
+      data_anonymization: true
+      evidence_chain_of_custody: true
+      citizen_appeal_enabled: true
+    
+    performance:
+      max_concurrent_streams: 10
+      max_processing_fps: 30
+      max_queue_size: 1000
+      cleanup_interval_hours: 1
+    
+    alerts:
+      high_risk_webhook: "${HIGH_RISK_WEBHOOK}"
+      sms_enabled: true
+      email_enabled: true
+      escalation_policies:
+        medium: "operator_notification"
+        high: "supervisor_review"
+        critical: "immediate_response"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: overwatch-logs-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: overwatch-evidence-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 1Ti
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: overwatch-audit-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 500Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: overwatch-models-pvc
+spec:
+  accessModes:
+  - ReadOnlyMany
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: overwatch-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: overwatch-role
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: overwatch-rolebinding
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: overwatch-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: overwatch-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kenya-overwatch-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kenya-overwatch-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 50
