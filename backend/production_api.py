@@ -111,17 +111,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Security headers middleware
-@app.middleware("http")
-async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
-    return response
-
 # Rate limiting storage
 rate_limit_storage = {}
 RATE_LIMIT_REQUESTS = 100  # requests per minute
@@ -993,8 +982,8 @@ async def assess_risk(assessment_data: Dict[str, Any]):
 
 # ==================== CAMERA MANAGEMENT ====================
 
-@app.get("/api/cameras")
-async def get_cameras():
+@app.get("/api/cameras/management")
+async def get_cameras_management():
     """Get all cameras with AI status"""
     return {
         "cameras": [
@@ -1090,6 +1079,98 @@ async def acknowledge_alert(alert_id: str, ack_data: Dict[str, str]):
     })
     
     return {"message": "Alert acknowledged successfully"}
+
+# ==================== NOTIFICATIONS ====================
+
+@app.get("/api/notifications")
+async def get_notifications(limit: int = 20):
+    """Get user notifications"""
+    notifications = []
+    for i in range(min(limit, 20)):
+        notifications.append({
+            "id": f"notif_{i}",
+            "type": random.choice(["alert", "incident", "system", "evidence"]),
+            "title": random.choice([
+                "New high-risk incident detected",
+                "Evidence package ready for review",
+                "System update available",
+                "New milestone assigned"
+            ]),
+            "message": "Notification message details here",
+            "read": i > 5,
+            "timestamp": (datetime.utcnow() - timedelta(minutes=i * 5)).isoformat()
+        })
+    return {"notifications": notifications, "total": len(notifications), "unread_count": sum(1 for n in notifications if not n["read"])}
+
+@app.post("/api/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str):
+    """Mark notification as read"""
+    return {"message": "Notification marked as read", "id": notification_id}
+
+@app.post("/api/notifications/read-all")
+async def mark_all_notifications_read():
+    """Mark all notifications as read"""
+    return {"message": "All notifications marked as read"}
+
+# ==================== USERS ====================
+
+@app.get("/api/users")
+async def get_users(role: Optional[str] = None, limit: int = 50):
+    """Get all users"""
+    users = [
+        {"id": "user_1", "username": "admin", "email": "admin@kenya-overwatch.go.ke", "role": "admin", "active": True},
+        {"id": "user_2", "username": "operator1", "email": "op1@kenya-overwatch.go.ke", "role": "operator", "active": True},
+        {"id": "user_3", "username": "operator2", "email": "op2@kenya-overwatch.go.ke", "role": "operator", "active": True},
+        {"id": "user_4", "username": "analyst", "email": "analyst@kenya-overwatch.go.ke", "role": "analyst", "active": True},
+    ]
+    if role:
+        users = [u for u in users if u["role"] == role]
+    return {"users": users[:limit], "total": len(users)}
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str):
+    """Get user by ID"""
+    return {"id": user_id, "username": "user", "email": "user@kenya-overwatch.go.ke", "role": "operator", "active": True}
+
+@app.post("/api/users")
+async def create_user(user_data: Dict[str, Any]):
+    """Create new user"""
+    return {"message": "User created", "user_id": f"user_{random.randint(1000,9999)}", **user_data}
+
+@app.patch("/api/users/{user_id}")
+async def update_user(user_id: str, user_data: Dict[str, Any]):
+    """Update user"""
+    return {"message": "User updated", "user_id": user_id, **user_data}
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: str):
+    """Delete user"""
+    return {"message": "User deleted", "user_id": user_id}
+
+# ==================== CAMERAS ====================
+
+@app.get("/api/cameras")
+async def get_cameras(status: Optional[str] = None):
+    """Get all cameras"""
+    cameras = [
+        {"id": "cam_1", "name": "Downtown Main", "location": "Nairobi CBD", "status": "active", "fps": 30, "resolution": "1080p"},
+        {"id": "cam_2", "name": "Airport Terminal 1", "location": "JKI Airport", "status": "active", "fps": 25, "resolution": "4K"},
+        {"id": "cam_3", "name": "Mombasa Port", "location": "Mombasa", "status": "active", "fps": 30, "resolution": "1080p"},
+        {"id": "cam_4", "name": "Nakuru Highway", "location": "Nakuru", "status": "inactive", "fps": 0, "resolution": "720p"},
+    ]
+    if status:
+        cameras = [c for c in cameras if c["status"] == status]
+    return {"cameras": cameras, "total": len(cameras)}
+
+@app.get("/api/cameras/{camera_id}")
+async def get_camera(camera_id: str):
+    """Get camera by ID"""
+    return {"id": camera_id, "name": "Camera", "location": "Location", "status": "active", "fps": 30, "resolution": "1080p"}
+
+@app.post("/api/cameras/{camera_id}/toggle")
+async def toggle_camera(camera_id: str):
+    """Toggle camera on/off"""
+    return {"message": "Camera toggled", "camera_id": camera_id, "new_status": "active"}
 
 # ==================== DASHBOARD ====================
 
