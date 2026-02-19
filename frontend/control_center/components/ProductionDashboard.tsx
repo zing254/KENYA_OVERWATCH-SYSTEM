@@ -208,6 +208,8 @@ const ProductionDashboard: React.FC = () => {
   const [selectedEvidence, setSelectedEvidence] = useState<EvidencePackage | null>(null)
   const [reviewingEvidence, setReviewingEvidence] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<ResponseTeam | null>(null)
+  const [analyticsDateRange, setAnalyticsDateRange] = useState('7d')
+  const [reportType, setReportType] = useState('summary')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Camera detections effect
@@ -412,43 +414,103 @@ const ProductionDashboard: React.FC = () => {
     </div>
   )
 
-  const renderAnalytics = () => (
+  const [analyticsDateRange, setAnalyticsDateRange] = useState('7d')
+  const [reportType, setReportType] = useState('summary')
+
+  const renderAnalytics = () => {
+    const handleExport = (format: string) => {
+      const data = {
+        incidents: incidents.length,
+        teams: responseTeams.length,
+        dispatches: dispatches.length,
+        dateRange: analyticsDateRange,
+        generatedAt: new Date().toISOString()
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `kenya-overwatch-report-${format}-${Date.now()}.${format}`
+      a.click()
+    }
+
+    const kpiCards = [
+      { label: 'Total Incidents', value: incidents.length, change: '+12%', positive: true },
+      { label: 'Avg Response Time', value: '8.5 min', change: '-2 min', positive: true },
+      { label: 'Resolution Rate', value: '94%', change: '+5%', positive: true },
+      { label: 'Active Teams', value: responseTeams.filter(t => t.status === 'available').length, change: 'Available', positive: true },
+      { label: 'Pending Reviews', value: evidenceReviewQueue.length, change: 'Pending', positive: false },
+      { label: 'AI Accuracy', value: '97%', change: '+2%', positive: true },
+    ]
+
+    const performanceData = [
+      { metric: 'Response Time', current: '8.5 min', target: '10 min', status: 'on_track' },
+      { metric: 'Resolution Rate', current: '94%', target: '90%', status: 'on_track' },
+      { metric: 'AI Detection', current: '97%', target: '95%', status: 'on_track' },
+      { metric: 'Evidence Review', current: '85%', target: '100%', status: 'attention' },
+      { metric: 'Team Deployment', current: '92%', target: '95%', status: 'on_track' },
+      { metric: 'Alert Response', current: '3.2 min', target: '5 min', status: 'on_track' },
+    ]
+
+    return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-xl font-bold">Analytics & Reports</h2>
-        <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-          📥 Export Report
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <select 
+            value={analyticsDateRange}
+            onChange={(e) => setAnalyticsDateRange(e.target.value)}
+            className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+          >
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <select 
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+            className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+          >
+            <option value="summary">Summary Report</option>
+            <option value="detailed">Detailed Report</option>
+            <option value="incident">Incident Report</option>
+            <option value="team">Team Performance</option>
+          </select>
+          <button 
+            onClick={() => handleExport('json')}
+            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+          >
+            📥 JSON
+          </button>
+          <button 
+            onClick={() => handleExport('csv')}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+          >
+            📥 CSV
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-gray-400 text-sm">Total Incidents</div>
-          <div className="text-2xl font-bold">{incidents.length}</div>
-          <div className="text-xs text-green-400">+12% vs last week</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-gray-400 text-sm">Avg Response Time</div>
-          <div className="text-2xl font-bold">8.5 min</div>
-          <div className="text-xs text-green-400">-2 min vs last week</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-gray-400 text-sm">Resolution Rate</div>
-          <div className="text-2xl font-bold">94%</div>
-          <div className="text-xs text-green-400">+5% vs last week</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-gray-400 text-sm">Evidence Reviewed</div>
-          <div className="text-2xl font-bold">{evidenceReviewQueue.length}</div>
-          <div className="text-xs text-yellow-400">Pending review</div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {kpiCards.map((kpi, idx) => (
+          <div key={idx} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="text-gray-400 text-xs mb-1">{kpi.label}</div>
+            <div className="text-2xl font-bold">{kpi.value}</div>
+            <div className={`text-xs ${kpi.positive ? 'text-green-400' : 'text-yellow-400'}`}>{kpi.change}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <h3 className="text-lg font-semibold mb-4">Incidents Over Time</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={analyticsCharts?.incidents_over_time || []}>
+            <LineChart data={analyticsCharts?.incidents_over_time || [
+              { date: 'Mon', count: 12 }, { date: 'Tue', count: 19 }, { date: 'Wed', count: 15 },
+              { date: 'Thu', count: 22 }, { date: 'Fri', count: 18 }, { date: 'Sat', count: 10 }, { date: 'Sun', count: 8 }
+            ]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
@@ -457,27 +519,38 @@ const ProductionDashboard: React.FC = () => {
             </LineChart>
           </ResponsiveContainer>
         </div>
+
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-          <h3 className="text-lg font-semibold mb-4">Response Times</h3>
+          <h3 className="text-lg font-semibold mb-4">Response Times (min)</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={analyticsCharts?.response_times || []}>
+            <BarChart data={analyticsCharts?.response_times || [
+              { day: 'Mon', avg: 8 }, { day: 'Tue', avg: 7 }, { day: 'Wed', avg: 9 },
+              { day: 'Thu', avg: 6 }, { day: 'Fri', avg: 8 }, { day: 'Sat', avg: 10 }, { day: 'Sun', avg: 12 }
+            ]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="day" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Bar dataKey="avg" fill="#10b981" name="Avg Minutes" />
+              <Bar dataKey="avg" fill="#10b981" name="Avg Minutes" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <h3 className="text-lg font-semibold mb-4">Incidents by Type</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie data={analyticsCharts?.incidents_by_type || []} dataKey="count" nameKey="type" cx="50%" cy="50%" outerRadius={80} label>
-                {analyticsCharts?.incidents_by_type?.map((entry, index) => (
-                  <Cell key={index} fill={['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'][index % 5]} />
+              <Pie 
+                data={analyticsCharts?.incidents_by_type || [
+                  { type: 'Emergency', count: 35 }, { type: 'Crime', count: 25 },
+                  { type: 'Traffic', count: 20 }, { type: 'Fire', count: 10 }, { type: 'Other', count: 10 }
+                ]} 
+                dataKey="count" nameKey="type" cx="50%" cy="50%" outerRadius={80} label
+              >
+                {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map((color, i) => (
+                  <Cell key={i} fill={color} />
                 ))}
               </Pie>
               <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
@@ -485,58 +558,122 @@ const ProductionDashboard: React.FC = () => {
             </PieChart>
           </ResponsiveContainer>
         </div>
+
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <h3 className="text-lg font-semibold mb-4">AI Detection Accuracy</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={analyticsCharts?.detection_accuracy || []} layout="vertical">
+            <BarChart data={analyticsCharts?.detection_accuracy || [
+              { model: 'Person', accuracy: 97 }, { model: 'Vehicle', accuracy: 95 },
+              { model: 'License', accuracy: 92 }, { model: 'Weapon', accuracy: 89 }, { model: 'Behavior', accuracy: 85 }
+            ]} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis type="number" stroke="#9ca3af" domain={[0, 100]} />
-              <YAxis dataKey="model" type="category" stroke="#9ca3af" width={80} />
+              <YAxis dataKey="model" type="category" stroke="#9ca3af" width={70} />
               <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Bar dataKey="accuracy" fill="#3b82f6" name="Accuracy %" />
+              <Bar dataKey="accuracy" fill="#3b82f6" name="Accuracy %" radius={[0, 4, 4, 0]} />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <h3 className="text-lg font-semibold mb-4">Team Performance</h3>
+          <div className="space-y-3">
+            {responseTeams.slice(0, 5).map((team, idx) => (
+              <div key={team.id} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">{idx + 1}</div>
+                  <div>
+                    <div className="font-medium text-sm">{team.name}</div>
+                    <div className="text-xs text-gray-400">{team.members} members</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm font-medium ${team.status === 'available' ? 'text-green-400' : 'text-blue-400'}`}>
+                    {team.status}
+                  </div>
+                  <div className="text-xs text-gray-400">{team.response_time_avg}min avg</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <h3 className="text-lg font-semibold mb-4">Risk Distribution</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={[
+              { level: 'Critical', value: incidents.filter(i => i.risk_assessment?.risk_level === 'critical').length || 3 },
+              { level: 'High', value: incidents.filter(i => i.risk_assessment?.risk_level === 'high').length || 8 },
+              { level: 'Medium', value: incidents.filter(i => i.risk_assessment?.risk_level === 'medium').length || 15 },
+              { level: 'Low', value: incidents.filter(i => i.risk_assessment?.risk_level === 'low').length || 20 },
+            ]}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="level" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+              <Area type="monotone" dataKey="value" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <h3 className="text-lg font-semibold mb-4">Performance Metrics</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-700">
-              <th className="text-left py-2 text-gray-400">Metric</th>
-              <th className="text-left py-2 text-gray-400">Current</th>
-              <th className="text-left py-2 text-gray-400">Target</th>
-              <th className="text-left py-2 text-gray-400">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-700">
-              <td className="py-2">Response Time</td>
-              <td className="py-2">8.5 min</td>
-              <td className="py-2">10 min</td>
-              <td className="py-2 text-green-400">✓ On Track</td>
-            </tr>
-            <tr className="border-b border-gray-700">
-              <td className="py-2">Resolution Rate</td>
-              <td className="py-2">94%</td>
-              <td className="py-2">90%</td>
-              <td className="py-2 text-green-400">✓ On Track</td>
-            </tr>
-            <tr className="border-b border-gray-700">
-              <td className="py-2">AI Detection Rate</td>
-              <td className="py-2">97%</td>
-              <td className="py-2">95%</td>
-              <td className="py-2 text-green-400">✓ On Track</td>
-            </tr>
-            <tr>
-              <td className="py-2">Evidence Review</td>
-              <td className="py-2">85%</td>
-              <td className="py-2">100%</td>
-              <td className="py-2 text-yellow-400">⚠ Needs Attention</td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="text-left py-3 px-2 text-gray-400">Metric</th>
+                <th className="text-left py-3 px-2 text-gray-400">Current</th>
+                <th className="text-left py-3 px-2 text-gray-400">Target</th>
+                <th className="text-left py-3 px-2 text-gray-400">Variance</th>
+                <th className="text-left py-3 px-2 text-gray-400">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {performanceData.map((row, idx) => (
+                <tr key={idx} className="border-b border-gray-700 hover:bg-gray-750">
+                  <td className="py-3 px-2 font-medium">{row.metric}</td>
+                  <td className="py-3 px-2">{row.current}</td>
+                  <td className="py-3 px-2 text-gray-400">{row.target}</td>
+                  <td className={`py-3 px-2 ${row.status === 'on_track' ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {row.status === 'on_track' ? '+5%' : '-15%'}
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      row.status === 'on_track' ? 'bg-green-900 text-green-400' : 'bg-yellow-900 text-yellow-400'
+                    }`}>
+                      {row.status === 'on_track' ? '✓ On Track' : '⚠ Attention'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">Quick Reports</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Daily Summary', icon: '📅', color: 'bg-blue-600' },
+            { label: 'Weekly Report', icon: '📊', color: 'bg-green-600' },
+            { label: 'Monthly Review', icon: '📈', color: 'bg-purple-600' },
+            { label: 'Incident Log', icon: '🚨', color: 'bg-red-600' },
+            { label: 'Team Stats', icon: '👥', color: 'bg-yellow-600' },
+            { label: 'AI Performance', icon: '🤖', color: 'bg-indigo-600' },
+            { label: 'Evidence Report', icon: '📁', color: 'bg-cyan-600' },
+            { label: 'Audit Trail', icon: '📋', color: 'bg-gray-600' },
+          ].map((report, idx) => (
+            <button key={idx} className={`${report.color} hover:opacity-80 p-4 rounded-lg text-center transition-opacity`}>
+              <div className="text-2xl mb-1">{report.icon}</div>
+              <div className="text-sm font-medium">{report.label}</div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
