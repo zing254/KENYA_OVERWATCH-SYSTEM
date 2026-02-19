@@ -82,7 +82,7 @@ interface Camera {
   resolution: string
   fps: number
   risk_score: number
-  detections_last_hour: number
+  cameraDetections_last_hour: number
 }
 
 interface CitizenReport {
@@ -197,8 +197,17 @@ const ProductionDashboard: React.FC = () => {
   const [showCreateIncident, setShowCreateIncident] = useState(false)
   const [incidentFilter, setIncidentFilter] = useState<string>('all')
   const [newIncident, setNewIncident] = useState({
-    title: '', description: '', type: 'emergency', severity: 'medium', location: '', coordinates: { lat: -1.2921, lng: 36.8219 }
+    title: '', description: '', type: 'emergency', severity: 'medium', location: '', vehicle_type: 'saloon', coordinates: { lat: -1.2921, lng: 36.8219 }
   })
+  const [cameraDetections, setCameraDetections] = useState<{id: string; type: string; confidence: number; x: number; y: number; timestamp: string}[]>([])
+  const [selectedCamera, setSelectedCamera] = useState<string>('cam_001')
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordings, setRecordings] = useState<{id: string; camera: string; startTime: string; duration: number; size: string}[]>([])
+  const [showRecordings, setShowRecordings] = useState(false)
+  const [evidenceFilter, setEvidenceFilter] = useState<string>('all')
+  const [selectedEvidence, setSelectedEvidence] = useState<EvidencePackage | null>(null)
+  const [reviewingEvidence, setReviewingEvidence] = useState(false)
+  const [selectedTeam, setSelectedTeam] = useState<ResponseTeam | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => { setIsClient(true) }, [])
@@ -542,7 +551,7 @@ const ProductionDashboard: React.FC = () => {
     }
     setIncidents([incident, ...incidents])
     setShowCreateIncident(false)
-    setNewIncident({ title: '', description: '', type: 'emergency', severity: 'medium', location: '', coordinates: { lat: -1.2921, lng: 36.8219 } })
+    setNewIncident({ title: '', description: '', type: 'emergency', severity: 'medium', location: '', vehicle_type: 'saloon', coordinates: { lat: -1.2921, lng: 36.8219 } })
   }
 
   const renderIncidents = () => {
@@ -676,6 +685,8 @@ const ProductionDashboard: React.FC = () => {
                       <option value="fire">Fire</option>
                       <option value="medical">Medical</option>
                       <option value="suspicious">Suspicious</option>
+                      <option value="traffic">Traffic Incident</option>
+                      <option value="vehicle">Vehicle Related</option>
                     </select>
                   </div>
                   <div>
@@ -692,6 +703,26 @@ const ProductionDashboard: React.FC = () => {
                     </select>
                   </div>
                 </div>
+                {newIncident.type === 'vehicle' && (
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Vehicle Type</label>
+                    <select
+                      value={newIncident.vehicle_type}
+                      onChange={(e) => setNewIncident({...newIncident, vehicle_type: e.target.value})}
+                      className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                    >
+                      <option value="saloon">Saloon Car</option>
+                      <option value=" pickup">Pickup</option>
+                      <option value="lorry">Lorry/Truck</option>
+                      <option value="bus">Bus</option>
+                      <option value="motorcycle">Motorcycle/Bike</option>
+                      <option value="taxi">Taxi/Ride</option>
+                      <option value="matatu">Matatu</option>
+                      <option value="tractor">Tractor</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">Location *</label>
                   <input
@@ -820,25 +851,15 @@ const ProductionDashboard: React.FC = () => {
   )
 
   const renderCameras = () => {
-    const [detections, setDetections] = useState<{id: string; type: string; confidence: number; x: number; y: number; timestamp: string}[]>([])
-    const [selectedCamera, setSelectedCamera] = useState<string>('cam_001')
-    const [isRecording, setIsRecording] = useState(false)
-    const [recordings, setRecordings] = useState<{id: string; camera: string; startTime: string; duration: number; size: string}[]>([
-      { id: '1', camera: 'cam_001', startTime: '2024-01-15 14:30', duration: 15, size: '245 MB' },
-      { id: '2', camera: 'cam_002', startTime: '2024-01-15 14:45', duration: 8, size: '120 MB' },
-      { id: '3', camera: 'cam_001', startTime: '2024-01-15 15:00', duration: 22, size: '380 MB' },
-    ])
-    const [showRecordings, setShowRecordings] = useState(false)
-
     useEffect(() => {
       const mockDetections = [
         { id: '1', type: 'vehicle', confidence: 0.92, x: 20, y: 30, timestamp: new Date().toISOString() },
         { id: '2', type: 'person', confidence: 0.87, x: 60, y: 45, timestamp: new Date().toISOString() },
         { id: '3', type: 'license_plate', confidence: 0.78, x: 45, y: 55, timestamp: new Date().toISOString() },
       ]
-      setDetections(mockDetections)
+      setCameraDetections(mockDetections)
       const interval = setInterval(() => {
-        setDetections([
+        setCameraDetections([
           { id: Date.now().toString(), type: ['vehicle', 'person', 'license_plate'][Math.floor(Math.random()*3)], confidence: 0.7 + Math.random()*0.3, x: Math.random()*80+10, y: Math.random()*60+20, timestamp: new Date().toISOString() }
         ])
       }, 3000)
@@ -856,7 +877,7 @@ const ProductionDashboard: React.FC = () => {
                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>LIVE - YOUR WEBCAM
               </div>
               <div className="absolute top-2 right-2 bg-red-600 px-2 py-1 rounded text-xs font-medium">AI: ON</div>
-              {detections.map(d => (
+              {cameraDetections.map(d => (
                 <div key={d.id} className="absolute border-2 border-green-500 rounded" style={{ left: `${d.x}%`, top: `${d.y}%`, width: '60px', height: '40px' }}>
                   <span className="absolute -top-5 left-0 bg-green-600 text-white text-xs px-1 rounded">{d.type} {(d.confidence*100).toFixed(0)}%</span>
                 </div>
@@ -885,7 +906,7 @@ const ProductionDashboard: React.FC = () => {
               <div className="absolute top-2 left-2 bg-yellow-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
                 <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>AI STREAM - {selectedCamera}
               </div>
-              {detections.map(d => (
+              {cameraDetections.map(d => (
                 <div key={d.id} className="absolute border-2 border-green-500 rounded" style={{ left: `${d.x}%`, top: `${d.y}%`, width: '60px', height: '40px' }}>
                   <span className="absolute -top-5 left-0 bg-green-600 text-white text-xs px-1 rounded">{d.type} {(d.confidence*100).toFixed(0)}%</span>
                 </div>
@@ -910,22 +931,22 @@ const ProductionDashboard: React.FC = () => {
         <h3 className="text-lg font-semibold mb-4">AI Detection & Tracking</h3>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="bg-gray-700 p-3 rounded-lg text-center">
-            <div className="text-2xl font-bold text-green-400">{detections.filter(d => d.type === 'person').length}</div>
+            <div className="text-2xl font-bold text-green-400">{cameraDetections.filter(d => d.type === 'person').length}</div>
             <div className="text-xs text-gray-400">Persons</div>
           </div>
           <div className="bg-gray-700 p-3 rounded-lg text-center">
-            <div className="text-2xl font-bold text-blue-400">{detections.filter(d => d.type === 'vehicle').length}</div>
+            <div className="text-2xl font-bold text-blue-400">{cameraDetections.filter(d => d.type === 'vehicle').length}</div>
             <div className="text-xs text-gray-400">Vehicles</div>
           </div>
           <div className="bg-gray-700 p-3 rounded-lg text-center">
-            <div className="text-2xl font-bold text-yellow-400">{detections.filter(d => d.type === 'license_plate').length}</div>
+            <div className="text-2xl font-bold text-yellow-400">{cameraDetections.filter(d => d.type === 'license_plate').length}</div>
             <div className="text-xs text-gray-400">License Plates</div>
           </div>
         </div>
         <div className="text-sm">
           <div className="font-medium mb-2">Recent Detections</div>
           <div className="space-y-1">
-            {detections.map(d => (
+            {cameraDetections.map(d => (
               <div key={d.id} className="flex justify-between text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 <span>{d.type.toUpperCase()}</span>
                 <span>{(d.confidence * 100).toFixed(1)}% confidence</span>
@@ -999,7 +1020,7 @@ const ProductionDashboard: React.FC = () => {
             <div className="text-sm text-gray-400">{camera.location}</div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-400">
               <div>FPS: {camera.fps}</div>
-              <div>Detections: {camera.detections_last_hour}</div>
+              <div>Detections: {camera.cameraDetections_last_hour}</div>
             </div>
           </div>
         ))}
@@ -1157,9 +1178,29 @@ const ProductionDashboard: React.FC = () => {
               ))}
             </div>
             <div className="mt-3 flex gap-2">
-              <button className="flex-1 bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">Dispatch</button>
-              <button className="flex-1 bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm">Details</button>
+              <button 
+                onClick={() => { setDeploySelectedTeam(team.id); setActiveTab('deploy') }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
+              >
+                Dispatch
+              </button>
+              <button 
+                onClick={() => setSelectedTeam(selectedTeam?.id === team.id ? null : team)}
+                className={`flex-1 px-3 py-1 rounded text-sm ${selectedTeam?.id === team.id ? 'bg-gray-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+              >
+                {selectedTeam?.id === team.id ? 'Hide Details' : 'Details'}
+              </button>
             </div>
+            {selectedTeam?.id === team.id && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="text-sm">
+                  <p><span className="text-gray-400">Team ID:</span> {team.id}</p>
+                  <p><span className="text-gray-400">Location:</span> {team.location?.lat}, {team.location?.lng}</p>
+                  <p><span className="text-gray-400">Current Incident:</span> {team.current_incident || 'None'}</p>
+                  <p><span className="text-gray-400">Last Deployed:</span> {formatTimestamp(team.last_deployed)}</p>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1445,16 +1486,12 @@ const ProductionDashboard: React.FC = () => {
   }
 
   const renderEvidence = () => {
-    const [filterStatus, setFilterStatus] = useState<string>('all')
-    const [selectedEvidence, setSelectedEvidence] = useState<EvidencePackage | null>(null)
-    const [reviewing, setReviewing] = useState(false)
-
-    const filteredEvidence = filterStatus === 'all' 
+    const filteredEvidence = evidenceFilter === 'all' 
       ? evidenceReviewQueue 
-      : evidenceReviewQueue.filter(e => e.status === filterStatus)
+      : evidenceReviewQueue.filter(e => e.status === evidenceFilter)
 
     const handleReview = async (evidenceId: string, decision: 'approve' | 'reject') => {
-      setReviewing(true)
+      setReviewingEvidence(true)
       try {
         await fetch(`http://localhost:8000/api/evidence/${evidenceId}/review`, {
           method: 'POST',
@@ -1465,7 +1502,7 @@ const ProductionDashboard: React.FC = () => {
       } catch (error) {
         console.error('Failed to review evidence:', error)
       }
-      setReviewing(false)
+      setReviewingEvidence(false)
       setSelectedEvidence(null)
     }
 
@@ -1478,9 +1515,9 @@ const ProductionDashboard: React.FC = () => {
               {['all', 'under_review', 'approved', 'rejected'].map(status => (
                 <button
                   key={status}
-                  onClick={() => setFilterStatus(status)}
+                  onClick={() => setEvidenceFilter(status)}
                   className={`px-3 py-1 rounded text-sm ${
-                    filterStatus === status ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
+                    evidenceFilter === status ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
                   }`}
                 >
                   {status.replace('_', ' ').toUpperCase()}

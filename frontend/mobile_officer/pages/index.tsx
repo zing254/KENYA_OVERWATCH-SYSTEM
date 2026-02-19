@@ -395,7 +395,6 @@ export default function ResponderApp() {
                 Close
               </button>
             </div>
-            </div>
           </div>
         )}
       </div>
