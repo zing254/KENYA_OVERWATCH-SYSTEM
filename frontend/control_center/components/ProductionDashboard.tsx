@@ -210,6 +210,22 @@ const ProductionDashboard: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<ResponseTeam | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  // Camera detections effect
+  useEffect(() => {
+    const mockDetections = [
+      { id: '1', type: 'vehicle', confidence: 0.92, x: 20, y: 30, timestamp: new Date().toISOString() },
+      { id: '2', type: 'person', confidence: 0.87, x: 60, y: 45, timestamp: new Date().toISOString() },
+      { id: '3', type: 'license_plate', confidence: 0.78, x: 45, y: 55, timestamp: new Date().toISOString() },
+    ]
+    setCameraDetections(mockDetections)
+    const interval = setInterval(() => {
+      setCameraDetections([
+        { id: Date.now().toString(), type: ['vehicle', 'person', 'license_plate'][Math.floor(Math.random()*3)], confidence: 0.7 + Math.random()*0.3, x: Math.random()*80+10, y: Math.random()*60+20, timestamp: new Date().toISOString() }
+      ])
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
   useEffect(() => { setIsClient(true) }, [])
 
   useEffect(() => {
@@ -851,21 +867,6 @@ const ProductionDashboard: React.FC = () => {
   )
 
   const renderCameras = () => {
-    useEffect(() => {
-      const mockDetections = [
-        { id: '1', type: 'vehicle', confidence: 0.92, x: 20, y: 30, timestamp: new Date().toISOString() },
-        { id: '2', type: 'person', confidence: 0.87, x: 60, y: 45, timestamp: new Date().toISOString() },
-        { id: '3', type: 'license_plate', confidence: 0.78, x: 45, y: 55, timestamp: new Date().toISOString() },
-      ]
-      setCameraDetections(mockDetections)
-      const interval = setInterval(() => {
-        setCameraDetections([
-          { id: Date.now().toString(), type: ['vehicle', 'person', 'license_plate'][Math.floor(Math.random()*3)], confidence: 0.7 + Math.random()*0.3, x: Math.random()*80+10, y: Math.random()*60+20, timestamp: new Date().toISOString() }
-        ])
-      }, 3000)
-      return () => clearInterval(interval)
-    }, [])
-
     return (
     <div className="space-y-6">
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
