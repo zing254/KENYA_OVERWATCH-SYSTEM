@@ -1609,14 +1609,14 @@ const ProductionDashboard: React.FC = () => {
                   <div className="flex gap-2 pt-4">
                     <button
                       onClick={() => handleReview(selectedEvidence.id, 'approve')}
-                      disabled={reviewing}
+                      disabled={reviewingEvidence}
                       className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-medium"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => handleReview(selectedEvidence.id, 'reject')}
-                      disabled={reviewing}
+                      disabled={reviewingEvidence}
                       className="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded font-medium"
                     >
                       Reject
