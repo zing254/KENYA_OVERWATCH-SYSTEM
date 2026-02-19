@@ -1,0 +1,24 @@
+{
+  "dataset": "TUMI Nairobi Mobility Data",
+  "description": "Ready-to-use GeoJSON layers for Nairobi from TUMI Data Hub",
+  "source": "TUMI Data Hub",
+  "source_url": "https://hub.tumidata.org/",
+  "region": "Nairobi",
+  "contents": [
+    "Buildings (GeoJSON)",
+    "Streets complete network (GeoJSON)",
+    "Points of Interest (GeoJSON)",
+    "Land Use (GeoJSON)",
+    "Transport infrastructure (GeoJSON)",
+    "Environmental zones (GeoJSON)"
+  ],
+  "formats": ["GeoJSON", "XLSX"],
+  "use_cases": [
+    "Enhanced map visualization",
+    "Route planning",
+    "POI analysis",
+    "Urban planning integration"
+  ],
+  "integration_priority": "Phase 2 - NICE-TO-HAVE",
+  "status": "requires_download"
+}

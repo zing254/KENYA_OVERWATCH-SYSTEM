@@ -1,0 +1,21 @@
+{
+  "dataset": "Kenya Terrorism Conflict Incidents",
+  "description": "National Counter Terrorism Centre data on terror-related attacks",
+  "source": "openAFRICA",
+  "source_url": "http://openafrica.net/sv/group/armed-conflict?tags=police&tags=bombing",
+  "temporal_coverage": "1975-present",
+  "contents": [
+    "Terror attack locations",
+    "Incident types (bombing, shooting, etc.)",
+    "Casualty counts",
+    "Perpetrator groups"
+  ],
+  "use_cases": [
+    "High-threshold security alerts",
+    "Risk assessment for public spaces",
+    "Threat pattern analysis"
+  ],
+  "integration_priority": "Phase 3 - MEDIUM",
+  "status": "requires_download",
+  "note": "Handle with appropriate sensitivity and legal compliance"
+}

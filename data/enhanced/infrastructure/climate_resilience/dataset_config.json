@@ -1,0 +1,22 @@
+{
+  "dataset": "Kenya Infrastructure Climate Resilience",
+  "description": "Comprehensive climate and infrastructure data for Kenya",
+  "source": "Zenodo - Kenya Infrastructure Starter Kit",
+  "source_url": "https://zenodo.org/records/14536865",
+  "contents": [
+    "Flood hazard maps (river/coastal)",
+    "Extreme heat/drought data",
+    "Tropical cyclone wind speeds",
+    "Power plants & transmission lines",
+    "Elevation data",
+    "Land-use classification"
+  ],
+  "use_cases": [
+    "Climate-aware accident predictions",
+    "Emergency response planning",
+    "Infrastructure resilience assessment",
+    "Flood-prone road warnings"
+  ],
+  "integration_priority": "Phase 3 - MEDIUM",
+  "status": "requires_download"
+}

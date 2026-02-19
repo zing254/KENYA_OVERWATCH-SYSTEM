@@ -1,0 +1,19 @@
+{
+  "dataset": "Crime Mapping Kenya 2015",
+  "description": "Official Kenya Police crime statistics with geolocations",
+  "source": "National Police Service Kenya",
+  "source_url": "https://github.com/louis103/crime-mapping-in-Kenya-2015",
+  "year": "2015",
+  "contents": [
+    "Crime categories with geolocations",
+    "Crime statistics by region",
+    "Offence types and counts"
+  ],
+  "use_cases": [
+    "High-crime area identification",
+    "Security camera placement optimization",
+    "Threat detection model training"
+  ],
+  "integration_priority": "Phase 2 - HIGH",
+  "status": "requires_download"
+}

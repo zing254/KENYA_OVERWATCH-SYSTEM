@@ -1,0 +1,23 @@
+{
+  "dataset": "World Bank Infrastructure Indicators Kenya",
+  "description": "Time-series infrastructure data (1960-2023) from World Bank",
+  "source": "Humanitarian Data Exchange",
+  "source_url": "https://dev.data-humdata-org.ahconu.org/m/dataset/world-bank-infrastructure-indicators-for-kenya",
+  "temporal_coverage": "1960-2023",
+  "contents": [
+    "Road density (km per 100 sq. km)",
+    "Motor vehicles per capita",
+    "Rail lines total (km)",
+    "Container port traffic (TEU)",
+    "Internet/broadband penetration",
+    "Mobile cellular subscriptions"
+  ],
+  "use_cases": [
+    "Long-term trend analysis",
+    "Infrastructure planning",
+    "Economic impact assessment",
+    "Growth predictions"
+  ],
+  "integration_priority": "Phase 3 - MEDIUM",
+  "status": "requires_download"
+}

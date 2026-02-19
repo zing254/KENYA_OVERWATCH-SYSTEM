@@ -1,0 +1,22 @@
+{
+  "dataset": "Kenya Road Traffic Crashes 2012-2023",
+  "description": "11+ years of road crash data from Ma3Route crowdsourced reports",
+  "source": "World Bank Microdata Library",
+  "source_url": "https://microdata.worldbank.org/index.php/catalog/6249",
+  "temporal_coverage": "2012-2023",
+  "contents": [
+    "Geolocated crash locations (primarily Nairobi)",
+    "Timestamps for temporal pattern analysis",
+    "Crash severity classifications",
+    "Vehicle types involved"
+  ],
+  "use_cases": [
+    "Accident hotspot identification",
+    "Predictive analytics",
+    "Temporal pattern analysis",
+    "Risk factor modeling"
+  ],
+  "integration_priority": "Phase 1 - CRITICAL",
+  "status": "requires_download",
+  "download_instructions": "Register at World Bank Microdata Library and download the dataset"
+}
