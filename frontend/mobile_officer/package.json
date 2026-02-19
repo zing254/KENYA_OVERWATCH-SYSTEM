@@ -1,12 +1,12 @@
 {
-  "name": "kenya-overwatch-responder",
+  "name": "kenya-overwatch-citizen-portal",
   "version": "1.0.0",
-  "description": "Kenya Overwatch Responder/Mobile Officer App",
+  "description": "Kenya Overwatch Citizen Portal for reporting emergencies",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start -p 3002",
+    "start": "next start -p 3001",
     "lint": "next lint"
   },
   "dependencies": {
@@ -14,8 +14,7 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "lucide-react": "0.294.0",
-    "axios": "1.6.2",
-    "recharts": "2.8.0"
+    "axios": "1.6.2"
   },
   "devDependencies": {
     "@types/node": "20.9.2",

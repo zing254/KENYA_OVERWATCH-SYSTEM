@@ -10,14 +10,14 @@ import {
   Clock, 
   Shield,
   Navigation,
-  Eye,
   ChevronRight,
   RefreshCw,
   Users,
-  Activity,
   Bell,
   X,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Send
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -55,12 +55,13 @@ export default function ResponderApp() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [activeTab, setActiveTab] = useState<'incidents' | 'my-team' | 'map' | 'chat'>('incidents')
+  const [activeTab, setActiveTab] = useState<string>('incidents')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string}[]>([])
   const [newMessage, setNewMessage] = useState('')
+  const [myTeam, setMyTeam] = useState<Team | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -77,6 +78,7 @@ export default function ResponderApp() {
       
       setIncidents(Array.isArray(incidentsData) ? incidentsData : incidentsData?.incidents || [])
       setTeams(teamsData?.teams || [])
+      setMyTeam(teamsData?.teams?.[0] || null)
       setNotifications(notifData?.notifications || [])
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -114,7 +116,23 @@ export default function ResponderApp() {
     }
   }
 
-  const myTeam = teams[0]
+  const sendMessage = () => {
+    if (!newMessage.trim()) return
+    setChatMessages([...chatMessages, {
+      id: Date.now().toString(),
+      sender: 'You',
+      message: newMessage,
+      timestamp: new Date().toISOString()
+    }])
+    setNewMessage('')
+  }
+
+  const tabs = [
+    { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+    { id: 'team', label: 'My Team', icon: Users },
+    { id: 'map', label: 'Map', icon: MapPin },
+    { id: 'chat', label: 'Chat', icon: MessageSquare },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -148,50 +166,69 @@ export default function ResponderApp() {
           </div>
         </div>
         
-        <div className="flex border-b border-gray-700">
-          <button
-            onClick={() => setActiveTab('incidents')}
-            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-              activeTab === 'incidents' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4" />
-            Incidents
-            {incidents.filter(i => i.status === 'active').length > 0 && (
-              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                {incidents.filter(i => i.status === 'active').length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('my-team')}
-            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-              activeTab === 'my-team' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            My Team
-          </button>
-          <button
-            onClick={() => setActiveTab('map')}
-            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-              activeTab === 'map' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
-            }`}
-          >
-            <MapPin className="w-4 h-4" />
-            Map
-          </button>
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-              activeTab === 'chat' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
-            }`}
-          >
-            <Bell className="w-4 h-4" />
-            Chat
-          </button>
+        <div className="flex border-b border-gray-700 overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-3 px-2 text-xs font-medium flex items-center justify-center gap-1 whitespace-nowrap ${
+                activeTab === tab.id ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              {tab.id === 'incidents' && incidents.filter(i => i.status === 'active').length > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">
+                  {incidents.filter(i => i.status === 'active').length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </header>
+
+      {showNotifications && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-16 px-4" onClick={() => setShowNotifications(false)}>
+          <div className="bg-gray-800 w-full max-w-md rounded-2xl p-4 max-h-[60vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <Bell className="w-5 h-5 text-yellow-400" />
+                Notifications
+              </h2>
+              <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {notifications.length === 0 ? (
+                <p className="text-gray-400 text-center py-4">No notifications</p>
+              ) : (
+                notifications.slice(0, 10).map(notif => (
+                  <div key={notif.id} className={`p-3 rounded-lg ${
+                    notif.severity === 'critical' ? 'bg-red-900 border border-red-600' :
+                    notif.severity === 'high' ? 'bg-orange-900 border border-orange-600' :
+                    'bg-gray-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                        notif.severity === 'critical' ? 'text-red-400' :
+                        notif.severity === 'high' ? 'text-orange-400' : 'text-gray-400'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{notif.title}</div>
+                        <div className="text-xs text-gray-400 mt-1">{notif.message}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {new Date(notif.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="p-4">
         {loading ? (
@@ -244,7 +281,7 @@ export default function ResponderApp() {
               ))
             )}
           </div>
-        ) : activeTab === 'my-team' ? (
+        ) : activeTab === 'team' ? (
           <div className="space-y-4">
             {myTeam ? (
               <>
@@ -283,26 +320,6 @@ export default function ResponderApp() {
                     </button>
                   </div>
                 </div>
-
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h3 className="font-medium mb-3">Update Status</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['available', 'en_route', 'on_scene'].map(status => (
-                      <button
-                        key={status}
-                        disabled={updatingStatus}
-                        onClick={() => {}}
-                        className={`py-2 rounded-lg text-sm font-medium ${
-                          status === 'available' ? 'bg-green-600 hover:bg-green-700' :
-                          status === 'en_route' ? 'bg-blue-600 hover:bg-blue-700' :
-                          'bg-purple-600 hover:bg-purple-700'
-                        }`}
-                      >
-                        {status.replace('_', ' ').toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </>
             ) : (
               <div className="text-center py-12 text-gray-400">
@@ -311,7 +328,7 @@ export default function ResponderApp() {
               </div>
             )}
           </div>
-            ) : (
+        ) : activeTab === 'map' ? (
           <div className="space-y-4">
             <h2 className="font-semibold">Incident Map - Nairobi</h2>
             <div className="bg-gray-800 rounded-lg p-4">
@@ -326,7 +343,7 @@ export default function ResponderApp() {
                 {incidents.filter(i => i.status === 'active').length === 0 ? (
                   <p className="text-gray-500 text-sm">No active incidents</p>
                 ) : (
-                  incidents.filter(i => i.status === 'active').map(incident => (
+                  incidents.filter(i => i.status === 'active').slice(0, 5).map(incident => (
                     <div 
                       key={incident.id}
                       onClick={() => { setSelectedIncident(incident); setActiveTab('incidents') }}
@@ -345,12 +362,46 @@ export default function ResponderApp() {
               </div>
             </div>
           </div>
+        ) : (
+          <div className="space-y-4">
+            <h2 className="font-semibold">Communication</h2>
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="bg-gray-900 rounded-lg p-3 h-80 overflow-y-auto space-y-2 mb-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-gray-500 text-center text-sm">No messages from dispatch</p>
+                ) : (
+                  chatMessages.map(msg => (
+                    <div key={msg.id} className="bg-gray-700 p-2 rounded">
+                      <div className="text-xs text-blue-400">{msg.sender}</div>
+                      <div className="text-sm">{msg.message}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Message dispatch..."
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                />
+                <button
+                  onClick={sendMessage}
+                  className="bg-blue-600 px-3 py-2 rounded text-sm"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
 
       {selectedIncident && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-          <div className="bg-gray-800 w-full rounded-t-2xl p-4 max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end" onClick={() => setSelectedIncident(null)}>
+          <div className="bg-gray-800 w-full rounded-t-2xl p-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-1 rounded text-xs font-bold ${getSeverityColor(selectedIncident.severity)}`}>
@@ -396,85 +447,8 @@ export default function ResponderApp() {
               </button>
             </div>
           </div>
-        )}
-      </div>
-
-      {showNotifications && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-20">
-          <div className="bg-gray-800 w-full mx-4 rounded-2xl p-4 max-h-[60vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg flex items-center gap-2">
-                <Bell className="w-5 h-5 text-yellow-400" />
-                Notifications
-              </h2>
-              <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {notifications.length === 0 ? (
-                <p className="text-gray-400 text-center py-4">No notifications</p>
-              ) : (
-                notifications.slice(0, 10).map(notif => (
-                  <div key={notif.id} className={`p-3 rounded-lg ${
-                    notif.severity === 'critical' ? 'bg-red-900 border border-red-600' :
-                    notif.severity === 'high' ? 'bg-orange-900 border border-orange-600' :
-                    'bg-gray-700'
-                  }`}>
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className={`w-4 h-4 mt-0.5 ${
-                        notif.severity === 'critical' ? 'text-red-400' :
-                        notif.severity === 'high' ? 'text-orange-400' : 'text-gray-400'
-                      }`} />
-                      <div>
-                        <div className="font-medium text-sm">{notif.title}</div>
-                        <div className="text-xs text-gray-400 mt-1">{notif.message}</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {new Date(notif.created_at).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            </div>
-          </div>
-        ) : activeTab === 'chat' ? (
-          <div className="space-y-4">
-            <h2 className="font-semibold">Communication</h2>
-            <div className="bg-gray-800 rounded-lg p-4">
-              <div className="bg-gray-900 rounded-lg p-3 h-80 overflow-y-auto space-y-2 mb-3">
-                {chatMessages.length === 0 ? (
-                  <p className="text-gray-500 text-center text-sm">No messages from dispatch</p>
-                ) : (
-                  chatMessages.map(msg => (
-                    <div key={msg.id} className="bg-gray-700 p-2 rounded">
-                      <div className="text-xs text-blue-400">{msg.sender}</div>
-                      <div className="text-sm">{msg.message}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && setChatMessages([...chatMessages, {id: Date.now().toString(), sender: 'You', message: newMessage, timestamp: new Date().toISOString()}])}
-                  placeholder="Message dispatch..."
-                  className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
-                />
-                <button
-                  onClick={() => { if(newMessage) { setChatMessages([...chatMessages, {id: Date.now().toString(), sender: 'You', message: newMessage, timestamp: new Date().toISOString()}]); setNewMessage('') }}}
-                  className="bg-blue-600 px-3 py-2 rounded text-sm"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
+      )}
     </div>
   )
 }

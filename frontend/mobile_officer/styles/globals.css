@@ -4,8 +4,11 @@
 
 :root {
   --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --emergency: #dc2626;
+  --success: #16a34a;
 }
 
 body {
-  background-color: #111827;
+  background-color: #f9fafb;
 }
