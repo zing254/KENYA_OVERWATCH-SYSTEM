@@ -162,7 +162,7 @@ interface AnalyticsCharts {
   detection_accuracy: { model: string; accuracy: number }[]
 }
 
-type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'deploy' | 'evidence' | 'chat'
+type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'deploy' | 'evidence' | 'chat' | 'incidents'
 
 const ProductionDashboard: React.FC = () => {
   const [incidents, setIncidents] = useState<ProductionIncident[]>([])
@@ -194,6 +194,11 @@ const ProductionDashboard: React.FC = () => {
   const [deployStatus, setDeployStatus] = useState<string>('')
   const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string; type: string}[]>([])
   const [newMessage, setNewMessage] = useState('')
+  const [showCreateIncident, setShowCreateIncident] = useState(false)
+  const [incidentFilter, setIncidentFilter] = useState<string>('all')
+  const [newIncident, setNewIncident] = useState({
+    title: '', description: '', type: 'emergency', severity: 'medium', location: '', coordinates: { lat: -1.2921, lng: 36.8219 }
+  })
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => { setIsClient(true) }, [])
@@ -329,11 +334,12 @@ const ProductionDashboard: React.FC = () => {
 
   const tabs: { id: TabType; label: string; icon: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'incidents', label: 'Incidents', icon: '🚨' },
     { id: 'cameras', label: 'Cameras', icon: '📹' },
     { id: 'map', label: 'Map', icon: '🗺️' },
     { id: 'reports', label: 'Reports', icon: '📋' },
     { id: 'teams', label: 'Teams', icon: '👥' },
-    { id: 'dispatch', label: 'Dispatch', icon: '🚨' },
+    { id: 'dispatch', label: 'Dispatch', icon: '🚑' },
     { id: 'deploy', label: 'Deploy & Response', icon: '🚀' },
     { id: 'evidence', label: 'Evidence', icon: '📁' },
     { id: 'chat', label: 'Chat', icon: '💬' },
@@ -509,6 +515,214 @@ const ProductionDashboard: React.FC = () => {
       </div>
     </div>
   )
+
+  const createIncident = () => {
+    if (!newIncident.title || !newIncident.location) return
+    const incident: ProductionIncident = {
+      id: `INC-${Date.now()}`,
+      type: newIncident.type,
+      title: newIncident.title,
+      description: newIncident.description,
+      location: newIncident.location,
+      coordinates: newIncident.coordinates,
+      severity: newIncident.severity as 'low' | 'medium' | 'high' | 'critical',
+      status: 'active',
+      risk_assessment: {
+        risk_score: newIncident.severity === 'critical' ? 0.9 : newIncident.severity === 'high' ? 0.7 : newIncident.severity === 'medium' ? 0.5 : 0.3,
+        risk_level: newIncident.severity as 'low' | 'medium' | 'high' | 'critical',
+        factors: { temporal_risk: 0.5, spatial_risk: 0.5, behavioral_risk: 0.5, contextual_risk: 0.5, reason_codes: [] },
+        recommended_action: 'Dispatch response team',
+        confidence: 0.85,
+        timestamp: new Date().toISOString()
+      },
+      evidence_packages: [],
+      created_at: new Date().toISOString(),
+      requires_human_review: newIncident.severity === 'critical',
+      human_review_completed: false
+    }
+    setIncidents([incident, ...incidents])
+    setShowCreateIncident(false)
+    setNewIncident({ title: '', description: '', type: 'emergency', severity: 'medium', location: '', coordinates: { lat: -1.2921, lng: 36.8219 } })
+  }
+
+  const renderIncidents = () => {
+    const filteredIncidents = incidentFilter === 'all' ? incidents : incidents.filter(i => i.status === incidentFilter)
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Incident Management</h2>
+          <button
+            onClick={() => setShowCreateIncident(true)}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+          >
+            + Create Incident
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          {['all', 'active', 'responding', 'resolved', 'under_review'].map(filter => (
+            <button
+              key={filter}
+              onClick={() => setIncidentFilter(filter)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                incidentFilter === filter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
+              }`}
+            >
+              {filter.replace('_', ' ').toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-4">
+          {filteredIncidents.length === 0 ? (
+            <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400">
+              No incidents found
+            </div>
+          ) : (
+            filteredIncidents.map(incident => (
+              <div key={incident.id} className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded text-sm font-bold ${
+                      incident.severity === 'critical' ? 'bg-red-600 text-white' :
+                      incident.severity === 'high' ? 'bg-orange-500 text-white' :
+                      incident.severity === 'medium' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'
+                    }`}>
+                      {incident.severity.toUpperCase()}
+                    </span>
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      incident.status === 'active' ? 'bg-red-900 text-red-400' :
+                      incident.status === 'responding' ? 'bg-blue-900 text-blue-400' :
+                      incident.status === 'resolved' ? 'bg-green-900 text-green-400' : 'bg-gray-700'
+                    }`}>
+                      {incident.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-400">{new Date(incident.created_at).toLocaleString()}</div>
+                </div>
+                <h3 className="text-lg font-semibold mb-1">{incident.title}</h3>
+                <p className="text-gray-400 text-sm mb-2">{incident.description}</p>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span>📍 {incident.location}</span>
+                  <span>Type: {incident.type}</span>
+                  <span>ID: {incident.id}</span>
+                </div>
+                {incident.risk_assessment && (
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Risk Score: <span className={`font-bold ${
+                        incident.risk_assessment.risk_level === 'critical' ? 'text-red-400' :
+                        incident.risk_assessment.risk_level === 'high' ? 'text-orange-400' : 'text-yellow-400'
+                      }`}>{(incident.risk_assessment.risk_score * 100).toFixed(0)}%</span></span>
+                      <span className="text-gray-400">Confidence: {(incident.risk_assessment.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => { setSelectedIncident(incident); setActiveTab('dispatch') }}
+                    className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
+                  >
+                    Dispatch
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('evidence')}
+                    className="bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-sm"
+                  >
+                    View Evidence
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {showCreateIncident && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+              <h3 className="text-xl font-bold mb-4">Create New Incident</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={newIncident.title}
+                    onChange={(e) => setNewIncident({...newIncident, title: e.target.value})}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                    placeholder="Incident title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Description</label>
+                  <textarea
+                    value={newIncident.description}
+                    onChange={(e) => setNewIncident({...newIncident, description: e.target.value})}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white h-24"
+                    placeholder="Describe the incident"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Type</label>
+                    <select
+                      value={newIncident.type}
+                      onChange={(e) => setNewIncident({...newIncident, type: e.target.value})}
+                      className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                    >
+                      <option value="emergency">Emergency</option>
+                      <option value="crime">Crime</option>
+                      <option value="accident">Accident</option>
+                      <option value="fire">Fire</option>
+                      <option value="medical">Medical</option>
+                      <option value="suspicious">Suspicious</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Severity</label>
+                    <select
+                      value={newIncident.severity}
+                      onChange={(e) => setNewIncident({...newIncident, severity: e.target.value})}
+                      className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Location *</label>
+                  <input
+                    type="text"
+                    value={newIncident.location}
+                    onChange={(e) => setNewIncident({...newIncident, location: e.target.value})}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white"
+                    placeholder="Enter location"
+                  />
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={createIncident}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded font-medium"
+                  >
+                    Create Incident
+                  </button>
+                  <button
+                    onClick={() => setShowCreateIncident(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 py-2 rounded font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const renderDashboard = () => (
     <>
@@ -1568,6 +1782,7 @@ const ProductionDashboard: React.FC = () => {
       </header>
       <main className="p-6">
         {activeTab === 'dashboard' && renderDashboard()}
+        {activeTab === 'incidents' && renderIncidents()}
         {activeTab === 'cameras' && renderCameras()}
         {activeTab === 'map' && renderMap()}
         {activeTab === 'reports' && renderReports()}
