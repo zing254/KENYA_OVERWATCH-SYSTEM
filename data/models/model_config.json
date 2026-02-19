@@ -1,0 +1,12 @@
+{
+  "models": {
+    "vehicle_classifier": "/home/zingri/Desktop/HACKATHON/kenya-overwatch-production/data/models/vehicle_classifier.pkl"
+  },
+  "classes": [
+    "car",
+    "truck",
+    "bus",
+    "motorcycle"
+  ],
+  "created_at": "2026-02-18T20:21:56.181777"
+}

@@ -1,0 +1,16 @@
+{
+  "dataset": "Kenya Accidents Analysis",
+  "directory": "/home/zingri/Desktop/HACKATHON/kenya-overwatch-production/data/enhanced/kenya/accidents",
+  "files": [
+    "Kenya-Accidents-Analysis.ipynb",
+    "README.md",
+    "dataset_config.json"
+  ],
+  "analysis_available": true,
+  "use_cases": [
+    "Temporal pattern analysis",
+    "Hotspot identification",
+    "Risk factor modeling",
+    "Response time optimization"
+  ]
+}

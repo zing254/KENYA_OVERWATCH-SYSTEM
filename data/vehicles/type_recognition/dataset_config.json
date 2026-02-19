@@ -1,0 +1,15 @@
+{
+  "dataset": "vehicle_type_recognition",
+  "categories": [
+    "car",
+    "truck",
+    "bus",
+    "motorcycle"
+  ],
+  "num_classes": 4,
+  "image_size": [
+    224,
+    224
+  ],
+  "source": "Kaggle"
+}

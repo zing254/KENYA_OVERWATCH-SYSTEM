@@ -1,11 +1,10 @@
-"""
-Frontend Tests for Kenya Overwatch Production System
-"""
+/**
+ * Frontend Tests for Kenya Overwatch Production System
+ */
 
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from 'react-query'
-import { BrowserRouter } from 'react-router-dom'
 import ProductionDashboard from '../components/ProductionDashboard'
 import AlertCard from '../components/AlertCard'
 import IncidentCard from '../components/IncidentCard'
@@ -22,9 +21,7 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        {children}
-      </BrowserRouter>
+      {children}
     </QueryClientProvider>
   )
 }

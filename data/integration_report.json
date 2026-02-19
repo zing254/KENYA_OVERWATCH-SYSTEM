@@ -1,0 +1,132 @@
+{
+  "timestamp": "2026-02-19T16:00:34.491047",
+  "datasets": {
+    "geospatial": {
+      "status": "connected",
+      "data": {
+        "osm": {
+          "dataset": "OpenStreetMap Kenya",
+          "file_size_mb": 52.0,
+          "status": "processing_limited",
+          "note": "Full extraction requires more memory"
+        },
+        "pois": {
+          "police_stations": {
+            "description": "Police stations across Kenya",
+            "sources": [
+              "OSM Kenya",
+              "National Police Service Kenya"
+            ],
+            "count_estimate": 1000,
+            "importance": "Critical for emergency response"
+          },
+          "hospitals": {
+            "description": "Hospitals and medical facilities",
+            "sources": [
+              "OSM Kenya",
+              "Ministry of Health"
+            ],
+            "count_estimate": 500,
+            "importance": "Emergency medical response"
+          },
+          "fire_stations": {
+            "description": "Fire and rescue stations",
+            "sources": [
+              "OSM Kenya",
+              "Nairobi Fire Brigade"
+            ],
+            "count_estimate": 100,
+            "importance": "Fire and disaster response"
+          },
+          "schools": {
+            "description": "Educational institutions",
+            "sources": [
+              "OSM Kenya",
+              "Ministry of Education"
+            ],
+            "count_estimate": 30000,
+            "importance": "Zone monitoring for child safety"
+          },
+          "banks": {
+            "description": "Banks and financial institutions",
+            "sources": [
+              "OSM Kenya",
+              "Central Bank of Kenya"
+            ],
+            "count_estimate": 3000,
+            "importance": "High-security zone monitoring"
+          }
+        },
+        "accidents": {
+          "dataset": "Kenya Accidents Analysis",
+          "directory": "/home/zingri/Desktop/HACKATHON/kenya-overwatch-production/data/enhanced/kenya/accidents",
+          "files": [
+            "Kenya-Accidents-Analysis.ipynb",
+            "README.md",
+            "dataset_config.json"
+          ],
+          "analysis_available": true,
+          "use_cases": [
+            "Temporal pattern analysis",
+            "Hotspot identification",
+            "Risk factor modeling",
+            "Response time optimization"
+          ]
+        }
+      }
+    },
+    "vehicles": {
+      "status": "connected",
+      "data": {
+        "uvh26": {
+          "dataset": "UVH-26",
+          "description": "Indian Urban Vehicle Dataset - highly relevant for Kenya traffic",
+          "source": "HuggingFace - aimiisc/UVH-26",
+          "classes": [
+            "two_wheeler",
+            "auto_rickshaw",
+            "car",
+            "bus",
+            "truck",
+            "light_commercial_vehicle",
+            "animal",
+            "other"
+          ],
+          "num_images": 26646,
+          "bounding_boxes": 1800000,
+          "note": "Download manually from HuggingFace for full dataset"
+        }
+      }
+    },
+    "training": {
+      "status": "connected",
+      "data": {
+        "samples": {
+          "car": 10,
+          "truck": 10,
+          "bus": 10,
+          "motorcycle": 10,
+          "plates": 20
+        },
+        "data_yaml": "\n# Kenya Overwatch Dataset Configuration\n# YOLO Format\n\n# Dataset paths\npath: /home/zingri/Desktop/HACKATHON/kenya-overwatch-production/data\ntrain: training/samples/vehicle_type/car\ntrain: training/samples/vehicle_type/truck\ntrain: training/samples/vehicle_type/bus\ntrain: training/samples/vehicle_type/motorcycle\n\n# Number of classes\nnc: 4\n\n# Class names\nnames:\n  0: car\n  1: truck\n  2: bus\n  3: motorcycle\n"
+      }
+    },
+    "models": {
+      "status": "connected",
+      "config": {
+        "models": {
+          "vehicle_classifier": "/home/zingri/Desktop/HACKATHON/kenya-overwatch-production/data/models/vehicle_classifier.pkl"
+        },
+        "classes": [
+          "car",
+          "truck",
+          "bus",
+          "motorcycle"
+        ],
+        "created_at": "2026-02-18T20:21:56.181777"
+      }
+    }
+  },
+  "pipeline_status": "connected",
+  "errors": []
+}

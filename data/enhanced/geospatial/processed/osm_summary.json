@@ -1,0 +1,6 @@
+{
+  "dataset": "OpenStreetMap Kenya",
+  "file_size_mb": 52.0,
+  "status": "processing_limited",
+  "note": "Full extraction requires more memory"
+}

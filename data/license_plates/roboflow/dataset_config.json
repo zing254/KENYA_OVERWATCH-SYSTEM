@@ -1,0 +1,10 @@
+{
+  "dataset": "license_plates",
+  "format": "yolo",
+  "classes": [
+    "license_plate"
+  ],
+  "source": "Roboflow",
+  "train_samples": 0,
+  "valid_samples": 0
+}

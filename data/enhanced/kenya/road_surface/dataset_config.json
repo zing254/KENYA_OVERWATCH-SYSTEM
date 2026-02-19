@@ -1,0 +1,12 @@
+{
+  "dataset": "Kenya Road Surface Type",
+  "description": "1,267,818 road segments classified as paved/unpaved",
+  "source": "Scientific Data - Springer Nature",
+  "accuracy": ">94% F1 score",
+  "num_segments": 1267818,
+  "classes": [
+    "paved",
+    "unpaved"
+  ],
+  "note": "Request access from Nature Scientific Data"
+}

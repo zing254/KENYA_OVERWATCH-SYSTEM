@@ -1,0 +1,18 @@
+{
+  "dataset": "UVH-26",
+  "description": "Indian Urban Vehicle Dataset - highly relevant for Kenya traffic",
+  "source": "HuggingFace - aimiisc/UVH-26",
+  "classes": [
+    "two_wheeler",
+    "auto_rickshaw",
+    "car",
+    "bus",
+    "truck",
+    "light_commercial_vehicle",
+    "animal",
+    "other"
+  ],
+  "num_images": 26646,
+  "bounding_boxes": 1800000,
+  "note": "Download manually from HuggingFace for full dataset"
+}

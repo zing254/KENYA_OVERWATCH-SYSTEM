@@ -1,0 +1,47 @@
+{
+  "police_stations": {
+    "description": "Police stations across Kenya",
+    "sources": [
+      "OSM Kenya",
+      "National Police Service Kenya"
+    ],
+    "count_estimate": 1000,
+    "importance": "Critical for emergency response"
+  },
+  "hospitals": {
+    "description": "Hospitals and medical facilities",
+    "sources": [
+      "OSM Kenya",
+      "Ministry of Health"
+    ],
+    "count_estimate": 500,
+    "importance": "Emergency medical response"
+  },
+  "fire_stations": {
+    "description": "Fire and rescue stations",
+    "sources": [
+      "OSM Kenya",
+      "Nairobi Fire Brigade"
+    ],
+    "count_estimate": 100,
+    "importance": "Fire and disaster response"
+  },
+  "schools": {
+    "description": "Educational institutions",
+    "sources": [
+      "OSM Kenya",
+      "Ministry of Education"
+    ],
+    "count_estimate": 30000,
+    "importance": "Zone monitoring for child safety"
+  },
+  "banks": {
+    "description": "Banks and financial institutions",
+    "sources": [
+      "OSM Kenya",
+      "Central Bank of Kenya"
+    ],
+    "count_estimate": 3000,
+    "importance": "High-security zone monitoring"
+  }
+}

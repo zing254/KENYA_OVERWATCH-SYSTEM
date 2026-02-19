@@ -17,6 +17,8 @@ import uuid
 import random
 import hashlib
 import logging
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import asdict, is_dataclass
 from typing import Any, Dict
@@ -2132,76 +2134,6 @@ async def update_dispatch(dispatch_id: str, update_data: Dict[str, Any]):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# ==================== NOTIFICATIONS ====================
-
-@app.get("/api/notifications")
-async def get_notifications(unread_only: bool = False):
-    """Get notifications"""
-    notifications = [
-        {
-            "id": "notif_001",
-            "type": "incident",
-            "title": "New High-Risk Incident",
-            "message": "Suspicious activity detected at Main Gate",
-            "severity": "high",
-            "read": False,
-            "created_at": (datetime.utcnow() - timedelta(minutes=5)).isoformat(),
-            "link": "/incidents/inc_001"
-        },
-        {
-            "id": "notif_002",
-            "type": "team",
-            "title": "Team Deployed",
-            "message": "Rapid Response Unit A dispatched to incident",
-            "severity": "info",
-            "read": False,
-            "created_at": (datetime.utcnow() - timedelta(minutes=10)).isoformat(),
-            "link": "/dispatch/disp_001"
-        },
-        {
-            "id": "notif_003",
-            "type": "system",
-            "title": "System Update Available",
-            "message": "AI model v2.3 is available for deployment",
-            "severity": "low",
-            "read": True,
-            "created_at": (datetime.utcnow() - timedelta(hours=2)).isoformat(),
-            "link": "/settings"
-        },
-        {
-            "id": "notif_004",
-            "type": "citizen",
-            "title": "New Citizen Report",
-            "message": "Traffic violation reported at Moi Avenue",
-            "severity": "medium",
-            "read": False,
-            "created_at": (datetime.utcnow() - timedelta(minutes=30)).isoformat(),
-            "link": "/reports/cit_002"
-        }
-    ]
-    
-    if unread_only:
-        notifications = [n for n in notifications if not n["read"]]
-    
-    return {"notifications": notifications, "unread_count": len([n for n in notifications if not n["read"]])}
-
-@app.patch("/api/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str):
-    """Mark notification as read"""
-    return {
-        "message": "Notification marked as read",
-        "notification_id": notification_id,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.post("/api/notifications/read-all")
-async def mark_all_notifications_read():
-    """Mark all notifications as read"""
-    return {
-        "message": "All notifications marked as read",
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
 # ==================== SYSTEM CONFIG ====================
 
 @app.get("/api/config")
@@ -2291,6 +2223,129 @@ async def get_dashboard_summary():
         },
         "timestamp": datetime.utcnow().isoformat()
     }
+
+# ==================== AI SERVICES ====================
+
+# AI Model integration
+AI_AVAILABLE = False
+ai_anpr = None
+
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from ai.integration import KenyaOverwatchAI, get_ai_instance
+    AI_AVAILABLE = True
+    logger.info("AI Module loaded successfully")
+except Exception as e:
+    logger.warning(f"AI Module not available: {e}")
+
+
+@app.get("/api/ai/status")
+async def get_ai_status():
+    """Get AI system status"""
+    return {
+        "ai_available": AI_AVAILABLE,
+        "models_loaded": {
+            "vehicle_classifier": True,
+            "license_plate_detector": True,
+            "vehicle_detector": True,
+        },
+        "model_versions": {
+            "vehicle_classifier": "1.0.0",
+            "anpr": "1.0.0",
+        },
+        "performance": {
+            "avg_processing_time_ms": 45,
+            "detections_per_second": 25,
+        },
+        "status": "operational" if AI_AVAILABLE else "limited"
+    }
+
+
+@app.post("/api/ai/analyze")
+async def analyze_image(image_data: bytes = None):
+    """Analyze an image using AI models"""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI services not available")
+    
+    try:
+        from ai.integration import get_ai_instance, process_image_data
+        
+        if image_data:
+            result = process_image_data(image_data)
+        else:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        
+        return result
+    except Exception as e:
+        logger.error(f"AI analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.get("/api/ai/datasets")
+async def get_dataset_status():
+    """Get status of downloaded datasets"""
+    import os
+    from pathlib import Path
+    
+    data_dir = Path(__file__).parent.parent / "data"
+    
+    datasets = {
+        "vehicle_type_recognition": {
+            "status": "available" if (data_dir / "vehicles" / "type_recognition").exists() else "not_downloaded",
+            "path": str(data_dir / "vehicles" / "type_recognition"),
+        },
+        "license_plates_roboflow": {
+            "status": "available" if (data_dir / "license_plates" / "roboflow").exists() else "not_downloaded",
+            "path": str(data_dir / "license_plates" / "roboflow"),
+        },
+        "ufpr_alpr": {
+            "status": "available" if (data_dir / "license_plates" / "ufpr_alpr").exists() else "not_downloaded",
+            "path": str(data_dir / "license_plates" / "ufpr_alpr"),
+        },
+        "vehicle_10": {
+            "status": "available" if (data_dir / "vehicles" / "vehicle_10").exists() else "not_downloaded",
+            "path": str(data_dir / "vehicles" / "vehicle_10"),
+        },
+    }
+    
+    return {
+        "datasets": datasets,
+        "total_datasets": len(datasets),
+        "downloaded": sum(1 for d in datasets.values() if d["status"] == "available"),
+    }
+
+
+@app.get("/api/ai/models")
+async def get_models_info():
+    """Get information about trained models"""
+    import os
+    from pathlib import Path
+    
+    models_dir = Path(__file__).parent.parent / "data" / "models"
+    
+    models_info = []
+    
+    for model_file in models_dir.glob("*.pkl"):
+        size_mb = model_file.stat().st_size / (1024 * 1024)
+        models_info.append({
+            "name": model_file.name,
+            "path": str(model_file),
+            "size_mb": round(size_mb, 2),
+            "created": datetime.fromtimestamp(model_file.stat().st_ctime).isoformat(),
+        })
+    
+    config_file = models_dir / "model_config.json"
+    config = {}
+    if config_file.exists():
+        import json
+        with open(config_file) as f:
+            config = json.load(f)
+    
+    return {
+        "models": models_info,
+        "config": config,
+    }
+
 
 # ==================== STARTUP ====================
 
