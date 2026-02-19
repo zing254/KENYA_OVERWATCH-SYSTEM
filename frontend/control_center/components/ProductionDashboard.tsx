@@ -5,9 +5,11 @@
 
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 import { Bell, X, Check, AlertTriangle, AlertCircle, MapPin, Send, Play, Pause, RefreshCw } from 'lucide-react'
+
+const LiveMap = lazy(() => import('@/components/LiveMap'))
 
 interface ProductionIncident {
   id: string
@@ -160,7 +162,7 @@ interface AnalyticsCharts {
   detection_accuracy: { model: string; accuracy: number }[]
 }
 
-type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'deploy'
+type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'deploy' | 'evidence' | 'chat'
 
 const ProductionDashboard: React.FC = () => {
   const [incidents, setIncidents] = useState<ProductionIncident[]>([])
@@ -185,6 +187,13 @@ const ProductionDashboard: React.FC = () => {
   const [useWebcamDirect, setUseWebcamDirect] = useState(false)
   const [cameraError, setCameraError] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [deploySelectedTeam, setDeploySelectedTeam] = useState<string>('')
+  const [deploySelectedIncident, setDeploySelectedIncident] = useState<string>('')
+  const [deployMessage, setDeployMessage] = useState('')
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deployStatus, setDeployStatus] = useState<string>('')
+  const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string; type: string}[]>([])
+  const [newMessage, setNewMessage] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => { setIsClient(true) }, [])
@@ -326,6 +335,8 @@ const ProductionDashboard: React.FC = () => {
     { id: 'teams', label: 'Teams', icon: '👥' },
     { id: 'dispatch', label: 'Dispatch', icon: '🚨' },
     { id: 'deploy', label: 'Deploy & Response', icon: '🚀' },
+    { id: 'evidence', label: 'Evidence', icon: '📁' },
+    { id: 'chat', label: 'Chat', icon: '💬' },
     { id: 'notifications', label: 'Alerts', icon: '🔔' },
     { id: 'logs', label: 'Logs', icon: '📜' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
@@ -372,6 +383,36 @@ const ProductionDashboard: React.FC = () => {
 
   const renderAnalytics = () => (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Analytics & Reports</h2>
+        <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+          📥 Export Report
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="text-gray-400 text-sm">Total Incidents</div>
+          <div className="text-2xl font-bold">{incidents.length}</div>
+          <div className="text-xs text-green-400">+12% vs last week</div>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="text-gray-400 text-sm">Avg Response Time</div>
+          <div className="text-2xl font-bold">8.5 min</div>
+          <div className="text-xs text-green-400">-2 min vs last week</div>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="text-gray-400 text-sm">Resolution Rate</div>
+          <div className="text-2xl font-bold">94%</div>
+          <div className="text-xs text-green-400">+5% vs last week</div>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="text-gray-400 text-sm">Evidence Reviewed</div>
+          <div className="text-2xl font-bold">{evidenceReviewQueue.length}</div>
+          <div className="text-xs text-yellow-400">Pending review</div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
           <h3 className="text-lg font-semibold mb-4">Incidents Over Time</h3>
@@ -425,6 +466,46 @@ const ProductionDashboard: React.FC = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">Performance Metrics</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-700">
+              <th className="text-left py-2 text-gray-400">Metric</th>
+              <th className="text-left py-2 text-gray-400">Current</th>
+              <th className="text-left py-2 text-gray-400">Target</th>
+              <th className="text-left py-2 text-gray-400">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-700">
+              <td className="py-2">Response Time</td>
+              <td className="py-2">8.5 min</td>
+              <td className="py-2">10 min</td>
+              <td className="py-2 text-green-400">✓ On Track</td>
+            </tr>
+            <tr className="border-b border-gray-700">
+              <td className="py-2">Resolution Rate</td>
+              <td className="py-2">94%</td>
+              <td className="py-2">90%</td>
+              <td className="py-2 text-green-400">✓ On Track</td>
+            </tr>
+            <tr className="border-b border-gray-700">
+              <td className="py-2">AI Detection Rate</td>
+              <td className="py-2">97%</td>
+              <td className="py-2">95%</td>
+              <td className="py-2 text-green-400">✓ On Track</td>
+            </tr>
+            <tr>
+              <td className="py-2">Evidence Review</td>
+              <td className="py-2">85%</td>
+              <td className="py-2">100%</td>
+              <td className="py-2 text-yellow-400">⚠ Needs Attention</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -524,7 +605,33 @@ const ProductionDashboard: React.FC = () => {
     </>
   )
 
-  const renderCameras = () => (
+  const renderCameras = () => {
+    const [detections, setDetections] = useState<{id: string; type: string; confidence: number; x: number; y: number; timestamp: string}[]>([])
+    const [selectedCamera, setSelectedCamera] = useState<string>('cam_001')
+    const [isRecording, setIsRecording] = useState(false)
+    const [recordings, setRecordings] = useState<{id: string; camera: string; startTime: string; duration: number; size: string}[]>([
+      { id: '1', camera: 'cam_001', startTime: '2024-01-15 14:30', duration: 15, size: '245 MB' },
+      { id: '2', camera: 'cam_002', startTime: '2024-01-15 14:45', duration: 8, size: '120 MB' },
+      { id: '3', camera: 'cam_001', startTime: '2024-01-15 15:00', duration: 22, size: '380 MB' },
+    ])
+    const [showRecordings, setShowRecordings] = useState(false)
+
+    useEffect(() => {
+      const mockDetections = [
+        { id: '1', type: 'vehicle', confidence: 0.92, x: 20, y: 30, timestamp: new Date().toISOString() },
+        { id: '2', type: 'person', confidence: 0.87, x: 60, y: 45, timestamp: new Date().toISOString() },
+        { id: '3', type: 'license_plate', confidence: 0.78, x: 45, y: 55, timestamp: new Date().toISOString() },
+      ]
+      setDetections(mockDetections)
+      const interval = setInterval(() => {
+        setDetections([
+          { id: Date.now().toString(), type: ['vehicle', 'person', 'license_plate'][Math.floor(Math.random()*3)], confidence: 0.7 + Math.random()*0.3, x: Math.random()*80+10, y: Math.random()*60+20, timestamp: new Date().toISOString() }
+        ])
+      }, 3000)
+      return () => clearInterval(interval)
+    }, [])
+
+    return (
     <div className="space-y-6">
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="relative bg-black aspect-video">
@@ -535,6 +642,11 @@ const ProductionDashboard: React.FC = () => {
                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>LIVE - YOUR WEBCAM
               </div>
               <div className="absolute top-2 right-2 bg-red-600 px-2 py-1 rounded text-xs font-medium">AI: ON</div>
+              {detections.map(d => (
+                <div key={d.id} className="absolute border-2 border-green-500 rounded" style={{ left: `${d.x}%`, top: `${d.y}%`, width: '60px', height: '40px' }}>
+                  <span className="absolute -top-5 left-0 bg-green-600 text-white text-xs px-1 rounded">{d.type} {(d.confidence*100).toFixed(0)}%</span>
+                </div>
+              ))}
               <div className="absolute bottom-2 right-2"><button onClick={stopWebcam} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-medium">Stop Webcam</button></div>
             </>
           ) : cameraError ? (
@@ -557,8 +669,13 @@ const ProductionDashboard: React.FC = () => {
                 }}
               />
               <div className="absolute top-2 left-2 bg-yellow-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>AI STREAM
+                <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>AI STREAM - {selectedCamera}
               </div>
+              {detections.map(d => (
+                <div key={d.id} className="absolute border-2 border-green-500 rounded" style={{ left: `${d.x}%`, top: `${d.y}%`, width: '60px', height: '40px' }}>
+                  <span className="absolute -top-5 left-0 bg-green-600 text-white text-xs px-1 rounded">{d.type} {(d.confidence*100).toFixed(0)}%</span>
+                </div>
+              ))}
             </>
           )}
         </div>
@@ -573,6 +690,89 @@ const ProductionDashboard: React.FC = () => {
             {(!useWebcamDirect || cameraError) && <button onClick={startWebcam} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-medium">Use My Webcam</button>}
           </div>
         </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">AI Detection & Tracking</h3>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="bg-gray-700 p-3 rounded-lg text-center">
+            <div className="text-2xl font-bold text-green-400">{detections.filter(d => d.type === 'person').length}</div>
+            <div className="text-xs text-gray-400">Persons</div>
+          </div>
+          <div className="bg-gray-700 p-3 rounded-lg text-center">
+            <div className="text-2xl font-bold text-blue-400">{detections.filter(d => d.type === 'vehicle').length}</div>
+            <div className="text-xs text-gray-400">Vehicles</div>
+          </div>
+          <div className="bg-gray-700 p-3 rounded-lg text-center">
+            <div className="text-2xl font-bold text-yellow-400">{detections.filter(d => d.type === 'license_plate').length}</div>
+            <div className="text-xs text-gray-400">License Plates</div>
+          </div>
+        </div>
+        <div className="text-sm">
+          <div className="font-medium mb-2">Recent Detections</div>
+          <div className="space-y-1">
+            {detections.map(d => (
+              <div key={d.id} className="flex justify-between text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+                <span>{d.type.toUpperCase()}</span>
+                <span>{(d.confidence * 100).toFixed(1)}% confidence</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Video Management</h3>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsRecording(!isRecording)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              {isRecording ? '⏹ Stop Recording' : '⏺ Start Recording'}
+            </button>
+            <button
+              onClick={() => setShowRecordings(!showRecordings)}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              📁 Recordings ({recordings.length})
+            </button>
+          </div>
+        </div>
+
+        {isRecording && (
+          <div className="bg-red-900 border border-red-700 p-3 rounded-lg mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="text-red-200">Recording in progress...</span>
+            </div>
+            <span className="text-red-200 text-sm">Camera: {selectedCamera}</span>
+          </div>
+        )}
+
+        {showRecordings && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-4 gap-2 text-xs text-gray-400 font-medium mb-2">
+              <div>Camera</div>
+              <div>Start Time</div>
+              <div>Duration</div>
+              <div>Size</div>
+            </div>
+            {recordings.map(rec => (
+              <div key={rec.id} className="grid grid-cols-4 gap-2 text-sm bg-gray-700 p-2 rounded items-center">
+                <div className="font-medium">{rec.camera}</div>
+                <div className="text-gray-400">{rec.startTime}</div>
+                <div>{rec.duration} min</div>
+                <div className="flex justify-between items-center">
+                  <span>{rec.size}</span>
+                  <button className="text-blue-400 hover:text-blue-300 text-xs">▶ Play</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -591,15 +791,9 @@ const ProductionDashboard: React.FC = () => {
         ))}
       </div>
     </div>
-  )
+  )}
 
   const renderMap = () => {
-    const [MapComponent, setMapComponent] = useState<any>(null)
-
-    useEffect(() => {
-      import('@/components/LiveMap').then(mod => setMapComponent(() => mod.default))
-    }, [])
-
     const mapMarkers = [
       ...incidents.filter(i => i.status === 'active' && i.coordinates).map(inc => ({
         id: inc.id,
@@ -632,20 +826,20 @@ const ProductionDashboard: React.FC = () => {
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <h3 className="text-lg font-semibold mb-4">Kenya Overwatch - Live Incident Map (Nairobi)</h3>
         <div className="rounded-lg overflow-hidden" style={{ height: '500px' }}>
-          {MapComponent ? (
-            <MapComponent 
-              markers={mapMarkers}
-              center={[-1.2921, 36.8219]}
-              zoom={12}
-            />
-          ) : (
+          <Suspense fallback={
             <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
               <div className="text-center">
                 <div className="text-6xl mb-4">🗺️</div>
                 <div>Loading map...</div>
               </div>
             </div>
-          )}
+          }>
+            <LiveMap 
+              markers={mapMarkers}
+              center={[-1.2921, 36.8219]}
+              zoom={12}
+            />
+          </Suspense>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div className="bg-gray-700 rounded-lg p-3 text-center">
@@ -832,14 +1026,8 @@ const ProductionDashboard: React.FC = () => {
   )
 
   const renderDeploy = () => {
-    const [selectedTeam, setSelectedTeam] = useState<string>('')
-    const [selectedIncident, setSelectedIncidentForDeploy] = useState<string>('')
-    const [deployMessage, setDeployMessage] = useState('')
-    const [isDeploying, setIsDeploying] = useState(false)
-    const [deployStatus, setDeployStatus] = useState<string>('')
-
     const handleDeploy = async () => {
-      if (!selectedTeam || !selectedIncident) {
+      if (!deploySelectedTeam || !deploySelectedIncident) {
         setDeployStatus('Please select both a team and an incident')
         return
       }
@@ -850,16 +1038,16 @@ const ProductionDashboard: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            team_id: selectedTeam,
-            incident_id: selectedIncident,
+            team_id: deploySelectedTeam,
+            incident_id: deploySelectedIncident,
             priority: 'high',
             notes: deployMessage
           })
         })
         if (response.ok) {
           setDeployStatus('Deployment successful! Team has been dispatched.')
-          setSelectedTeam('')
-          setSelectedIncidentForDeploy('')
+          setDeploySelectedTeam('')
+          setDeploySelectedIncident('')
           setDeployMessage('')
         } else {
           setDeployStatus('Deployment failed. Please try again.')
@@ -871,21 +1059,21 @@ const ProductionDashboard: React.FC = () => {
     }
 
     const handleSendResponse = async () => {
-      if (!selectedIncident) {
+      if (!deploySelectedIncident) {
         setDeployStatus('Please select an incident')
         return
       }
       setIsDeploying(true)
       setDeployStatus('')
       try {
-        const response = await fetch(`http://localhost:8000/api/incidents/${selectedIncident}/respond`, {
+        const response = await fetch(`http://localhost:8000/api/incidents/${deploySelectedIncident}/respond`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ response_message: deployMessage })
         })
         if (response.ok) {
           setDeployStatus('Response sent successfully!')
-          setSelectedIncidentForDeploy('')
+          setDeploySelectedIncident('')
           setDeployMessage('')
         } else {
           setDeployStatus('Failed to send response.')
@@ -907,8 +1095,8 @@ const ProductionDashboard: React.FC = () => {
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Select Incident</label>
                 <select 
-                  value={selectedIncident}
-                  onChange={(e) => setSelectedIncidentForDeploy(e.target.value)}
+                  value={deploySelectedIncident}
+                  onChange={(e) => setDeploySelectedIncident(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">Choose an incident...</option>
@@ -920,8 +1108,8 @@ const ProductionDashboard: React.FC = () => {
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Select Response Team</label>
                 <select 
-                  value={selectedTeam}
-                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  value={deploySelectedTeam}
+                  onChange={(e) => setDeploySelectedTeam(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">Choose a team...</option>
@@ -958,8 +1146,8 @@ const ProductionDashboard: React.FC = () => {
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Select Incident</label>
                 <select 
-                  value={selectedIncident}
-                  onChange={(e) => setSelectedIncidentForDeploy(e.target.value)}
+                  value={deploySelectedIncident}
+                  onChange={(e) => setDeploySelectedIncident(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">Choose an incident...</option>
@@ -1002,7 +1190,7 @@ const ProductionDashboard: React.FC = () => {
               onClick={() => {
                 const highRisk = incidents.find(i => i.risk_assessment?.risk_level === 'critical' && i.status === 'active')
                 if (highRisk) {
-                  setSelectedIncidentForDeploy(highRisk.id)
+                  setDeploySelectedIncident(highRisk.id)
                   setDeployMessage('Auto-deployed due to critical risk level')
                 }
               }}
@@ -1015,7 +1203,7 @@ const ProductionDashboard: React.FC = () => {
             <button 
               onClick={() => {
                 const available = responseTeams.find(t => t.status === 'available')
-                if (available) setSelectedTeam(available.id)
+                if (available) setDeploySelectedTeam(available.id)
               }}
               className="bg-green-600 hover:bg-green-700 p-4 rounded-lg text-center"
             >
@@ -1025,8 +1213,8 @@ const ProductionDashboard: React.FC = () => {
             </button>
             <button 
               onClick={() => {
-                setSelectedIncidentForDeploy('')
-                setSelectedTeam('')
+                setDeploySelectedIncident('')
+                setDeploySelectedTeam('')
                 setDeployMessage('')
                 setDeployStatus('')
               }}
@@ -1041,6 +1229,223 @@ const ProductionDashboard: React.FC = () => {
       </div>
     )
   }
+
+  const renderEvidence = () => {
+    const [filterStatus, setFilterStatus] = useState<string>('all')
+    const [selectedEvidence, setSelectedEvidence] = useState<EvidencePackage | null>(null)
+    const [reviewing, setReviewing] = useState(false)
+
+    const filteredEvidence = filterStatus === 'all' 
+      ? evidenceReviewQueue 
+      : evidenceReviewQueue.filter(e => e.status === filterStatus)
+
+    const handleReview = async (evidenceId: string, decision: 'approve' | 'reject') => {
+      setReviewing(true)
+      try {
+        await fetch(`http://localhost:8000/api/evidence/${evidenceId}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, notes: '' })
+        })
+        fetchData()
+      } catch (error) {
+        console.error('Failed to review evidence:', error)
+      }
+      setReviewing(false)
+      setSelectedEvidence(null)
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Evidence Management</h3>
+            <div className="flex gap-2">
+              {['all', 'under_review', 'approved', 'rejected'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    filterStatus === status ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  {status.replace('_', ' ').toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3">
+            {filteredEvidence.length === 0 ? (
+              <p className="text-gray-400 text-center py-8">No evidence packages found</p>
+            ) : (
+              filteredEvidence.map(evidence => (
+                <div key={evidence.id} className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm">{evidence.id}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        evidence.status === 'approved' ? 'bg-green-900 text-green-400' :
+                        evidence.status === 'rejected' ? 'bg-red-900 text-red-400' :
+                        'bg-yellow-900 text-yellow-400'
+                      }`}>
+                        {evidence.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedEvidence(evidence)}
+                      className="text-blue-400 hover:text-blue-300 text-sm"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    Incident: {evidence.incident_id} | Events: {evidence.events?.length || 0}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Package Hash: {evidence.package_hash?.substring(0, 16)}...
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {selectedEvidence && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Evidence Package Details</h3>
+                <button onClick={() => setSelectedEvidence(null)} className="text-gray-400 hover:text-white">✕</button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-400 text-sm">Package ID</label>
+                  <p className="font-mono">{selectedEvidence.id}</p>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Incident ID</label>
+                  <p>{selectedEvidence.incident_id}</p>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Status</label>
+                  <p className={`${
+                    selectedEvidence.status === 'approved' ? 'text-green-400' :
+                    selectedEvidence.status === 'rejected' ? 'text-red-400' : 'text-yellow-400'
+                  }`}>{selectedEvidence.status.toUpperCase()}</p>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Package Hash</label>
+                  <p className="font-mono text-xs break-all">{selectedEvidence.package_hash}</p>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Detection Events</label>
+                  <div className="mt-2 space-y-2">
+                    {selectedEvidence.events?.map((event, idx) => (
+                      <div key={idx} className="bg-gray-700 p-2 rounded text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-blue-400">{event.camera_id}</span>
+                          <span className="text-gray-500">{event.detection_type}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Confidence: {(event.confidence * 100).toFixed(1)}% | Model: {event.model_version}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {selectedEvidence.status === 'under_review' && (
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => handleReview(selectedEvidence.id, 'approve')}
+                      disabled={reviewing}
+                      className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-medium"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleReview(selectedEvidence.id, 'reject')}
+                      disabled={reviewing}
+                      className="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded font-medium"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return
+    const msg = {
+      id: Date.now().toString(),
+      sender: 'Control Center',
+      message: newMessage,
+      timestamp: new Date().toISOString(),
+      type: 'dispatch'
+    }
+    setChatMessages([...chatMessages, msg])
+    setNewMessage('')
+  }
+
+  const renderChat = () => (
+    <div className="space-y-4">
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">Dispatch Communication</h3>
+        <div className="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto space-y-3 mb-4">
+          {chatMessages.length === 0 ? (
+            <p className="text-gray-500 text-center">No messages yet. Start a conversation with response teams.</p>
+          ) : (
+            chatMessages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.sender === 'Control Center' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[70%] p-3 rounded-lg ${
+                  msg.sender === 'Control Center' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'
+                }`}>
+                  <div className="text-xs opacity-70 mb-1">{msg.sender} • {new Date(msg.timestamp).toLocaleTimeString()}</div>
+                  <div>{msg.message}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Type a message to response teams..."
+            className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
+          />
+          <button
+            onClick={sendMessage}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">Quick Messages</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {['All units report to station', 'Standby for deployment', 'Emergency assembly point', 'Code Red - All units', 'Traffic incident reported', 'Medical emergency'].map((msg, idx) => (
+            <button
+              key={idx}
+              onClick={() => { setNewMessage(msg); sendMessage() }}
+              className="bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm text-left"
+            >
+              {msg}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 
   const renderSettings = () => (
     <div className="space-y-6">
@@ -1168,9 +1573,10 @@ const ProductionDashboard: React.FC = () => {
         {activeTab === 'reports' && renderReports()}
         {activeTab === 'teams' && renderTeams()}
         {activeTab === 'dispatch' && renderDispatch()}
-        {activeTab === 'notifications' && renderNotifications()}
         {activeTab === 'deploy' && renderDeploy()}
-
+        {activeTab === 'evidence' && renderEvidence()}
+        {activeTab === 'chat' && renderChat()}
+        {activeTab === 'notifications' && renderNotifications()}
         {activeTab === 'logs' && renderLogs()}
         {activeTab === 'analytics' && renderAnalytics()}
         {activeTab === 'settings' && renderSettings()}

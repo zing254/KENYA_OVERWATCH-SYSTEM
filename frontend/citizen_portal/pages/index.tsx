@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { 
   AlertTriangle, 
@@ -11,7 +11,11 @@ import {
   Clock, 
   Shield,
   MessageSquare,
-  ChevronRight
+  ChevronRight,
+  Bell,
+  Search,
+  X,
+  Info
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -23,9 +27,19 @@ interface Report {
   location: string
   latitude?: number
   longitude?: number
-  contact_name: string
-  contact_phone: string
   anonymous: boolean
+  first_name: string
+  last_name: string
+  phone_number: string
+  phone: string
+}
+
+interface Alert {
+  id: string
+  title: string
+  message: string
+  severity: string
+  created_at: string
 }
 
 export default function CitizenPortal() {
@@ -33,14 +47,20 @@ export default function CitizenPortal() {
     type: 'emergency',
     description: '',
     location: '',
-    contact_name: '',
-    contact_phone: '',
-    anonymous: false
+    anonymous: false,
+    first_name: '',
+    last_name: '',
+    phone_number: '',
+    phone: ''
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [reportId, setReportId] = useState('')
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [showAlerts, setShowAlerts] = useState(false)
+  const [checkStatus, setCheckStatus] = useState('')
+  const [reportStatus, setReportStatus] = useState<any>(null)
 
   const reportTypes = [
     { id: 'emergency', label: 'Emergency', icon: '🚨', color: 'bg-red-500' },
@@ -96,6 +116,32 @@ export default function CitizenPortal() {
     }
   }
 
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/notifications`).catch(() => ({ json: () => ({ notifications: [] }) }))
+        const data = await res.json()
+        setAlerts(data.notifications?.slice(0, 10) || [])
+      } catch (err) {
+        console.error('Error fetching alerts:', err)
+      }
+    }
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const checkReportStatus = async () => {
+    if (!checkStatus) return
+    try {
+      const res = await fetch(`${API_URL}/api/citizen/reports/${checkStatus}`).catch(() => ({ json: () => null }))
+      const data = await res.json()
+      setReportStatus(data)
+    } catch (err) {
+      setReportStatus({ error: 'Could not fetch status' })
+    }
+  }
+
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
@@ -124,9 +170,11 @@ export default function CitizenPortal() {
               type: 'emergency',
               description: '',
               location: '',
-              contact_name: '',
-              contact_phone: '',
-              anonymous: false
+              anonymous: false,
+              first_name: '',
+              last_name: '',
+              phone_number: '',
+              phone: ''
             })}}
             className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
@@ -154,12 +202,50 @@ export default function CitizenPortal() {
               <p className="text-xs text-blue-200">Citizen Emergency Portal</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Phone className="w-4 h-4" />
-            <span>Emergency: 999</span>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowAlerts(!showAlerts)}
+              className="relative p-2 hover:bg-blue-800 rounded-lg transition-colors"
+            >
+              <Bell className="w-5 h-5" />
+              {alerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{alerts.length}</span>
+              )}
+            </button>
+            <div className="text-sm flex items-center gap-1">
+              <Phone className="w-4 h-4" />
+              <span>999</span>
+            </div>
           </div>
         </div>
       </header>
+
+      {showAlerts && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-yellow-800 flex items-center gap-2"><Bell className="w-4 h-4" /> Public Alerts</h3>
+              <button onClick={() => setShowAlerts(false)} className="text-yellow-600 hover:text-yellow-800"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {alerts.length === 0 ? (
+                <p className="text-sm text-yellow-700">No active alerts in your area</p>
+              ) : (
+                alerts.map(alert => (
+                  <div key={alert.id} className={`p-3 rounded-lg text-sm ${
+                    alert.severity === 'critical' ? 'bg-red-100 border border-red-300' :
+                    alert.severity === 'high' ? 'bg-orange-100 border border-orange-300' :
+                    'bg-yellow-100 border border-yellow-300'
+                  }`}>
+                    <div className="font-medium text-gray-900">{alert.title}</div>
+                    <div className="text-gray-600">{alert.message}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-2xl mx-auto p-4">
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -241,7 +327,7 @@ export default function CitizenPortal() {
             </div>
 
             <div className="border-t pt-6">
-              <p className="text-sm text-gray-500 mb-4">Your contact information (optional)</p>
+              <p className="text-sm text-gray-500 mb-4">Your information</p>
               
               <div className="flex items-center gap-2 mb-4">
                 <input
@@ -257,23 +343,36 @@ export default function CitizenPortal() {
               </div>
 
               {!report.anonymous && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
-                    <input
-                      type="text"
-                      value={report.contact_name}
-                      onChange={(e) => setReport(prev => ({ ...prev, contact_name: e.target.value }))}
-                      placeholder="Your name"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                      <input
+                        type="text"
+                        value={report.first_name}
+                        onChange={(e) => setReport(prev => ({ ...prev, first_name: e.target.value }))}
+                        placeholder="First name"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                      <input
+                        type="text"
+                        value={report.last_name}
+                        onChange={(e) => setReport(prev => ({ ...prev, last_name: e.target.value }))}
+                        placeholder="Last name"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                     <input
                       type="tel"
-                      value={report.contact_phone}
-                      onChange={(e) => setReport(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      value={report.phone_number}
+                      onChange={(e) => setReport(prev => ({ ...prev, phone_number: e.target.value }))}
                       placeholder="07XX XXX XXX"
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
                     />
@@ -307,6 +406,40 @@ export default function CitizenPortal() {
               For immediate assistance, call 999. This portal is for non-life-threatening reports.
             </p>
           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Search className="w-5 h-5 text-gray-600" />
+            <h3 className="text-lg font-bold text-gray-900">Check Report Status</h3>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={checkStatus}
+              onChange={(e) => setCheckStatus(e.target.value)}
+              placeholder="Enter your report reference number"
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={checkReportStatus}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Check
+            </button>
+          </div>
+          {reportStatus && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              {reportStatus.error ? (
+                <p className="text-red-600">{reportStatus.error}</p>
+              ) : (
+                <div>
+                  <p className="font-medium">Status: <span className="text-blue-600">{reportStatus.status || 'Unknown'}</span></p>
+                  <p className="text-sm text-gray-600 mt-1">Reference: {reportStatus.id}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 

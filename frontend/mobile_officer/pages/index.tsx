@@ -14,7 +14,10 @@ import {
   ChevronRight,
   RefreshCw,
   Users,
-  Activity
+  Activity,
+  Bell,
+  X,
+  AlertCircle
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -39,27 +42,42 @@ interface Team {
   members: number
 }
 
+interface Notification {
+  id: string
+  title: string
+  message: string
+  severity: string
+  created_at: string
+}
+
 export default function ResponderApp() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [activeTab, setActiveTab] = useState<'incidents' | 'my-team' | 'map'>('incidents')
+  const [activeTab, setActiveTab] = useState<'incidents' | 'my-team' | 'map' | 'chat'>('incidents')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string}[]>([])
+  const [newMessage, setNewMessage] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [incidentsRes, teamsRes] = await Promise.all([
+      const [incidentsRes, teamsRes, notifRes] = await Promise.all([
         fetch(`${API_URL}/api/incidents`).catch(() => ({ json: () => [] })),
-        fetch(`${API_URL}/api/teams`).catch(() => ({ json: () => ({ teams: [] }) }))
+        fetch(`${API_URL}/api/teams`).catch(() => ({ json: () => ({ teams: [] }) })),
+        fetch(`${API_URL}/api/notifications`).catch(() => ({ json: () => ({ notifications: [] }) }))
       ])
       
       const incidentsData = await incidentsRes.json()
       const teamsData = await teamsRes.json()
+      const notifData = await notifRes.json()
       
       setIncidents(Array.isArray(incidentsData) ? incidentsData : incidentsData?.incidents || [])
       setTeams(teamsData?.teams || [])
+      setNotifications(notifData?.notifications || [])
     } catch (error) {
       console.error('Failed to fetch data:', error)
     }
@@ -111,9 +129,22 @@ export default function ResponderApp() {
             <Shield className="w-6 h-6 text-blue-400" />
             <span className="font-bold">Responder App</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-sm text-gray-400">Online</span>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-1 hover:bg-gray-700 rounded"
+            >
+              <Bell className="w-5 h-5" />
+              {notifications.filter(n => n.severity === 'critical' || n.severity === 'high').length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  {notifications.filter(n => n.severity === 'critical' || n.severity === 'high').length}
+                </span>
+              )}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-sm text-gray-400">Online</span>
+            </div>
           </div>
         </div>
         
@@ -149,6 +180,15 @@ export default function ResponderApp() {
           >
             <MapPin className="w-4 h-4" />
             Map
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
+              activeTab === 'chat' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            Chat
           </button>
         </div>
       </header>
@@ -271,13 +311,37 @@ export default function ResponderApp() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="bg-gray-800 rounded-lg p-4">
-            <div className="aspect-square bg-gray-700 rounded-lg flex items-center justify-center">
-              <div className="text-center text-gray-400">
-                <MapPin className="w-16 h-16 mx-auto mb-2" />
-                <p>Map View</p>
-                <p className="text-sm">Incidents: {incidents.filter(i => i.status === 'active').length}</p>
+            ) : (
+          <div className="space-y-4">
+            <h2 className="font-semibold">Incident Map - Nairobi</h2>
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="aspect-video bg-gray-700 rounded-lg flex items-center justify-center mb-4">
+                <div className="text-center text-gray-400">
+                  <MapPin className="w-16 h-16 mx-auto mb-2" />
+                  <p>Map View</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-medium text-sm text-gray-400">Active Incidents</h3>
+                {incidents.filter(i => i.status === 'active').length === 0 ? (
+                  <p className="text-gray-500 text-sm">No active incidents</p>
+                ) : (
+                  incidents.filter(i => i.status === 'active').map(incident => (
+                    <div 
+                      key={incident.id}
+                      onClick={() => { setSelectedIncident(incident); setActiveTab('incidents') }}
+                      className="bg-gray-700 p-3 rounded-lg cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getSeverityColor(incident.severity)}`}>
+                          {incident.severity.toUpperCase()}
+                        </span>
+                        <span className="text-xs text-gray-400">{incident.location}</span>
+                      </div>
+                      <p className="text-sm mt-1 font-medium">{incident.title}</p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -331,9 +395,87 @@ export default function ResponderApp() {
                 Close
               </button>
             </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {showNotifications && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-20">
+          <div className="bg-gray-800 w-full mx-4 rounded-2xl p-4 max-h-[60vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <Bell className="w-5 h-5 text-yellow-400" />
+                Notifications
+              </h2>
+              <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {notifications.length === 0 ? (
+                <p className="text-gray-400 text-center py-4">No notifications</p>
+              ) : (
+                notifications.slice(0, 10).map(notif => (
+                  <div key={notif.id} className={`p-3 rounded-lg ${
+                    notif.severity === 'critical' ? 'bg-red-900 border border-red-600' :
+                    notif.severity === 'high' ? 'bg-orange-900 border border-orange-600' :
+                    'bg-gray-700'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className={`w-4 h-4 mt-0.5 ${
+                        notif.severity === 'critical' ? 'text-red-400' :
+                        notif.severity === 'high' ? 'text-orange-400' : 'text-gray-400'
+                      }`} />
+                      <div>
+                        <div className="font-medium text-sm">{notif.title}</div>
+                        <div className="text-xs text-gray-400 mt-1">{notif.message}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {new Date(notif.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            </div>
+          </div>
+        ) : activeTab === 'chat' ? (
+          <div className="space-y-4">
+            <h2 className="font-semibold">Communication</h2>
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="bg-gray-900 rounded-lg p-3 h-80 overflow-y-auto space-y-2 mb-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-gray-500 text-center text-sm">No messages from dispatch</p>
+                ) : (
+                  chatMessages.map(msg => (
+                    <div key={msg.id} className="bg-gray-700 p-2 rounded">
+                      <div className="text-xs text-blue-400">{msg.sender}</div>
+                      <div className="text-sm">{msg.message}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && setChatMessages([...chatMessages, {id: Date.now().toString(), sender: 'You', message: newMessage, timestamp: new Date().toISOString()}])}
+                  placeholder="Message dispatch..."
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                />
+                <button
+                  onClick={() => { if(newMessage) { setChatMessages([...chatMessages, {id: Date.now().toString(), sender: 'You', message: newMessage, timestamp: new Date().toISOString()}]); setNewMessage('') }}}
+                  className="bg-blue-600 px-3 py-2 rounded text-sm"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
