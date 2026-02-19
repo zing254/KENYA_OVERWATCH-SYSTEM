@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import MilestoneList from './MilestoneList'
+import { Bell, X, Check, AlertTriangle, AlertCircle, MapPin, Send, Play, Pause, RefreshCw } from 'lucide-react'
 
 interface ProductionIncident {
   id: string
@@ -160,7 +160,7 @@ interface AnalyticsCharts {
   detection_accuracy: { model: string; accuracy: number }[]
 }
 
-type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'milestones'
+type TabType = 'dashboard' | 'cameras' | 'map' | 'reports' | 'teams' | 'dispatch' | 'notifications' | 'settings' | 'logs' | 'analytics' | 'deploy'
 
 const ProductionDashboard: React.FC = () => {
   const [incidents, setIncidents] = useState<ProductionIncident[]>([])
@@ -184,6 +184,7 @@ const ProductionDashboard: React.FC = () => {
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const [useWebcamDirect, setUseWebcamDirect] = useState(false)
   const [cameraError, setCameraError] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => { setIsClient(true) }, [])
@@ -266,24 +267,24 @@ const ProductionDashboard: React.FC = () => {
     return () => clearInterval(interval)
   }, [])
 
-  // Auto-start webcam on mount
+  // Auto-start webcam on mount - but show click to start
   useEffect(() => {
-    const initWebcam = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: 1280, height: 720, facingMode: 'user' } 
-        })
-        setWebcamStream(stream)
-        setUseWebcamDirect(true)
-        if (videoRef.current) videoRef.current.srcObject = stream
-      } catch (error) {
-        console.log('Webcam not available, using stream instead')
+    // Check if webcam is available but don't auto-start
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        stream.getTracks().forEach(track => track.stop())
+        setCameraError(false)
+      })
+      .catch(() => {
         setCameraError(true)
-      }
-    }
-    // Delay to ensure page is ready
-    setTimeout(initWebcam, 1000)
+      })
   }, [])
+
+  useEffect(() => {
+    if (useWebcamDirect && videoRef.current && webcamStream) {
+      videoRef.current.srcObject = webcamStream
+    }
+  }, [useWebcamDirect, webcamStream])
 
   const startWebcam = async () => {
     try {
@@ -324,8 +325,8 @@ const ProductionDashboard: React.FC = () => {
     { id: 'reports', label: 'Reports', icon: '📋' },
     { id: 'teams', label: 'Teams', icon: '👥' },
     { id: 'dispatch', label: 'Dispatch', icon: '🚨' },
+    { id: 'deploy', label: 'Deploy & Response', icon: '🚀' },
     { id: 'notifications', label: 'Alerts', icon: '🔔' },
-    { id: 'milestones', label: 'Milestones', icon: '🎯' },
     { id: 'logs', label: 'Logs', icon: '📜' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
@@ -531,11 +532,18 @@ const ProductionDashboard: React.FC = () => {
             <>
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               <div className="absolute top-2 left-2 bg-green-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>LIVE - WEBCAM
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>LIVE - YOUR WEBCAM
               </div>
               <div className="absolute top-2 right-2 bg-red-600 px-2 py-1 rounded text-xs font-medium">AI: ON</div>
-              <div className="absolute bottom-2 right-2"><button onClick={stopWebcam} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-medium">Stop</button></div>
+              <div className="absolute bottom-2 right-2"><button onClick={stopWebcam} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-medium">Stop Webcam</button></div>
             </>
+          ) : cameraError ? (
+            <div className="w-full h-full flex items-center justify-center flex-col text-gray-400">
+              <div className="text-6xl mb-4">📷</div>
+              <div className="text-lg mb-2">No Camera Available</div>
+              <div className="text-sm mb-4">Click below to use your webcam</div>
+              <button onClick={startWebcam} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium">Start My Webcam</button>
+            </div>
           ) : (
             <>
               <img 
@@ -545,23 +553,24 @@ const ProductionDashboard: React.FC = () => {
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
-                  target.parentElement!.innerHTML = '<div class="text-gray-400 text-center w-full h-full flex items-center justify-center flex-col"><div class=\"text-4xl mb-2\">📹</div><div class=\"text-sm\">Camera Feed Loading...</div></div>';
+                  target.parentElement!.innerHTML = '<div class="text-gray-400 text-center w-full h-full flex items-center justify-center flex-col"><div class="text-4xl mb-2">📹</div><div class="text-sm">Camera Offline - Click to use your webcam</div></div>';
                 }}
               />
-              <div className="absolute top-2 left-2 bg-green-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>LIVE - AI STREAM
+              <div className="absolute top-2 left-2 bg-yellow-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>AI STREAM
               </div>
-              <div className="absolute top-2 right-2 bg-red-600 px-2 py-1 rounded text-xs font-medium">AI: ON</div>
             </>
           )}
         </div>
         <div className="p-3 bg-gray-800 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Main Camera</span>
-            <span className="text-xs px-2 py-1 rounded bg-green-900 text-green-400">online</span>
+            <span className="font-medium">{useWebcamDirect ? 'Your Webcam' : 'AI Camera Stream'}</span>
+            <span className={`text-xs px-2 py-1 rounded ${useWebcamDirect || !cameraError ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
+              {useWebcamDirect ? 'LIVE' : cameraError ? 'OFFLINE' : 'CONNECTED'}
+            </span>
           </div>
           <div className="flex gap-2">
-            {!useWebcamDirect && <button onClick={startWebcam} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-medium">Use My Webcam</button>}
+            {(!useWebcamDirect || cameraError) && <button onClick={startWebcam} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-medium">Use My Webcam</button>}
           </div>
         </div>
       </div>
@@ -584,34 +593,77 @@ const ProductionDashboard: React.FC = () => {
     </div>
   )
 
-  const renderMap = () => (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-      <h3 className="text-lg font-semibold mb-4">Kenya Overwatch - Live Incident Map</h3>
-      <div className="relative bg-gray-900 rounded-lg aspect-[16/9] overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center"><div className="text-6xl mb-4">🗺️</div><p className="text-gray-400 text-lg">Nairobi CBD Coverage Area</p></div>
+  const renderMap = () => {
+    const [MapComponent, setMapComponent] = useState<any>(null)
+
+    useEffect(() => {
+      import('@/components/LiveMap').then(mod => setMapComponent(() => mod.default))
+    }, [])
+
+    const mapMarkers = [
+      ...incidents.filter(i => i.status === 'active' && i.coordinates).map(inc => ({
+        id: inc.id,
+        position: [inc.coordinates.lat, inc.coordinates.lng] as [number, number],
+        type: 'incident' as const,
+        title: inc.title,
+        description: inc.location,
+        severity: inc.severity,
+        status: inc.status
+      })),
+      ...cameras.filter(c => c.coordinates).map(cam => ({
+        id: cam.id,
+        position: [cam.coordinates.lat, cam.coordinates.lng] as [number, number],
+        type: 'camera' as const,
+        title: cam.name,
+        description: cam.location,
+        status: cam.status
+      })),
+      ...responseTeams.map(team => ({
+        id: team.id,
+        position: [team.location.lat, team.location.lng] as [number, number],
+        type: 'team' as const,
+        title: team.name,
+        description: team.base,
+        status: team.status
+      }))
+    ]
+
+    return (
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h3 className="text-lg font-semibold mb-4">Kenya Overwatch - Live Incident Map (Nairobi)</h3>
+        <div className="rounded-lg overflow-hidden" style={{ height: '500px' }}>
+          {MapComponent ? (
+            <MapComponent 
+              markers={mapMarkers}
+              center={[-1.2921, 36.8219]}
+              zoom={12}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+              <div className="text-center">
+                <div className="text-6xl mb-4">🗺️</div>
+                <div>Loading map...</div>
+              </div>
+            </div>
+          )}
         </div>
-        {incidents.filter(i => i.status === 'active').map((inc, i) => (
-          <div key={inc.id} className="absolute w-4 h-4 bg-red-500 rounded-full animate-ping" style={{ top: `${30 + i * 20}%`, left: `${30 + i * 15}%` }}></div>
-        ))}
-        {responseTeams.filter(t => t.status === 'deployed').map((team, i) => (
-          <div key={team.id} className="absolute w-4 h-4 bg-blue-500 rounded-full" style={{ top: `${50 + i * 10}%`, left: `${40 + i * 10}%` }}></div>
-        ))}
-        <div className="absolute bottom-4 left-4 bg-gray-800 p-3 rounded-lg text-xs">
-          <div className="font-semibold mb-2">Legend</div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full"></div><span>Active Incident</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-500 rounded-full"></div><span>Deployed Team</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-500 rounded-full"></div><span>Available Team</span></div>
-        </div>
-        <div className="absolute top-4 right-4 bg-gray-800 p-3 rounded-lg text-xs">
-          <div className="font-semibold mb-2">Stats</div>
-          <div>Incidents: {incidents.filter(i => i.status === 'active').length}</div>
-          <div>Teams Deployed: {responseTeams.filter(t => t.status === 'deployed').length}</div>
-          <div>Cameras: {cameras.length}</div>
+        <div className="mt-4 grid grid-cols-3 gap-4">
+          <div className="bg-gray-700 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-red-400">{incidents.filter(i => i.status === 'active').length}</div>
+            <div className="text-xs text-gray-400">Active Incidents</div>
+          </div>
+          <div className="bg-gray-700 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-blue-400">{responseTeams.filter(t => t.status === 'deployed').length}</div>
+            <div className="text-xs text-gray-400">Teams Deployed</div>
+          </div>
+          <div className="bg-gray-700 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-green-400">{cameras.length}</div>
+            <div className="text-xs text-gray-400">Cameras Online</div>
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const renderReports = () => (
     <div>
@@ -779,6 +831,217 @@ const ProductionDashboard: React.FC = () => {
     </div>
   )
 
+  const renderDeploy = () => {
+    const [selectedTeam, setSelectedTeam] = useState<string>('')
+    const [selectedIncident, setSelectedIncidentForDeploy] = useState<string>('')
+    const [deployMessage, setDeployMessage] = useState('')
+    const [isDeploying, setIsDeploying] = useState(false)
+    const [deployStatus, setDeployStatus] = useState<string>('')
+
+    const handleDeploy = async () => {
+      if (!selectedTeam || !selectedIncident) {
+        setDeployStatus('Please select both a team and an incident')
+        return
+      }
+      setIsDeploying(true)
+      setDeployStatus('')
+      try {
+        const response = await fetch('http://localhost:8000/api/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            team_id: selectedTeam,
+            incident_id: selectedIncident,
+            priority: 'high',
+            notes: deployMessage
+          })
+        })
+        if (response.ok) {
+          setDeployStatus('Deployment successful! Team has been dispatched.')
+          setSelectedTeam('')
+          setSelectedIncidentForDeploy('')
+          setDeployMessage('')
+        } else {
+          setDeployStatus('Deployment failed. Please try again.')
+        }
+      } catch (error) {
+        setDeployStatus('Error: Could not connect to server')
+      }
+      setIsDeploying(false)
+    }
+
+    const handleSendResponse = async () => {
+      if (!selectedIncident) {
+        setDeployStatus('Please select an incident')
+        return
+      }
+      setIsDeploying(true)
+      setDeployStatus('')
+      try {
+        const response = await fetch(`http://localhost:8000/api/incidents/${selectedIncident}/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response_message: deployMessage })
+        })
+        if (response.ok) {
+          setDeployStatus('Response sent successfully!')
+          setSelectedIncidentForDeploy('')
+          setDeployMessage('')
+        } else {
+          setDeployStatus('Failed to send response.')
+        }
+      } catch (error) {
+        setDeployStatus('Error: Could not connect to server')
+      }
+      setIsDeploying(false)
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Send className="w-5 h-5 text-blue-400" /> Deploy Response Team
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Select Incident</label>
+                <select 
+                  value={selectedIncident}
+                  onChange={(e) => setSelectedIncidentForDeploy(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">Choose an incident...</option>
+                  {incidents.filter(i => i.status === 'active').map(inc => (
+                    <option key={inc.id} value={inc.id}>{inc.title} - {inc.location}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Select Response Team</label>
+                <select 
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">Choose a team...</option>
+                  {responseTeams.filter(t => t.status === 'available').map(team => (
+                    <option key={team.id} value={team.id}>{team.name} - {team.base}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Deployment Notes</label>
+                <textarea 
+                  value={deployMessage}
+                  onChange={(e) => setDeployMessage(e.target.value)}
+                  placeholder="Add deployment instructions..."
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white h-20"
+                />
+              </div>
+              <button 
+                onClick={handleDeploy}
+                disabled={isDeploying}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                {isDeploying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                Deploy Team
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-400" /> Send Incident Response
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Select Incident</label>
+                <select 
+                  value={selectedIncident}
+                  onChange={(e) => setSelectedIncidentForDeploy(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">Choose an incident...</option>
+                  {incidents.map(inc => (
+                    <option key={inc.id} value={inc.id}>{inc.title} - {inc.status}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Response Message</label>
+                <textarea 
+                  value={deployMessage}
+                  onChange={(e) => setDeployMessage(e.target.value)}
+                  placeholder="Enter response details..."
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white h-32"
+                />
+              </div>
+              <button 
+                onClick={handleSendResponse}
+                disabled={isDeploying}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                {isDeploying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send Response
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {deployStatus && (
+          <div className={`bg-gray-800 rounded-lg border p-4 ${deployStatus.includes('success') ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}`}>
+            {deployStatus}
+          </div>
+        )}
+
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+          <h3 className="text-lg font-semibold mb-4">Quick Deploy Actions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onClick={() => {
+                const highRisk = incidents.find(i => i.risk_assessment?.risk_level === 'critical' && i.status === 'active')
+                if (highRisk) {
+                  setSelectedIncidentForDeploy(highRisk.id)
+                  setDeployMessage('Auto-deployed due to critical risk level')
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 p-4 rounded-lg text-center"
+            >
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+              <div className="font-medium">Deploy to Critical</div>
+              <div className="text-xs text-red-200">Auto-select highest risk</div>
+            </button>
+            <button 
+              onClick={() => {
+                const available = responseTeams.find(t => t.status === 'available')
+                if (available) setSelectedTeam(available.id)
+              }}
+              className="bg-green-600 hover:bg-green-700 p-4 rounded-lg text-center"
+            >
+              <MapPin className="w-8 h-8 mx-auto mb-2" />
+              <div className="font-medium">Nearest Available</div>
+              <div className="text-xs text-green-200">Find closest team</div>
+            </button>
+            <button 
+              onClick={() => {
+                setSelectedIncidentForDeploy('')
+                setSelectedTeam('')
+                setDeployMessage('')
+                setDeployStatus('')
+              }}
+              className="bg-gray-600 hover:bg-gray-500 p-4 rounded-lg text-center"
+            >
+              <Pause className="w-8 h-8 mx-auto mb-2" />
+              <div className="font-medium">Reset Form</div>
+              <div className="text-xs text-gray-300">Clear all selections</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderSettings = () => (
     <div className="space-y-6">
       {systemConfig && (
@@ -839,6 +1102,48 @@ const ProductionDashboard: React.FC = () => {
               <span className="text-sm">AI: {aiStatus.pipeline}</span>
             </div>
             <div className="text-sm text-gray-400">{aiStatus.processing_fps} FPS</div>
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 text-gray-400 hover:text-white transition-colors"
+              >
+                <Bell className="w-6 h-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-xl z-50 border border-gray-700 max-h-96 overflow-y-auto">
+                  <div className="flex items-center justify-between p-4 border-b border-gray-700">
+                    <h3 className="text-white font-semibold">Notifications</h3>
+                    <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-white">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-gray-400">No notifications</div>
+                  ) : (
+                    notifications.slice(0, 10).map(notif => (
+                      <div key={notif.id} className={`p-3 border-b border-gray-700 ${!notif.read ? 'bg-gray-750' : ''}`}>
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className={`w-5 h-5 ${notif.severity === 'critical' ? 'text-red-500' : notif.severity === 'high' ? 'text-orange-500' : 'text-blue-500'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm ${!notif.read ? 'text-white font-medium' : 'text-gray-300'}`}>
+                              {notif.title}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1 truncate">
+                              {notif.message}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <div className="text-sm text-gray-400">{isClient ? currentTime : ''}</div>
           </div>
         </div>
@@ -864,7 +1169,8 @@ const ProductionDashboard: React.FC = () => {
         {activeTab === 'teams' && renderTeams()}
         {activeTab === 'dispatch' && renderDispatch()}
         {activeTab === 'notifications' && renderNotifications()}
-        {activeTab === 'milestones' && <MilestoneList userRole="supervisor" currentUser="operator_01" />}
+        {activeTab === 'deploy' && renderDeploy()}
+
         {activeTab === 'logs' && renderLogs()}
         {activeTab === 'analytics' && renderAnalytics()}
         {activeTab === 'settings' && renderSettings()}
