@@ -6,7 +6,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { Bell, X, Check, AlertTriangle, AlertCircle, MapPin, Send, Play, Pause, RefreshCw } from 'lucide-react'
 
 const LiveMap = lazy(() => import('@/components/LiveMap'))
@@ -206,6 +206,9 @@ const ProductionDashboard: React.FC = () => {
   const [showRecordings, setShowRecordings] = useState(false)
   const [evidenceFilter, setEvidenceFilter] = useState<string>('all')
   const [selectedEvidence, setSelectedEvidence] = useState<EvidencePackage | null>(null)
+  const [evidenceAttachments, setEvidenceAttachments] = useState<{id: string; type: string; camera_id: string; timestamp: string; description: string; file_path: string; mime_type: string}[]>([])
+  const [showAttachmentUpload, setShowAttachmentUpload] = useState(false)
+  const [attachmentUploadType, setAttachmentUploadType] = useState<'snapshot' | 'video'>('snapshot')
   const [reviewingEvidence, setReviewingEvidence] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<ResponseTeam | null>(null)
   const [analyticsDateRange, setAnalyticsDateRange] = useState('7d')
@@ -327,6 +330,15 @@ const ProductionDashboard: React.FC = () => {
     }
   }, [useWebcamDirect, webcamStream])
 
+  useEffect(() => {
+    if (selectedEvidence) {
+      fetch(`http://localhost:8000/api/evidence/${selectedEvidence.id}/attachments`)
+        .then(res => res.json())
+        .then(data => setEvidenceAttachments(data || []))
+        .catch(err => console.error('Failed to fetch attachments:', err))
+    }
+  }, [selectedEvidence])
+
   const startWebcam = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -413,9 +425,6 @@ const ProductionDashboard: React.FC = () => {
       </div>
     </div>
   )
-
-  const [analyticsDateRange, setAnalyticsDateRange] = useState('7d')
-  const [reportType, setReportType] = useState('summary')
 
   const renderAnalytics = () => {
     const handleExport = (format: string) => {
@@ -705,6 +714,7 @@ const ProductionDashboard: React.FC = () => {
     setIncidents([incident, ...incidents])
     setShowCreateIncident(false)
     setNewIncident({ title: '', description: '', type: 'emergency', severity: 'medium', location: '', vehicle_type: 'saloon', coordinates: { lat: -1.2921, lng: 36.8219 } })
+  }
   }
 
   const renderIncidents = () => {
@@ -1742,6 +1752,42 @@ const ProductionDashboard: React.FC = () => {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-gray-400 text-sm">Evidence Attachments (Snapshot & Video)</label>
+                    <button
+                      onClick={() => setShowAttachmentUpload(true)}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
+                    >
+                      + Add Attachment
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {evidenceAttachments.length === 0 ? (
+                      <p className="text-gray-500 text-sm col-span-2">No attachments yet</p>
+                    ) : (
+                      evidenceAttachments.map((att) => (
+                        <div key={att.id} className="bg-gray-700 p-2 rounded">
+                          {att.mime_type?.startsWith('image/') ? (
+                            <img 
+                              src={`http://localhost:8000/api/attachments/${att.id}`} 
+                              alt="Snapshot" 
+                              className="w-full h-24 object-cover rounded"
+                              onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60"><rect fill="%23333" width="100" height="60"/><text x="50" y="35" fill="%23666" text-anchor="middle" font-size="10">No Image</text></svg>' }}
+                            />
+                          ) : (
+                            <div className="w-full h-24 bg-gray-600 rounded flex items-center justify-center">
+                              <span className="text-xs text-gray-400">🎥 Video ({att.duration_seconds || 3}s)</span>
+                            </div>
+                          )}
+                          <div className="mt-1 text-xs text-gray-400">
+                            <span className="text-blue-400">{att.camera_id}</span> | {att.timestamp}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
                 {selectedEvidence.status === 'under_review' && (
                   <div className="flex gap-2 pt-4">
                     <button
@@ -1987,9 +2033,131 @@ const ProductionDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  )
-}
+        )}
+        
+        {showAttachmentUpload && selectedEvidence && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Add Evidence Attachment</h3>
+                <button onClick={() => setShowAttachmentUpload(false)} className="text-gray-400 hover:text-white">✕</button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-400 text-sm">Attachment Type</label>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setAttachmentUploadType('snapshot')}
+                      className={`flex-1 py-2 rounded ${
+                        attachmentUploadType === 'snapshot' ? 'bg-blue-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      📷 Snapshot
+                    </button>
+                    <button
+                      onClick={() => setAttachmentUploadType('video')}
+                      className={`flex-1 py-2 rounded ${
+                        attachmentUploadType === 'video' ? 'bg-blue-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      🎥 Video Clip
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Camera ID</label>
+                  <input
+                    type="text"
+                    id="attachmentCameraId"
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1"
+                    placeholder="cam_001"
+                    defaultValue="cam_001"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">Description</label>
+                  <input
+                    type="text"
+                    id="attachmentDescription"
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1"
+                    placeholder={attachmentUploadType === 'snapshot' ? "Snapshot of incident" : "3-second clip of collision"}
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm">
+                    {attachmentUploadType === 'snapshot' ? 'Select Image File' : 'Select Video File (max 3 seconds)'}
+                  </label>
+                  <input
+                    type="file"
+                    id="attachmentFile"
+                    accept={attachmentUploadType === 'snapshot' ? 'image/*' : 'video/*'}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    const fileInput = document.getElementById('attachmentFile') as HTMLInputElement;
+                    const cameraIdInput = document.getElementById('attachmentCameraId') as HTMLInputElement;
+                    const descInput = document.getElementById('attachmentDescription') as HTMLInputElement;
+                    
+                    if (!fileInput?.files?.[0]) {
+                      alert('Please select a file');
+                      return;
+                    }
+                    
+                    const file = fileInput.files[0];
+                    const reader = new FileReader();
+                    
+                    reader.onload = async () => {
+                      const base64 = (reader.result as string).split(',')[1];
+                      const endpoint = attachmentUploadType === 'snapshot' 
+                        ? 'snapshot' 
+                        : 'video';
+                      
+                      try {
+                        const response = await fetch(
+                          `http://localhost:8000/api/evidence/${selectedEvidence.id}/attachments/${endpoint}`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                              camera_id: cameraIdInput?.value || 'cam_001',
+                              timestamp: new Date().toISOString(),
+                              description: descInput?.value || '',
+                              duration_seconds: '3',
+                              [attachmentUploadType === 'snapshot' ? 'image_data' : 'video_data']: base64
+                            })
+                          }
+                        );
+                        
+                        if (response.ok) {
+                          alert('Attachment uploaded successfully!');
+                          setShowAttachmentUpload(false);
+                          // Refresh attachments
+                          const attRes = await fetch(`http://localhost:8000/api/evidence/${selectedEvidence.id}/attachments`);
+                          const attData = await attRes.json();
+                          setEvidenceAttachments(attData);
+                        } else {
+                          alert('Failed to upload attachment');
+                        }
+                      } catch (err) {
+                        console.error('Upload error:', err);
+                        alert('Error uploading attachment');
+                      }
+                    };
+                    
+                    reader.readAsDataURL(file);
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-medium"
+                >
+                  Upload Attachment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
 export default ProductionDashboard

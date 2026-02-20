@@ -3,9 +3,9 @@ Production-Grade Kenya Overwatch FastAPI
 Real-time AI Pipeline, Risk Scoring, Evidence Management
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Dict, List, Optional, Any
 import asyncio
@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import asdict, is_dataclass
-from typing import Any, Dict
 
 # Add parent directory to path for imports
 import os
@@ -866,6 +865,187 @@ async def submit_appeal(package_id: str, appeal_data: Dict[str, Any]):
     
     return {"message": "Appeal submitted successfully"}
 
+# ==================== EVIDENCE ATTACHMENTS ====================
+
+import base64
+import os
+from pathlib import Path
+
+# Evidence attachments storage
+evidence_attachments: Dict[str, Dict[str, Any]] = {}
+attachments_dir = Path("static/evidence_attachments")
+attachments_dir.mkdir(parents=True, exist_ok=True)
+
+@app.post("/api/evidence/{package_id}/attachments/snapshot")
+async def upload_snapshot(
+    package_id: str,
+    camera_id: str = Form(...),
+    timestamp: str = Form(...),
+    description: str = Form(""),
+    image_data: str = Form(...)  # Base64 encoded image
+):
+    """Upload snapshot image as evidence attachment"""
+    
+    # Validate evidence package exists
+    if package_id not in evidence_store:
+        # Check in production incidents
+        found = False
+        for incident in production_system.active_incidents.values():
+            for pkg in incident.evidence_packages:
+                if pkg.id == package_id:
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Evidence package not found")
+    
+    # Decode base64 image
+    try:
+        image_bytes = base64.b64decode(image_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
+    
+    # Save image
+    attachment_id = f"snap_{uuid.uuid4().hex[:12]}"
+    image_path = attachments_dir / f"{attachment_id}.jpg"
+    image_path.write_bytes(image_bytes)
+    
+    # Store attachment metadata
+    attachment = {
+        "id": attachment_id,
+        "package_id": package_id,
+        "type": "snapshot",
+        "camera_id": camera_id,
+        "timestamp": timestamp,
+        "description": description,
+        "file_path": str(image_path),
+        "file_size": len(image_bytes),
+        "mime_type": "image/jpeg",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    evidence_attachments[attachment_id] = attachment
+    
+    # Update evidence package
+    if package_id in evidence_store:
+        if "attachments" not in evidence_store[package_id]:
+            evidence_store[package_id]["attachments"] = []
+        evidence_store[package_id]["attachments"].append(attachment)
+    
+    logger.info(f"Snapshot uploaded for evidence {package_id}: {attachment_id}")
+    
+    return {
+        "message": "Snapshot uploaded successfully",
+        "attachment": attachment
+    }
+
+@app.post("/api/evidence/{package_id}/attachments/video")
+async def upload_video_clip(
+    package_id: str,
+    camera_id: str = Form(...),
+    timestamp: str = Form(...),
+    duration_seconds: int = Form(3),
+    description: str = Form(""),
+    video_data: str = Form(...)  # Base64 encoded video
+):
+    """Upload 3-second video clip as evidence attachment"""
+    
+    # Validate evidence package exists
+    if package_id not in evidence_store:
+        found = False
+        for incident in production_system.active_incidents.values():
+            for pkg in incident.evidence_packages:
+                if pkg.id == package_id:
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Evidence package not found")
+    
+    # Validate duration
+    if duration_seconds > 10:
+        raise HTTPException(status_code=400, detail="Video duration cannot exceed 10 seconds")
+    
+    # Decode base64 video
+    try:
+        video_bytes = base64.b64decode(video_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid video data: {str(e)}")
+    
+    # Save video
+    attachment_id = f"vid_{uuid.uuid4().hex[:12]}"
+    video_path = attachments_dir / f"{attachment_id}.mp4"
+    video_path.write_bytes(video_bytes)
+    
+    # Store attachment metadata
+    attachment = {
+        "id": attachment_id,
+        "package_id": package_id,
+        "type": "video_clip",
+        "camera_id": camera_id,
+        "timestamp": timestamp,
+        "duration_seconds": duration_seconds,
+        "description": description,
+        "file_path": str(video_path),
+        "file_size": len(video_bytes),
+        "mime_type": "video/mp4",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    evidence_attachments[attachment_id] = attachment
+    
+    # Update evidence package
+    if package_id in evidence_store:
+        if "attachments" not in evidence_store[package_id]:
+            evidence_store[package_id]["attachments"] = []
+        evidence_store[package_id]["attachments"].append(attachment)
+    
+    logger.info(f"Video clip uploaded for evidence {package_id}: {attachment_id}")
+    
+    return {
+        "message": "Video clip uploaded successfully",
+        "attachment": attachment
+    }
+
+@app.get("/api/evidence/{package_id}/attachments")
+async def get_attachments(package_id: str):
+    """Get all attachments for an evidence package"""
+    attachments = []
+    
+    # Check in evidence store
+    if package_id in evidence_store:
+        attachments = evidence_store[package_id].get("attachments", [])
+    
+    # Check in production incidents
+    for incident in production_system.active_incidents.values():
+        for pkg in incident.evidence_packages:
+            if pkg.id == package_id:
+                # Get from metadata if available
+                if hasattr(pkg, 'metadata') and pkg.metadata:
+                    attachments = pkg.metadata.get("attachments", [])
+    
+    return attachments
+
+@app.get("/api/attachments/{attachment_id}")
+async def get_attachment(attachment_id: str):
+    """Get specific attachment file"""
+    if attachment_id not in evidence_attachments:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    attachment = evidence_attachments[attachment_id]
+    file_path = attachment["file_path"]
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Attachment file not found")
+    
+    return FileResponse(
+        file_path,
+        media_type=attachment["mime_type"],
+        filename=f"{attachment_id}.{attachment['mime_type'].split('/')[1]}"
+    )
+
 # ==================== CITIZEN REPORTS ====================
 
 @app.get("/api/citizen/reports")
@@ -1278,7 +1458,7 @@ async def get_statistics_summary():
     """Get overall system statistics summary"""
     total_incidents = len(production_system.active_incidents)
     high_risk_count = sum(1 for i in production_system.active_incidents.values() 
-                         if i.risk_assessment.risk_level == RiskLevel.HIGH)
+                         if i.risk_assessment and i.risk_assessment.risk_level == RiskLevel.HIGH)
     
     return {
         "incidents": {

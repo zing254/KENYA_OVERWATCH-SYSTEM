@@ -117,7 +117,6 @@ class EvidencePackage(Base):
     appeal_date = Column(DateTime(timezone=True))
     retention_until = Column(DateTime(timezone=True))
     package_hash = Column(String(64))  # SHA-256 hash of entire package
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
