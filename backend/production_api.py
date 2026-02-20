@@ -1267,6 +1267,138 @@ async def get_recent_detections(camera_id: str, limit: int = 10):
     
     return detections
 
+# ==================== ANPR SYSTEM ====================
+
+# Global ANPR system instance
+anpr_system = None
+
+@app.on_event("startup")
+async def init_anpr():
+    """Initialize ANPR system on startup"""
+    global anpr_system
+    try:
+        from anpr import ANPRSystem
+        anpr_system = ANPRSystem({
+            'detection_threshold': 0.5,
+            'max_age': 30,
+            'min_hits': 3
+        })
+        logger.info("ANPR System initialized")
+    except Exception as e:
+        logger.warning(f"ANPR System not available: {e}")
+
+@app.get("/api/anpr/status")
+async def get_anpr_status():
+    """Get ANPR system status"""
+    if anpr_system is None:
+        return {
+            "status": "initializing",
+            "message": "ANPR system starting up..."
+        }
+    
+    return {
+        "status": "operational",
+        "statistics": anpr_system.stats,
+        "plates_in_database": len(anpr_system.database.plates)
+    }
+
+@app.get("/api/anpr/plates")
+async def get_detected_plates(limit: int = 100):
+    """Get all detected plates"""
+    if anpr_system is None:
+        raise HTTPException(status_code=503, detail="ANPR system not available")
+    
+    plates = anpr_system.database.get_all_plates()
+    return {
+        "plates": plates[:limit],
+        "total": len(plates),
+        "today_count": anpr_system.database.get_today_count()
+    }
+
+@app.get("/api/anpr/plates/{plate_number}")
+async def get_plate_info(plate_number: str):
+    """Get info for specific plate"""
+    if anpr_system is None:
+        raise HTTPException(status_code=503, detail="ANPR system not available")
+    
+    plate = anpr_system.database.get_plate(plate_number)
+    if plate is None:
+        raise HTTPException(status_code=404, detail="Plate not found")
+    
+    return plate
+
+@app.post("/api/anpr/detect")
+async def detect_plates_in_image(image_data: str = Form(...)):
+    """Detect plates in base64 encoded image"""
+    if anpr_system is None:
+        raise HTTPException(status_code=503, detail="ANPR system not available")
+    
+    try:
+        # Decode image
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Invalid image data")
+        
+        # Process frame
+        result = anpr_system.process_frame(frame, "api")
+        
+        return {
+            "detections": result['tracks'],
+            "statistics": result['stats']
+        }
+    except Exception as e:
+        logger.error(f"ANPR detection error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/anpr/statistics")
+async def get_anpr_statistics():
+    """Get ANPR statistics"""
+    if anpr_system is None:
+        return {
+            "vehicles_today": 0,
+            "active_tracks": 0,
+            "avg_confidence": 0,
+            "fps": 0,
+            "latency_ms": 0,
+            "total_plates": 0
+        }
+    
+    stats = anpr_system.stats
+    return {
+        "vehicles_today": anpr_system.database.get_today_count(),
+        "active_tracks": stats.get('active_tracks', 0),
+        "avg_confidence": stats.get('avg_confidence', 0) * 100,
+        "fps": stats.get('fps', 0),
+        "latency_ms": stats.get('latency_ms', 0),
+        "total_plates": stats.get('total_plates', 0),
+        "total_detections": stats.get('total_detections', 0)
+    }
+
+@app.get("/api/anpr/tracks")
+async def get_active_tracks():
+    """Get currently active vehicle tracks"""
+    if anpr_system is None:
+        return {"tracks": []}
+    
+    # Get active tracks from tracker
+    tracks = []
+    for track_id, track_data in anpr_system.tracker.tracks.items():
+        if track_data['hits'] >= anpr_system.tracker.min_hits:
+            tracks.append({
+                'track_id': track_data['id'],
+                'plate': track_data['plate'],
+                'confidence': track_data['plate_confidence'],
+                'verified': track_data['verified'],
+                'camera_id': track_data['camera_id'],
+                'last_seen': track_data['last_seen'].isoformat() if track_data['last_seen'] else None,
+                'bbox': track_data['bbox']
+            })
+    
+    return {"tracks": tracks}
+
 # ==================== EVIDENCE SIGNATURES ====================
 
 @app.post("/api/evidence/{package_id}/signature")
