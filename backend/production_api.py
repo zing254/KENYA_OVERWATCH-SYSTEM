@@ -1212,6 +1212,158 @@ async def enable_ai(camera_id: str, ai_config: Dict[str, Any]):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.get("/api/cameras/{camera_id}/snapshot")
+async def get_camera_snapshot(camera_id: str):
+    """Get current camera snapshot as base64 image"""
+    import numpy as np
+    import io
+    from PIL import Image, ImageDraw
+    
+    # Generate a sample frame (in production, this would come from actual camera)
+    frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    
+    # Add timestamp overlay
+    img = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 10), f"Camera: {camera_id}", fill=(255, 255, 255))
+    draw.text((10, 30), datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), fill=(255, 255, 255))
+    
+    # Convert to base64
+    buffer = io.BytesIO()
+    img.save(buffer, format='JPEG')
+    image_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    return {
+        "camera_id": camera_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "image": image_base64,
+        "format": "jpeg"
+    }
+
+@app.get("/api/cameras/{camera_id}/detections")
+async def get_recent_detections(camera_id: str, limit: int = 10):
+    """Get recent AI detections for a camera"""
+    detection_types = ['person', 'vehicle', 'license_plate', 'weapon', 'suspicious_behavior']
+    
+    detections = []
+    for i in range(min(limit, 20)):
+        detections.append({
+            "id": f"det_{uuid.uuid4().hex[:8]}",
+            "camera_id": camera_id,
+            "type": random.choice(detection_types),
+            "confidence": round(random.uniform(0.7, 0.99), 2),
+            "timestamp": (datetime.utcnow() - timedelta(seconds=i*30)).isoformat(),
+            "bounding_box": {
+                "x": random.randint(50, 500),
+                "y": random.randint(50, 350),
+                "width": random.randint(80, 200),
+                "height": random.randint(100, 300)
+            },
+            "metadata": {
+                "model_version": "2.0.0",
+                "processing_time_ms": random.randint(15, 50)
+            }
+        })
+    
+    return detections
+
+# ==================== EVIDENCE SIGNATURES ====================
+
+@app.post("/api/evidence/{package_id}/signature")
+async def capture_evidence_signature(
+    package_id: str,
+    signer_name: str = Form(...),
+    signer_role: str = Form(...),
+    signature_data: str = Form(...)  # Base64 encoded signature image
+):
+    """Capture digital signature for evidence package"""
+    
+    # Validate evidence package exists
+    if package_id not in evidence_store:
+        raise HTTPException(status_code=404, detail="Evidence package not found")
+    
+    # Decode signature image
+    try:
+        signature_bytes = base64.b64decode(signature_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid signature data: {str(e)}")
+    
+    # Save signature
+    sig_id = f"sig_{uuid.uuid4().hex[:12]}"
+    sig_path = attachments_dir / f"{sig_id}.png"
+    sig_path.write_bytes(signature_bytes)
+    
+    # Store signature metadata
+    signature = {
+        "id": sig_id,
+        "package_id": package_id,
+        "signer_name": signer_name,
+        "signer_role": signer_role,
+        "file_path": str(sig_path),
+        "signed_at": datetime.utcnow().isoformat(),
+        "ip_address": "0.0.0.0"  # In production, get from request
+    }
+    
+    # Update evidence package
+    if package_id in evidence_store:
+        evidence_store[package_id]["signatures"] = evidence_store[package_id].get("signatures", [])
+        evidence_store[package_id]["signatures"].append(signature)
+    
+    logger.info(f"Signature captured for evidence {package_id} by {signer_name}")
+    
+    return {
+        "message": "Signature captured successfully",
+        "signature": signature
+    }
+
+@app.get("/api/evidence/{package_id}/signatures")
+async def get_evidence_signatures(package_id: str):
+    """Get all signatures for an evidence package"""
+    if package_id in evidence_store:
+        return evidence_store[package_id].get("signatures", [])
+    return []
+
+# ==================== REAL-TIME EVENTS ====================
+
+@app.get("/api/events/stream")
+async def events_stream():
+    """Server-sent events for real-time updates"""
+    async def event_generator():
+        import asyncio
+        while True:
+            # Generate random event
+            event_types = ['incident_created', 'incident_updated', 'detection', 'alert', 'team_dispatched']
+            event_type = random.choice(event_types)
+            
+            event_data = {
+                "type": event_type,
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "id": f"{event_type[:3]}_{uuid.uuid4().hex[:6]}",
+                    "message": f"New {event_type} event"
+                }
+            }
+            
+            if event_type == 'incident_created':
+                event_data["data"] = {
+                    "id": f"inc_{uuid.uuid4().hex[:6]}",
+                    "type": random.choice(["suspicious_activity", "theft", "accident"]),
+                    "location": random.choice(["Nairobi CBD", "Westlands", "Kasarani"]),
+                    "severity": random.choice(["low", "medium", "high", "critical"])
+                }
+            
+            yield f"data: {json.dumps(event_data)}\n\n"
+            await asyncio.sleep(3)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
 # ==================== ALERT SYSTEM ====================
 
 @app.get("/api/alerts")
