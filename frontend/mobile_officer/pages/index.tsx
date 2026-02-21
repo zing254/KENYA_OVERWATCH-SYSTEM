@@ -135,6 +135,59 @@ export default function ResponderApp() {
   }, [])
 
   useEffect(() => {
+    let ws: WebSocket | null = null
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/ws/responder_001`
+        ws = new WebSocket(wsUrl)
+        
+        ws.onopen = () => {
+          console.log('WebSocket connected')
+          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['incidents', 'alerts', 'dispatches'] }))
+        }
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            console.log('WebSocket message:', data)
+            
+            if (data.type === 'incident_update') {
+              setIncidents(prev => [data.incident, ...prev.filter(i => i.id !== data.incident.id)])
+            } else if (data.type === 'new_incident') {
+              setIncidents(prev => [data.incident, ...prev])
+            } else if (data.type === 'new_alert') {
+              setNotifications(prev => [data.alert, ...prev])
+            } else if (data.type === 'dispatch_update') {
+              setDispatches(prev => [...prev.filter(d => d.id !== data.dispatch.id), data.dispatch])
+            }
+          } catch (e) {
+            console.error('Failed to parse WebSocket message:', e)
+          }
+        }
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error)
+        }
+        
+        ws.onclose = () => {
+          console.log('WebSocket disconnected, reconnecting...')
+          setTimeout(connectWebSocket, 3000)
+        }
+      } catch (error) {
+        console.error('Failed to connect WebSocket:', error)
+      }
+    }
+    
+    connectWebSocket()
+    
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -216,7 +269,86 @@ export default function ResponderApp() {
   const navigateToIncident = (incident: Incident) => {
     if (incident.coordinates) {
       setMapCenter(incident.coordinates)
-      setMapZoom(16)
+      setMapZoom(18)
+    } else if (incident.location) {
+      const coords = getCoordinatesFromLocation(incident.location)
+      if (coords) {
+        setMapCenter(coords)
+        setMapZoom(18)
+      }
+    }
+  }
+
+  const getCoordinatesFromLocation = (location: string): {lat: number, lng: number} | null => {
+    const nairobiAreas: {[key: string]: {lat: number, lng: number}} = {
+      'nairobi cbd': { lat: -1.2921, lng: 36.8219 },
+      'westlands': { lat: -1.2644, lng: 36.8019 },
+      'eastleigh': { lat: -1.2815, lng: 36.8556 },
+      'kasarani': { lat: -1.2205, lng: 36.8396 },
+      'mombasa road': { lat: -1.3150, lng: 36.8600 },
+      'kenyatta avenue': { lat: -1.2939, lng: 36.8225 },
+      ' Moi Avenue': { lat: -1.2833, lng: 36.8167 },
+      'kilimani': { lat: -1.2950, lng: 36.7800 },
+      'kileleshwa': { lat: -1.2700, lng: 36.7650 },
+      'ngara': { lat: -1.2600, lng: 36.8300 },
+      'parklands': { lat: -1.2500, lng: 36.8400 },
+      'highridge': { lat: -1.2400, lng: 36.8500 },
+      'loresho': { lat: -1.2300, lng: 36.8600 },
+      'runda': { lat: -1.2100, lng: 36.8700 },
+      'muthaiga': { lat: -1.2500, lng: 36.8500 },
+      'karen': { lat: -1.3300, lng: 36.7200 },
+      'langata': { lat: -1.3500, lng: 36.7500 },
+      'donholm': { lat: -1.3300, lng: 36.8500 },
+      'embakasi': { lat: -1.3500, lng: 36.9000 },
+      'juja': { lat: -1.1100, lng: 37.0100 },
+    }
+    const lowerLoc = location.toLowerCase()
+    for (const [key, coords] of Object.entries(nairobiAreas)) {
+      if (lowerLoc.includes(key)) return coords
+    }
+    return { lat: -1.2921, lng: 36.8219 }
+  }
+
+  const startNavigation = (incident: Incident) => {
+    let destLat = incident.coordinates?.lat
+    let destLng = incident.coordinates?.lng
+    
+    if (!destLat || !destLng) {
+      const coords = getCoordinatesFromLocation(incident.location)
+      if (coords) {
+        destLat = coords.lat
+        destLng = coords.lng
+      }
+    }
+    
+    if (destLat && destLng) {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const mapsUrl = isMobile 
+        ? `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`
+      window.open(mapsUrl, '_blank')
+    }
+  }
+
+  const handleAcceptAndRespond = (incident: Incident) => {
+    updateIncidentStatus(incident.id, 'responding')
+    setSelectedIncident(null)
+    startNavigation(incident)
+  }
+
+  const handleCall = (incident: Incident) => {
+    const report = incident
+    const phoneNumber = report.phone_number || incident.reporter_phone || '999'
+    window.location.href = `tel:${phoneNumber}`
+  }
+
+  const handleNavigateToBase = (team: Team) => {
+    if (team.location) {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const mapsUrl = isMobile
+        ? `https://www.google.com/maps/dir/?api=1&destination=${team.location.lat},${team.location.lng}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${team.location.lat},${team.location.lng}`
+      window.open(mapsUrl, '_blank')
     }
   }
 
@@ -427,6 +559,13 @@ export default function ResponderApp() {
                   <div className="text-gray-400">Type: <span className="text-white">{myTeam.type}</span></div>
                   <div className="text-gray-400">Capabilities: <span className="text-white">{myTeam.capabilities?.join(', ')}</span></div>
                 </div>
+                <button 
+                  onClick={() => handleNavigateToBase(myTeam)}
+                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Navigate to {myTeam.name} Base
+                </button>
               </div>
             )}
 
@@ -814,12 +953,12 @@ export default function ResponderApp() {
 
             <div className="space-y-2">
               <button 
-                onClick={() => { updateIncidentStatus(selectedIncident.id, 'responding'); setSelectedIncident(null) }}
+                onClick={() => { handleAcceptAndRespond(selectedIncident) }}
                 disabled={updatingStatus}
                 className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Navigation className="w-4 h-4" />
-                Accept & Respond
+                Accept & Navigate
               </button>
               <button 
                 onClick={() => { updateIncidentStatus(selectedIncident.id, 'resolved'); setSelectedIncident(null) }}
@@ -837,11 +976,26 @@ export default function ResponderApp() {
                   <MapPin className="w-4 h-4" />
                   Show on Map
                 </button>
-                <button className="bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-medium flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => handleCall(selectedIncident)}
+                  className="bg-green-700 hover:bg-green-600 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                >
                   <Phone className="w-4 h-4" />
-                  Call
+                  Call Reporter
                 </button>
               </div>
+              {selectedIncident.phone_number && (
+                <button 
+                  onClick={() => { 
+                    const responderInfo = `${myTeam?.name || 'Team'} responding. ETA: 5-10 mins. Contact: ${selectedIncident.phone_number}`
+                    alert(responderInfo)
+                  }}
+                  className="w-full bg-purple-700 hover:bg-purple-600 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  View Responder Info
+                </button>
+              )}
               <button 
                 onClick={() => setSelectedIncident(null)}
                 className="w-full bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-medium"

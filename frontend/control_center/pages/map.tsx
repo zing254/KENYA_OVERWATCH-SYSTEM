@@ -31,9 +31,13 @@ interface MapMarker {
 export default function LiveMapPage() {
   const [markers, setMarkers] = useState<MapMarker[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+
+  useEffect(() => {
+    setLastUpdate(new Date())
+  }, [])
 
   const loadMapData = useCallback(async () => {
     try {
@@ -181,7 +185,7 @@ export default function LiveMapPage() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-blue-200">Last Update</p>
-              <p className="text-white text-sm">{lastUpdate.toLocaleTimeString()}</p>
+              <p className="text-white text-sm">{lastUpdate ? lastUpdate.toLocaleTimeString() : 'Loading...'}</p>
             </div>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}

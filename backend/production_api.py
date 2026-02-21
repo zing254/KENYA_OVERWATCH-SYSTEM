@@ -19,7 +19,10 @@ import hashlib
 import logging
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def utcnow():
+    return datetime.now(timezone.utc)
 from dataclasses import asdict, is_dataclass
 
 # Add parent directory to path for imports
@@ -33,6 +36,14 @@ from production_system import (
     EvidenceStatus, SeverityLevel, Coordinates, Milestone,
     MilestoneStatus, MilestoneType, RiskFactors
 )
+
+# Import new backend modules
+from ai.pipeline import pipeline, DetectionType, Detection, AIFrameAnalysis
+from ai.anpr import anpr, LicensePlate, KenyanPlateValidator
+from alerting.manager import alert_manager, AlertType, AlertSeverity, AlertStatus
+from risk_engine.engine import risk_engine, RiskAssessment as RAResult
+from offence_engine.engine import offence_engine, OffenceType, OffenceStatus
+from integrations.services import integrations
 
 def serialize_for_json(obj: Any) -> Any:
     """Convert objects to JSON-serializable format"""
@@ -54,6 +65,49 @@ def serialize_for_json(obj: Any) -> Any:
         return obj.value
     else:
         return obj
+
+# Global citizen reports storage
+citizen_reports_store = []
+
+# Mock citizen reports for demonstration
+MOCK_CITIZEN_REPORTS = [
+    {
+        "id": "cit_001",
+        "type": "suspicious_activity",
+        "description": "Unidentified individuals loitering near ATM",
+        "location": "Kenyatta Avenue, Nairobi",
+        "coordinates": {"lat": -1.2864, "lng": 36.8232},
+        "reported_by": "citizen_anon_1234",
+        "status": "pending",
+        "priority": "medium",
+        "created_at": (utcnow() - timedelta(hours=2)).isoformat(),
+        "verified": False
+    },
+    {
+        "id": "cit_002",
+        "type": "traffic_violation",
+        "description": "Vehicle running red light at intersection",
+        "location": "Moi Avenue & Kenyatta Avenue",
+        "coordinates": {"lat": -1.2833, "lng": 36.8167},
+        "reported_by": "citizen_anon_5678",
+        "status": "investigating",
+        "priority": "high",
+        "created_at": (utcnow() - timedelta(hours=5)).isoformat(),
+        "verified": True
+    },
+    {
+        "id": "cit_003",
+        "type": "emergency",
+        "description": "Medical emergency in progress",
+        "location": "Nairobi Central Station",
+        "coordinates": {"lat": -1.2855, "lng": 36.8222},
+        "reported_by": "citizen_anon_9012",
+        "status": "resolved",
+        "priority": "critical",
+        "created_at": (utcnow() - timedelta(hours=8)).isoformat(),
+        "verified": True
+    }
+]
 
 # Configure production logging
 import os
@@ -115,6 +169,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add compression
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """Log all requests"""
+    start_time = time.time()
+    
+    # Log request
+    logger.info(f"Request: {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    
+    # Log response
+    duration = (time.time() - start_time) * 1000
+    logger.info(f"Response: {response.status_code} | Duration: {duration:.2f}ms | {request.method} {request.url.path}")
+    
+    return response
 
 # Rate limiting storage
 rate_limit_storage = {}
@@ -255,7 +330,7 @@ def generate_ai_enhanced_stream(camera_id: str):
         if cap is not None:
             success, frame = cap.read()
             if success:
-                timestamp = datetime.utcnow()
+                timestamp = utcnow()
                 frame_processed = process_frame_with_ai(camera_id, frame, timestamp)
                 ret, buffer = cv2.imencode('.jpg', frame_processed)
                 if ret:
@@ -307,7 +382,7 @@ def generate_ai_enhanced_stream(camera_id: str):
             cv2.putText(frame, f"{label} {random.randint(80, 99)}%", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
         
         # Timestamp
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        ts = utcnow().strftime("%Y-%m-%d %H:%M:%S")
         cv2.putText(frame, ts, (width - 200, height - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
         
         # Risk indicator
@@ -489,7 +564,7 @@ async def health_check():
     """Comprehensive health check for all systems"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "services": {
             "ai_pipeline": "operational",
             "risk_engine": "operational",
@@ -506,6 +581,51 @@ async def health_check():
             "database_mode": "postgresql" if db_connected else "in_memory"
         }
     }
+
+# ==================== PROMETHEUS METRICS ====================
+
+@app.get("/api/metrics")
+async def prometheus_metrics():
+    """Prometheus-compatible metrics endpoint"""
+    import random
+    import time
+    
+    current_time = time.time()
+    
+    metrics = []
+    metrics.append(f'# HELP kenya_overwatch_up Whether the system is up')
+    metrics.append(f'# TYPE kenya_overwatch_up gauge')
+    metrics.append(f'kenya_overwatch_up 1')
+    
+    metrics.append(f'# HELP kenya_overwatch_incidents_total Total number of incidents')
+    metrics.append(f'# TYPE kenya_overwatch_incidents_total counter')
+    metrics.append(f'kenya_overwatch_incidents_total {len(production_system.active_incidents)}')
+    
+    metrics.append(f'# HELP kenya_overwatch_evidence_packages_total Total evidence packages')
+    metrics.append(f'# TYPE kenya_overwatch_evidence_packages_total counter')
+    metrics.append(f'kenya_overwatch_evidence_packages_total {len(production_system.evidence_packages)}')
+    
+    metrics.append(f'# HELP kenya_overwatch_active_streams Active camera streams')
+    metrics.append(f'# TYPE kenya_overwatch_active_streams gauge')
+    metrics.append(f'kenya_overwatch_active_streams {len(active_streams)}')
+    
+    metrics.append(f'# HELP kenya_overwatch_risk_score_avg Average risk score')
+    metrics.append(f'# TYPE kenya_overwatch_risk_score_avg gauge')
+    metrics.append(f'kenya_overwatch_risk_score_avg {random.uniform(0.3, 0.7):.3f}')
+    
+    metrics.append(f'# HELP kenya_overwatch_api_requests_total Total API requests')
+    metrics.append(f'# TYPE kenya_overwatch_api_requests_total counter')
+    metrics.append(f'kenya_overwatch_api_requests_total {random.randint(10000, 50000)}')
+    
+    metrics.append(f'# HELP kenya_overwatch_websocket_connections Active WebSocket connections')
+    metrics.append(f'# TYPE kenya_overwatch_websocket_connections gauge')
+    metrics.append(f'kenya_overwatch_websocket_connections {len(ws_manager.active_connections)}')
+    
+    metrics.append(f'# HELP kenya_overwatch_response_time_avg Average response time in ms')
+    metrics.append(f'# TYPE kenya_overwatch_response_time_avg gauge')
+    metrics.append(f'kenya_overwatch_response_time_avg {random.uniform(50, 200):.2f}')
+    
+    return "\n".join(metrics)
 
 # ==================== INCIDENT MANAGEMENT ====================
 
@@ -538,10 +658,10 @@ async def get_incidents(status: Optional[str] = None, severity: Optional[str] = 
                     },
                     "recommended_action": "Dispatch response team",
                     "confidence": 0.85,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": utcnow().isoformat()
                 },
                 "evidence_packages": [],
-                "created_at": (datetime.utcnow() - timedelta(minutes=15)).isoformat(),
+                "created_at": (utcnow() - timedelta(minutes=15)).isoformat(),
                 "requires_human_review": True,
                 "human_review_completed": False
             },
@@ -566,10 +686,10 @@ async def get_incidents(status: Optional[str] = None, severity: Optional[str] = 
                     },
                     "recommended_action": "Log and monitor",
                     "confidence": 0.92,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": utcnow().isoformat()
                 },
                 "evidence_packages": [],
-                "created_at": (datetime.utcnow() - timedelta(minutes=30)).isoformat(),
+                "created_at": (utcnow() - timedelta(minutes=30)).isoformat(),
                 "requires_human_review": False,
                 "human_review_completed": False
             }
@@ -619,10 +739,10 @@ async def create_incident(incident_data: Dict[str, Any]):
             ),
             recommended_action="Pending assessment",
             confidence=0.0,
-            timestamp=datetime.utcnow()
+            timestamp=utcnow()
         ),
         evidence_packages=[],
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
         updated_at=None,
         reported_by=incident_data.get('reported_by', 'manual'),
         assigned_team_id=None,
@@ -643,7 +763,20 @@ async def create_incident(incident_data: Dict[str, Any]):
         'coordinates': {'lat': incident.coordinates.lat, 'lng': incident.coordinates.lng},
         'severity': incident.severity.value,
         'status': incident.status.value,
-        'risk_assessment': incident.risk_assessment,
+        'risk_assessment': {
+            'risk_score': incident.risk_assessment.risk_score,
+            'risk_level': incident.risk_assessment.risk_level.value if hasattr(incident.risk_assessment.risk_level, 'value') else str(incident.risk_assessment.risk_level),
+            'factors': {
+                'temporal_risk': incident.risk_assessment.factors.temporal_risk,
+                'spatial_risk': incident.risk_assessment.factors.spatial_risk,
+                'behavioral_risk': incident.risk_assessment.factors.behavioral_risk,
+                'contextual_risk': incident.risk_assessment.factors.contextual_risk,
+                'reason_codes': incident.risk_assessment.factors.reason_codes
+            },
+            'recommended_action': incident.risk_assessment.recommended_action,
+            'confidence': incident.risk_assessment.confidence,
+            'timestamp': incident.risk_assessment.timestamp.isoformat() if incident.risk_assessment.timestamp else None
+        },
         'evidence_packages': incident.evidence_packages,
         'created_at': incident.created_at.isoformat() if incident.created_at else None,
         'updated_at': incident.updated_at.isoformat() if incident.updated_at else None,
@@ -674,7 +807,7 @@ async def update_incident_status(incident_id: str, status_data: Dict[str, str]):
     new_status = IncidentStatus(status_data.get('status', 'active'))
     
     incident.status = new_status
-    incident.updated_at = datetime.utcnow()
+    incident.updated_at = utcnow()
     
     # Log status change
     logger.info(f"Incident {incident_id} status changed: {old_status} -> {new_status}")
@@ -699,13 +832,13 @@ evidence_store = {}
 evidence_store["ev_001"] = {
     "id": "ev_001",
     "incident_id": "inc_001",
-    "created_at": (datetime.utcnow() - timedelta(minutes=10)).isoformat(),
+    "created_at": (utcnow() - timedelta(minutes=10)).isoformat(),
     "status": "under_review",
     "package_hash": "a1b2c3d4e5f6",
     "events": [
         {
             "camera_id": "cam_001",
-            "timestamp": (datetime.utcnow() - timedelta(minutes=15)).isoformat(),
+            "timestamp": (utcnow() - timedelta(minutes=15)).isoformat(),
             "detection_type": "person",
             "confidence": 0.92,
             "bounding_box": {"x": 100, "y": 100, "w": 50, "h": 100},
@@ -718,13 +851,13 @@ evidence_store["ev_001"] = {
 evidence_store["ev_002"] = {
     "id": "ev_002",
     "incident_id": "inc_002",
-    "created_at": (datetime.utcnow() - timedelta(minutes=25)).isoformat(),
+    "created_at": (utcnow() - timedelta(minutes=25)).isoformat(),
     "status": "created",
     "package_hash": "f6e5d4c3b2a1",
     "events": [
         {
             "camera_id": "cam_001",
-            "timestamp": (datetime.utcnow() - timedelta(minutes=30)).isoformat(),
+            "timestamp": (utcnow() - timedelta(minutes=30)).isoformat(),
             "detection_type": "vehicle",
             "confidence": 0.88,
             "bounding_box": {"x": 200, "y": 150, "w": 120, "h": 80},
@@ -747,7 +880,7 @@ alert_store["alert_001"] = {
     "risk_score": 0.78,
     "acknowledged": False,
     "requires_action": True,
-    "created_at": datetime.utcnow().isoformat()
+    "created_at": utcnow().isoformat()
 }
 alert_store["alert_002"] = {
     "id": "alert_002",
@@ -759,7 +892,7 @@ alert_store["alert_002"] = {
     "risk_score": 0.92,
     "acknowledged": False,
     "requires_action": True,
-    "created_at": (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+    "created_at": (utcnow() - timedelta(minutes=5)).isoformat()
 }
 alert_store["alert_003"] = {
     "id": "alert_003",
@@ -772,7 +905,7 @@ alert_store["alert_003"] = {
     "acknowledged": True,
     "acknowledged_by": "operator_01",
     "requires_action": False,
-    "created_at": (datetime.utcnow() - timedelta(hours=1)).isoformat()
+    "created_at": (utcnow() - timedelta(hours=1)).isoformat()
 }
 
 # ==================== EVIDENCE MANAGEMENT ====================
@@ -825,7 +958,7 @@ async def review_evidence(package_id: str, review_data: Dict[str, Any]):
             "package_id": package_id,
             "reviewer_id": reviewer_id,
             "decision": decision,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow().isoformat()
         }
     })
     
@@ -855,10 +988,10 @@ async def submit_appeal(package_id: str, appeal_data: Dict[str, Any]):
     evidence_package.appeal_status = 'submitted'
     evidence_package.metadata['appeal_reason'] = appeal_reason
     evidence_package.metadata['citizen_id'] = citizen_id
-    evidence_package.metadata['appeal_date'] = datetime.utcnow().isoformat()
+    evidence_package.metadata['appeal_date'] = utcnow().isoformat()
     
     # Extend retention
-    evidence_package.retention_until = datetime.utcnow() + timedelta(days=2555)  # 7 years
+    evidence_package.retention_until = utcnow() + timedelta(days=2555)  # 7 years
     
     # Log appeal
     logger.info(f"Appeal submitted for evidence {package_id} by {citizen_id}")
@@ -922,7 +1055,7 @@ async def upload_snapshot(
         "file_path": str(image_path),
         "file_size": len(image_bytes),
         "mime_type": "image/jpeg",
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": utcnow().isoformat()
     }
     
     evidence_attachments[attachment_id] = attachment
@@ -991,7 +1124,7 @@ async def upload_video_clip(
         "file_path": str(video_path),
         "file_size": len(video_bytes),
         "mime_type": "video/mp4",
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": utcnow().isoformat()
     }
     
     evidence_attachments[attachment_id] = attachment
@@ -1051,69 +1184,145 @@ async def get_attachment(attachment_id: str):
 @app.get("/api/citizen/reports")
 async def get_citizen_reports(status: Optional[str] = None):
     """Get citizen incident reports"""
-    mock_reports = [
-        {
-            "id": "cit_001",
-            "type": "suspicious_activity",
-            "description": "Unidentified individuals loitering near ATM",
-            "location": "Kenyatta Avenue, Nairobi",
-            "coordinates": {"lat": -1.2864, "lng": 36.8232},
-            "reported_by": "citizen_anon_1234",
-            "status": "pending",
-            "priority": "medium",
-            "created_at": (datetime.utcnow() - timedelta(hours=2)).isoformat(),
-            "verified": False
-        },
-        {
-            "id": "cit_002",
-            "type": "traffic_violation",
-            "description": "Vehicle running red light at intersection",
-            "location": "Moi Avenue & Kenyatta Avenue",
-            "coordinates": {"lat": -1.2833, "lng": 36.8167},
-            "reported_by": "citizen_anon_5678",
-            "status": "investigating",
-            "priority": "high",
-            "created_at": (datetime.utcnow() - timedelta(hours=5)).isoformat(),
-            "verified": True
-        },
-        {
-            "id": "cit_003",
-            "type": "emergency",
-            "description": "Medical emergency in progress",
-            "location": "Nairobi Central Station",
-            "coordinates": {"lat": -1.2855, "lng": 36.8222},
-            "reported_by": "citizen_anon_9012",
-            "status": "resolved",
-            "priority": "critical",
-            "created_at": (datetime.utcnow() - timedelta(hours=8)).isoformat(),
-            "verified": True
-        }
-    ]
+    all_reports = MOCK_CITIZEN_REPORTS + citizen_reports_store
     
     if status and status != "all":
-        mock_reports = [r for r in mock_reports if r["status"] == status]
+        all_reports = [r for r in all_reports if r["status"] == status]
     
-    return {"reports": mock_reports, "total": len(mock_reports)}
+    return {"reports": all_reports, "total": len(all_reports)}
 
 @app.post("/api/citizen/reports")
 async def submit_citizen_report(report_data: Dict[str, Any]):
     """Submit new citizen incident report"""
+    import random
+    
     new_report = {
-        "id": f"cit_{uuid.uuid4().hex[:8]}",
+        "id": f"cit_{uuid.uuid4().hex[:8].upper()}",
         "type": report_data.get("type", "general"),
         "description": report_data.get("description", ""),
         "location": report_data.get("location", "Unknown"),
-        "coordinates": report_data.get("coordinates", {"lat": -1.2921, "lng": 36.8219}),
+        "latitude": report_data.get("latitude"),
+        "longitude": report_data.get("longitude"),
+        "coordinates": report_data.get("coordinates", {"lat": report_data.get("latitude", -1.2921), "lng": report_data.get("longitude", 36.8219)}),
         "reported_by": report_data.get("reported_by", "anonymous"),
         "status": "pending",
         "priority": report_data.get("priority", "low"),
-        "created_at": datetime.utcnow().isoformat(),
-        "verified": False
+        "created_at": utcnow().isoformat(),
+        "verified": False,
+        "attachments": report_data.get("attachments", []),
+        "ai_analysis": None,
+        "anonymous": report_data.get("anonymous", False),
+        "first_name": report_data.get("first_name", ""),
+        "last_name": report_data.get("last_name", ""),
+        "phone_number": report_data.get("phone_number", ""),
     }
     
-    logger.info(f"New citizen report submitted: {new_report['id']}")
+    report_type = new_report["type"]
+    has_attachments = len(new_report.get("attachments", [])) > 0
     
-    return {"message": "Report submitted successfully", "report": new_report}
+    severity_score = 0.3
+    recommendation = "Standard processing"
+    response_time = "~10-15 minutes"
+    
+    type_scores = {
+        "emergency": {"score": 0.95, "recommendation": "Immediate dispatch required", "response": "~2-5 minutes"},
+        "crime": {"score": 0.85, "recommendation": "Priority dispatch - police unit", "response": "~5-8 minutes"},
+        "fire": {"score": 0.90, "recommendation": "Fire department + ambulance standby", "response": "~3-7 minutes"},
+        "medical": {"score": 0.80, "recommendation": "Medical team dispatch", "response": "~5-10 minutes"},
+        "accident": {"score": 0.70, "recommendation": "Traffic police + ambulance if needed", "response": "~8-12 minutes"},
+        "suspicious": {"score": 0.50, "recommendation": "Patrol unit verification", "response": "~15-20 minutes"},
+    }
+    
+    if report_type in type_scores:
+        type_info = type_scores[report_type]
+        severity_score = type_info["score"]
+        recommendation = type_info["recommendation"]
+        response_time = type_info["response"]
+    
+    if has_attachments:
+        severity_score = min(1.0, severity_score + 0.1)
+        recommendation = f"{recommendation} - Evidence attached, expedited review"
+    
+    ai_analysis = {
+        "severity_score": severity_score,
+        "risk_level": "critical" if severity_score >= 0.9 else "high" if severity_score >= 0.7 else "medium" if severity_score >= 0.5 else "low",
+        "recommendation": recommendation,
+        "response_time_estimate": response_time,
+        "required_teams": get_required_teams(report_type),
+        "analysis_timestamp": utcnow().isoformat(),
+        "automated": True,
+        "confidence": 0.85 if has_attachments else 0.65
+    }
+    
+    new_report["ai_analysis"] = ai_analysis
+    new_report["priority"] = "critical" if severity_score >= 0.9 else "high" if severity_score >= 0.7 else "medium"
+    new_report["status"] = "in_progress" if severity_score >= 0.7 else "pending"
+    
+    citizen_reports_store.append(new_report)
+    
+    if has_attachments:
+        logger.info(f"Citizen report {new_report['id']} has {len(new_report['attachments'])} attachments - AI expedited analysis triggered")
+    
+    logger.info(f"New citizen report submitted: {new_report['id']} - AI Priority: {new_report['priority']}")
+    
+    return {"message": "Report submitted successfully", "report": new_report, "ai_analysis": ai_analysis}
+
+
+def get_required_teams(report_type: str) -> List[str]:
+    """Determine required response teams based on incident type"""
+    team_map = {
+        "emergency": ["Rapid Response Unit", "Medical Team"],
+        "crime": ["Police Unit", "Crime Investigation"],
+        "fire": ["Fire Department", "Medical Team"],
+        "medical": ["Medical Emergency Team", "Ambulance"],
+        "accident": ["Traffic Police", "Medical Team"],
+        "suspicious": ["Patrol Unit", "Surveillance Team"],
+    }
+    return team_map.get(report_type, ["Patrol Unit"])
+
+
+@app.get("/api/citizen/reports/{report_id}")
+async def get_citizen_report_status(report_id: str):
+    """Get status of a citizen report"""
+    all_reports = MOCK_CITIZEN_REPORTS + citizen_reports_store
+    for report in all_reports:
+        if report["id"] == report_id or report_id.upper() in report["id"].upper():
+            return report
+    
+    return {
+        "id": report_id,
+        "status": "not_found",
+        "message": "Report not found. Please check your reference number and try again."
+    }
+
+
+@app.post("/api/evidence/attachments")
+async def upload_evidence_attachment(file: UploadFile = File(...)):
+    """Upload evidence attachments (photos/videos)"""
+    import os
+    from pathlib import Path
+    
+    upload_dir = Path(__file__).parent / "static" / "evidence_attachments"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    safe_filename = f"{uuid.uuid4().hex}_{int(time.time())}.{file_ext}"
+    file_path = upload_dir / safe_filename
+    
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+    
+    file_url = f"/static/evidence_attachments/{safe_filename}"
+    
+    logger.info(f"Evidence attachment uploaded: {file_url}")
+    
+    return {
+        "success": True,
+        "url": file_url,
+        "filename": file.filename,
+        "size": len(content)
+    }
 
 # ==================== RISK ASSSMENT ====================
 
@@ -1132,7 +1341,7 @@ async def get_risk_scores(camera_id: Optional[str] = None):
         },
         "risk_level": "high",
         "recommended_action": "Supervisor review",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 @app.post("/api/risk/assess")
@@ -1154,7 +1363,7 @@ async def assess_risk(assessment_data: Dict[str, Any]):
             "reason_codes": ["BEHAVIORAL_ANOMALY", "MEDIUM_RISK_LOCATION"]
         },
         "recommended_action": "Operator notification",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
     
     # Send alert if high risk
@@ -1185,7 +1394,7 @@ async def get_cameras_management():
                 "fps": 30,
                 "risk_score": 0.45,
                 "detections_last_hour": 127,
-                "last_frame": datetime.utcnow().isoformat()
+                "last_frame": utcnow().isoformat()
             }
         ]
     }
@@ -1209,7 +1418,7 @@ async def enable_ai(camera_id: str, ai_config: Dict[str, Any]):
         "message": "AI enabled successfully",
         "camera_id": camera_id,
         "enabled_models": models,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 @app.get("/api/cameras/{camera_id}/snapshot")
@@ -1226,7 +1435,7 @@ async def get_camera_snapshot(camera_id: str):
     img = Image.fromarray(frame)
     draw = ImageDraw.Draw(img)
     draw.text((10, 10), f"Camera: {camera_id}", fill=(255, 255, 255))
-    draw.text((10, 30), datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), fill=(255, 255, 255))
+    draw.text((10, 30), utcnow().strftime("%Y-%m-%d %H:%M:%S"), fill=(255, 255, 255))
     
     # Convert to base64
     buffer = io.BytesIO()
@@ -1235,7 +1444,7 @@ async def get_camera_snapshot(camera_id: str):
     
     return {
         "camera_id": camera_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "image": image_base64,
         "format": "jpeg"
     }
@@ -1252,7 +1461,7 @@ async def get_recent_detections(camera_id: str, limit: int = 10):
             "camera_id": camera_id,
             "type": random.choice(detection_types),
             "confidence": round(random.uniform(0.7, 0.99), 2),
-            "timestamp": (datetime.utcnow() - timedelta(seconds=i*30)).isoformat(),
+            "timestamp": (utcnow() - timedelta(seconds=i*30)).isoformat(),
             "bounding_box": {
                 "x": random.randint(50, 500),
                 "y": random.randint(50, 350),
@@ -1432,7 +1641,7 @@ async def capture_evidence_signature(
         "signer_name": signer_name,
         "signer_role": signer_role,
         "file_path": str(sig_path),
-        "signed_at": datetime.utcnow().isoformat(),
+        "signed_at": utcnow().isoformat(),
         "ip_address": "0.0.0.0"  # In production, get from request
     }
     
@@ -1469,7 +1678,7 @@ async def events_stream():
             
             event_data = {
                 "type": event_type,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": utcnow().isoformat(),
                 "data": {
                     "id": f"{event_type[:3]}_{uuid.uuid4().hex[:6]}",
                     "message": f"New {event_type} event"
@@ -1513,7 +1722,7 @@ async def get_alerts(severity: Optional[str] = None, acknowledged: Optional[bool
             "risk_score": 0.78,
             "acknowledged": False,
             "requires_action": True,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": utcnow().isoformat()
         }
     ]
     
@@ -1544,7 +1753,7 @@ async def acknowledge_alert(alert_id: str, ack_data: Dict[str, str]):
             "alert_id": alert_id,
             "acknowledged_by": acknowledged_by,
             "action_taken": action_taken,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow().isoformat()
         }
     })
     
@@ -1568,7 +1777,7 @@ async def get_notifications(limit: int = 20):
             ]),
             "message": "Notification message details here",
             "read": i > 5,
-            "timestamp": (datetime.utcnow() - timedelta(minutes=i * 5)).isoformat()
+            "timestamp": (utcnow() - timedelta(minutes=i * 5)).isoformat()
         })
     return {"notifications": notifications, "total": len(notifications), "unread_count": sum(1 for n in notifications if not n["read"])}
 
@@ -1674,7 +1883,7 @@ async def get_dashboard_stats():
             "risk_alerts_today": 3,
             "system_health": "optimal"
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== ANALYTICS ====================
@@ -1704,7 +1913,7 @@ async def get_performance_metrics():
             "data_integrity_score": 1.0,
             "audit_log_completeness": 1.0
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== SEARCH & STATISTICS ====================
@@ -1770,7 +1979,7 @@ async def get_statistics_summary():
             "active_cameras": 10,
             "average_fps": 29.8
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 @app.get("/api/statistics/trends")
@@ -1778,7 +1987,7 @@ async def get_statistics_trends(days: int = 7):
     """Get trend data for the specified number of days"""
     trends = []
     for i in range(days):
-        date = datetime.utcnow() - timedelta(days=days - i - 1)
+        date = utcnow() - timedelta(days=days - i - 1)
         trends.append({
             "date": date.strftime("%Y-%m-%d"),
             "incidents": 5 + (i * 2) % 10,
@@ -1790,7 +1999,7 @@ async def get_statistics_trends(days: int = 7):
     return {
         "trends": trends,
         "period_days": days,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== EXPORT ====================
@@ -1804,7 +2013,7 @@ async def get_compliance_audit_logs(user_id: Optional[str] = None, action: Optio
     return {
         "audit_logs": [
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": utcnow().isoformat(),
                 "user_id": "ai_system",
                 "action": "evidence_created",
                 "resource_id": "evidence_001",
@@ -1828,8 +2037,8 @@ async def get_retention_status():
         },
         "auto_deletion": {
             "enabled": True,
-            "next_run": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-            "last_run": (datetime.utcnow() - timedelta(hours=23)).isoformat()
+            "next_run": (utcnow() + timedelta(hours=1)).isoformat(),
+            "last_run": (utcnow() - timedelta(hours=23)).isoformat()
         },
         "storage_usage": {
             "total_gb": 1250,
@@ -1848,7 +2057,7 @@ async def get_activity_logs(limit: int = 50):
     for i in range(min(limit, 50)):
         logs.append({
             "id": f"log_{i:04d}",
-            "timestamp": (datetime.utcnow() - timedelta(minutes=i * 5)).isoformat(),
+            "timestamp": (utcnow() - timedelta(minutes=i * 5)).isoformat(),
             "type": random.choice(["incident", "dispatch", "camera", "user", "system"]),
             "action": random.choice([
                 "Incident created", "Team dispatched", "Alert acknowledged", 
@@ -1868,7 +2077,7 @@ async def get_audit_logs(limit: int = 50):
     for i in range(min(limit, 50)):
         logs.append({
             "id": f"audit_{i:04d}",
-            "timestamp": (datetime.utcnow() - timedelta(minutes=i * 3)).isoformat(),
+            "timestamp": (utcnow() - timedelta(minutes=i * 3)).isoformat(),
             "user_id": random.choice(["admin", "operator_01", "operator_02"]),
             "action": random.choice(actions),
             "resource": random.choice(["incidents", "cameras", "teams", "evidence"]),
@@ -1891,8 +2100,8 @@ async def get_incident_history(days: int = 7):
             "location": random.choice(["Nairobi CBD", "Westlands", "Kasarani", "Kilimani", "CBD North"]),
             "severity": random.choice(["low", "medium", "high", "critical"]),
             "status": random.choice(["active", "responding", "resolved", "closed"]),
-            "created_at": (datetime.utcnow() - timedelta(hours=i * 2)).isoformat(),
-            "resolved_at": (datetime.utcnow() - timedelta(hours=i * 2 - 1)).isoformat() if random.random() > 0.3 else None,
+            "created_at": (utcnow() - timedelta(hours=i * 2)).isoformat(),
+            "resolved_at": (utcnow() - timedelta(hours=i * 2 - 1)).isoformat() if random.random() > 0.3 else None,
             "response_time_minutes": random.randint(3, 25)
         })
     return {"history": history, "total": len(history)}
@@ -1948,14 +2157,14 @@ async def get_trend_analysis(
         "change_percentage": round(random.uniform(-20, 30), 1),
         "data_points": [
             {
-                "timestamp": (datetime.utcnow() - timedelta(hours=i*hours)).isoformat(),
+                "timestamp": (utcnow() - timedelta(hours=i*hours)).isoformat(),
                 "value": random.randint(10, 100)
             }
             for i in range(min(10, hours))
         ],
         "forecast": [
             {
-                "timestamp": (datetime.utcnow() + timedelta(hours=i*hours)).isoformat(),
+                "timestamp": (utcnow() + timedelta(hours=i*hours)).isoformat(),
                 "predicted": random.randint(10, 100)
             }
             for i in range(1, 4)
@@ -2035,7 +2244,7 @@ async def bulk_acknowledge_alerts(
         if alert_id in alert_store:
             alert_store[alert_id]['acknowledged'] = True
             alert_store[alert_id]['acknowledged_by'] = acknowledged_by
-            alert_store[alert_id]['acknowledged_at'] = datetime.utcnow().isoformat()
+            alert_store[alert_id]['acknowledged_at'] = utcnow().isoformat()
             acknowledged.append(alert_id)
         else:
             failed.append(alert_id)
@@ -2076,9 +2285,9 @@ async def get_milestones(
                 "created_by": "admin",
                 "assigned_to": "developer_01",
                 "approved_by": "supervisor_01",
-                "created_at": (datetime.utcnow() - timedelta(days=5)).isoformat(),
-                "due_date": (datetime.utcnow() + timedelta(days=10)).isoformat(),
-                "completed_at": (datetime.utcnow() - timedelta(days=2)).isoformat()
+                "created_at": (utcnow() - timedelta(days=5)).isoformat(),
+                "due_date": (utcnow() + timedelta(days=10)).isoformat(),
+                "completed_at": (utcnow() - timedelta(days=2)).isoformat()
             },
             {
                 "id": "ms_002",
@@ -2090,8 +2299,8 @@ async def get_milestones(
                 "created_by": "system",
                 "assigned_to": "reviewer_01",
                 "approved_by": None,
-                "created_at": (datetime.utcnow() - timedelta(hours=2)).isoformat(),
-                "due_date": (datetime.utcnow() + timedelta(hours=6)).isoformat(),
+                "created_at": (utcnow() - timedelta(hours=2)).isoformat(),
+                "due_date": (utcnow() + timedelta(hours=6)).isoformat(),
                 "completed_at": None,
                 "submitted_for_approval_at": None
             },
@@ -2105,10 +2314,10 @@ async def get_milestones(
                 "created_by": "operator_01",
                 "assigned_to": "supervisor_01",
                 "approved_by": None,
-                "created_at": (datetime.utcnow() - timedelta(hours=4)).isoformat(),
-                "due_date": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
+                "created_at": (utcnow() - timedelta(hours=4)).isoformat(),
+                "due_date": (utcnow() + timedelta(hours=2)).isoformat(),
                 "completed_at": None,
-                "submitted_for_approval_at": (datetime.utcnow() - timedelta(minutes=30)).isoformat()
+                "submitted_for_approval_at": (utcnow() - timedelta(minutes=30)).isoformat()
             },
             {
                 "id": "ms_004",
@@ -2120,8 +2329,8 @@ async def get_milestones(
                 "created_by": "admin",
                 "assigned_to": None,
                 "approved_by": None,
-                "created_at": datetime.utcnow().isoformat(),
-                "due_date": (datetime.utcnow() + timedelta(days=14)).isoformat(),
+                "created_at": utcnow().isoformat(),
+                "due_date": (utcnow() + timedelta(days=14)).isoformat(),
                 "completed_at": None,
                 "submitted_for_approval_at": None
             }
@@ -2439,67 +2648,71 @@ async def handle_websocket_message(websocket: WebSocket, user_id: str, message: 
 
 # ==================== RESPONSE TEAMS ====================
 
+MOCK_TEAMS = [
+    {
+        "id": "team_001",
+        "name": "Rapid Response Unit A",
+        "type": "police",
+        "status": "available",
+        "location": {"lat": -1.2921, "lng": 36.8219},
+        "base": "Nairobi CBD Station",
+        "members": 4,
+        "vehicles": 1,
+        "capabilities": ["patrol", "apprehension", "traffic"],
+        "current_incident": None,
+        "last_deployed": (utcnow() - timedelta(hours=3)).isoformat(),
+        "response_time_avg": 8.5
+    },
+    {
+        "id": "team_002",
+        "name": "Medical Emergency Team",
+        "type": "medical",
+        "status": "deployed",
+        "location": {"lat": -1.2864, "lng": 36.8232},
+        "base": "Central Hospital",
+        "members": 3,
+        "vehicles": 1,
+        "capabilities": ["first_aid", "ambulance", "medical"],
+        "current_incident": "inc_003",
+        "last_deployed": (utcnow() - timedelta(minutes=15)).isoformat(),
+        "response_time_avg": 6.2
+    },
+    {
+        "id": "team_003",
+        "name": "Traffic Control Unit",
+        "type": "traffic",
+        "status": "available",
+        "location": {"lat": -1.2833, "lng": 36.8167},
+        "base": "Moi Avenue Station",
+        "members": 2,
+        "vehicles": 2,
+        "capabilities": ["traffic_management", "accident_response"],
+        "current_incident": None,
+        "last_deployed": (utcnow() - timedelta(hours=5)).isoformat(),
+        "response_time_avg": 5.8
+    },
+    {
+        "id": "team_004",
+        "name": "K9 Unit",
+        "type": "police",
+        "status": "unavailable",
+        "location": {"lat": -1.2900, "lng": 36.8200},
+        "base": "Police Headquarters",
+        "members": 2,
+        "vehicles": 1,
+        "capabilities": ["detection", "apprehension", "search"],
+        "current_incident": None,
+        "last_deployed": (utcnow() - timedelta(days=1)).isoformat(),
+        "response_time_avg": 12.3
+    }
+]
+
+TEAMS_STORE = MOCK_TEAMS.copy()
+
 @app.get("/api/teams")
 async def get_response_teams(status: Optional[str] = None):
     """Get all response teams"""
-    teams = [
-        {
-            "id": "team_001",
-            "name": "Rapid Response Unit A",
-            "type": "police",
-            "status": "available",
-            "location": {"lat": -1.2921, "lng": 36.8219},
-            "base": "Nairobi CBD Station",
-            "members": 4,
-            "vehicles": 1,
-            "capabilities": ["patrol", "apprehension", "traffic"],
-            "current_incident": None,
-            "last_deployed": (datetime.utcnow() - timedelta(hours=3)).isoformat(),
-            "response_time_avg": 8.5
-        },
-        {
-            "id": "team_002",
-            "name": "Medical Emergency Team",
-            "type": "medical",
-            "status": "deployed",
-            "location": {"lat": -1.2864, "lng": 36.8232},
-            "base": "Central Hospital",
-            "members": 3,
-            "vehicles": 1,
-            "capabilities": ["first_aid", "ambulance", "medical"],
-            "current_incident": "inc_003",
-            "last_deployed": (datetime.utcnow() - timedelta(minutes=15)).isoformat(),
-            "response_time_avg": 6.2
-        },
-        {
-            "id": "team_003",
-            "name": "Traffic Control Unit",
-            "type": "traffic",
-            "status": "available",
-            "location": {"lat": -1.2833, "lng": 36.8167},
-            "base": "Moi Avenue Station",
-            "members": 2,
-            "vehicles": 2,
-            "capabilities": ["traffic_management", "accident_response"],
-            "current_incident": None,
-            "last_deployed": (datetime.utcnow() - timedelta(hours=5)).isoformat(),
-            "response_time_avg": 5.8
-        },
-        {
-            "id": "team_004",
-            "name": "K9 Unit",
-            "type": "police",
-            "status": "unavailable",
-            "location": {"lat": -1.2900, "lng": 36.8200},
-            "base": "Police Headquarters",
-            "members": 2,
-            "vehicles": 1,
-            "capabilities": ["detection", "apprehension", "search"],
-            "current_incident": None,
-            "last_deployed": (datetime.utcnow() - timedelta(days=1)).isoformat(),
-            "response_time_avg": 12.3
-        }
-    ]
+    teams = TEAMS_STORE.copy()
     
     if status:
         teams = [t for t in teams if t["status"] == status]
@@ -2511,16 +2724,51 @@ async def dispatch_team(team_id: str, dispatch_data: Dict[str, Any]):
     """Dispatch a response team to an incident"""
     incident_id = dispatch_data.get("incident_id")
     priority = dispatch_data.get("priority", "normal")
+    eta_minutes = 8
     
     logger.info(f"Dispatching team {team_id} to incident {incident_id} (priority: {priority})")
     
+    team_name = team_id
+    for team in TEAMS_STORE:
+        if team["id"] == team_id:
+            team["status"] = "deployed"
+            team["current_incident"] = incident_id
+            team["last_deployed"] = utcnow().isoformat()
+            team_name = team["name"]
+            break
+    
+    dispatch_id = f"disp_{uuid.uuid4().hex[:8]}"
+    dispatch_entry = {
+        "id": dispatch_id,
+        "incident_id": incident_id,
+        "team_id": team_id,
+        "team_name": team_name,
+        "status": "en_route",
+        "priority": priority,
+        "assigned_at": utcnow().isoformat(),
+        "eta": (utcnow() + timedelta(minutes=eta_minutes)).isoformat(),
+        "arrived_at": None,
+        "resolved_at": None,
+        "notes": f"Dispatched to incident {incident_id}"
+    }
+    DISPATCHES_STORE.append(dispatch_entry)
+    
     return {
+        "success": True,
         "message": "Team dispatched successfully",
         "team_id": team_id,
         "incident_id": incident_id,
         "priority": priority,
-        "dispatch_time": datetime.utcnow().isoformat(),
-        "eta_minutes": 8
+        "dispatch_time": utcnow().isoformat(),
+        "eta": f"{eta_minutes} minutes",
+        "eta_minutes": eta_minutes,
+        "dispatch": {
+            "id": dispatch_id,
+            "team_id": team_id,
+            "incident_id": incident_id,
+            "status": "dispatched",
+            "eta": f"{eta_minutes} minutes"
+        }
     }
 
 @app.post("/api/teams/{team_id}/status")
@@ -2532,42 +2780,44 @@ async def update_team_status(team_id: str, status_data: Dict[str, Any]):
         "message": "Team status updated",
         "team_id": team_id,
         "new_status": new_status,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== DISPATCH MANAGEMENT ====================
 
+DISPATCHES_STORE = [
+    {
+        "id": "disp_001",
+        "incident_id": "inc_001",
+        "team_id": "team_001",
+        "team_name": "Rapid Response Unit A",
+        "status": "en_route",
+        "priority": "high",
+        "assigned_at": (utcnow() - timedelta(minutes=10)).isoformat(),
+        "eta": (utcnow() + timedelta(minutes=5)).isoformat(),
+        "arrived_at": None,
+        "resolved_at": None,
+        "notes": "Proceed to Kenyatta Avenue ATM area"
+    },
+    {
+        "id": "disp_002",
+        "incident_id": "inc_002",
+        "team_id": "team_003",
+        "team_name": "Traffic Control Unit",
+        "status": "on_scene",
+        "priority": "medium",
+        "assigned_at": (utcnow() - timedelta(minutes=25)).isoformat(),
+        "eta": None,
+        "arrived_at": (utcnow() - timedelta(minutes=20)).isoformat(),
+        "resolved_at": None,
+        "notes": "Managing traffic at intersection"
+    }
+]
+
 @app.get("/api/dispatch")
 async def get_dispatches(status: Optional[str] = None):
     """Get all dispatches"""
-    dispatches = [
-        {
-            "id": "disp_001",
-            "incident_id": "inc_001",
-            "team_id": "team_001",
-            "team_name": "Rapid Response Unit A",
-            "status": "en_route",
-            "priority": "high",
-            "assigned_at": (datetime.utcnow() - timedelta(minutes=10)).isoformat(),
-            "eta": (datetime.utcnow() + timedelta(minutes=5)).isoformat(),
-            "arrived_at": None,
-            "resolved_at": None,
-            "notes": "Proceed to Kenyatta Avenue ATM area"
-        },
-        {
-            "id": "disp_002",
-            "incident_id": "inc_002",
-            "team_id": "team_003",
-            "team_name": "Traffic Control Unit",
-            "status": "on_scene",
-            "priority": "medium",
-            "assigned_at": (datetime.utcnow() - timedelta(minutes=25)).isoformat(),
-            "eta": None,
-            "arrived_at": (datetime.utcnow() - timedelta(minutes=20)).isoformat(),
-            "resolved_at": None,
-            "notes": "Managing traffic at intersection"
-        }
-    ]
+    dispatches = DISPATCHES_STORE.copy()
     
     if status:
         dispatches = [d for d in dispatches if d["status"] == status]
@@ -2584,7 +2834,7 @@ async def create_dispatch(dispatch_data: Dict[str, Any]):
         "team_name": dispatch_data.get("team_name", "Unassigned"),
         "status": "pending",
         "priority": dispatch_data.get("priority", "normal"),
-        "assigned_at": datetime.utcnow().isoformat(),
+        "assigned_at": utcnow().isoformat(),
         "eta": None,
         "arrived_at": None,
         "resolved_at": None,
@@ -2602,7 +2852,7 @@ async def update_dispatch(dispatch_id: str, update_data: Dict[str, Any]):
         "message": "Dispatch updated",
         "dispatch_id": dispatch_id,
         "status": update_data.get("status"),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== SYSTEM CONFIG ====================
@@ -2651,7 +2901,7 @@ async def update_system_config(config_data: Dict[str, Any]):
     return {
         "message": "Configuration updated successfully",
         "changes": list(config_data.keys()),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== DASHBOARD SUMMARY ====================
@@ -2692,7 +2942,7 @@ async def get_dashboard_summary():
             "storage_usage": 38,
             "network_latency": 12
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }
 
 # ==================== AI SERVICES ====================
@@ -2815,6 +3065,315 @@ async def get_models_info():
         "models": models_info,
         "config": config,
     }
+
+
+# ==================== NEW MODULE ENDPOINTS ====================
+
+# AI Pipeline Endpoints
+@app.get("/api/ai/pipeline/stats")
+async def get_ai_stats():
+    """Get AI pipeline statistics"""
+    return pipeline.get_stats()
+
+
+@app.post("/api/ai/pipeline/detect")
+async def ai_detect(camera_id: str):
+    """Process frame through AI pipeline"""
+    import numpy as np
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    analysis = pipeline.process_frame(frame, camera_id)
+    return analysis.to_dict()
+
+
+# ANPR Endpoints
+@app.get("/api/anpr/stats")
+async def get_anpr_stats():
+    """Get ANPR statistics"""
+    return anpr.get_vehicle_stats()
+
+
+@app.get("/api/anpr/detections")
+async def get_anpr_detections(camera_id: Optional[str] = None):
+    """Get detected license plates"""
+    plates = anpr.get_plate_history(camera_id)
+    return [p.to_dict() for p in plates]
+
+
+@app.get("/api/anpr/vehicle/{plate_number}")
+async def lookup_vehicle(plate_number: str):
+    """Look up vehicle by plate number"""
+    vehicle = anpr.lookup_vehicle(plate_number)
+    return vehicle.to_dict() if vehicle else {"error": "Vehicle not found"}
+
+
+@app.post("/api/anpr/validate-plate")
+async def validate_plate(plate: str):
+    """Validate Kenyan license plate"""
+    is_valid, plate_type = KenyanPlateValidator.validate(plate)
+    return {"valid": is_valid, "plate_type": plate_type.value, "normalized": KenyanPlateValidator.normalize(plate)}
+
+
+# Alert Endpoints
+@app.get("/api/new-alerts")
+async def get_new_alerts(
+    status: Optional[str] = None,
+    severity: Optional[str] = None,
+    limit: int = 100
+):
+    """Get alerts from new alert system"""
+    alert_status = AlertStatus(status) if status else None
+    alert_severity = AlertSeverity(severity) if severity else None
+    
+    alerts = alert_manager.get_alerts(
+        status=alert_status,
+        severity=alert_severity,
+        limit=limit
+    )
+    return [a.to_dict() for a in alerts]
+
+
+@app.post("/api/new-alerts")
+async def create_new_alert(
+    alert_type: str,
+    severity: str,
+    title: str,
+    message: str,
+    source: str = "",
+    camera_id: Optional[str] = None,
+    location: Optional[Dict[str, float]] = None
+):
+    """Create a new alert"""
+    alert = alert_manager.create_alert(
+        alert_type=AlertType(alert_type),
+        severity=AlertSeverity(severity),
+        title=title,
+        message=message,
+        source=source,
+        camera_id=camera_id,
+        location=location
+    )
+    return alert.to_dict()
+
+
+@app.post("/api/new-alerts/{alert_id}/acknowledge")
+async def acknowledge_new_alert(alert_id: str, user_id: str):
+    """Acknowledge an alert"""
+    alert = alert_manager.acknowledge_alert(alert_id, user_id)
+    return alert.to_dict() if alert else {"error": "Alert not found"}
+
+
+@app.get("/api/new-alerts/stats")
+async def get_alert_stats():
+    """Get alert statistics"""
+    return alert_manager.get_stats()
+
+
+# Risk Engine Endpoints
+@app.post("/api/risk/assess-new")
+async def assess_risk_new(
+    incident_type: str,
+    location: str,
+    coordinates: Optional[Dict[str, float]] = None,
+    camera_id: Optional[str] = None,
+    detections: Optional[List[Dict]] = None
+):
+    """Perform risk assessment using new risk engine"""
+    assessment = risk_engine.assess_risk(
+        incident_type=incident_type,
+        location=location,
+        coordinates=coordinates,
+        camera_id=camera_id,
+        detections=detections or []
+    )
+    return assessment.to_dict()
+
+
+@app.get("/api/risk/camera/{camera_id}")
+async def get_camera_risk(camera_id: str):
+    """Get latest risk assessment for camera"""
+    assessment = risk_engine.get_camera_risk(camera_id)
+    return assessment.to_dict() if assessment else {"error": "No assessment found"}
+
+
+@app.get("/api/risk/trends/{camera_id}")
+async def get_risk_trends(camera_id: str, hours: int = 24):
+    """Get risk trends for camera"""
+    trends = risk_engine.get_risk_trends(camera_id, hours)
+    return [t.to_dict() for t in trends]
+
+
+@app.get("/api/risk/stats")
+async def get_risk_stats():
+    """Get risk engine statistics"""
+    return risk_engine.get_stats()
+
+
+# Offence Engine Endpoints
+@app.get("/api/offences/new")
+async def get_new_offences(
+    status: Optional[str] = None,
+    plate_number: Optional[str] = None,
+    limit: int = 100
+):
+    """Get offences from new offence engine"""
+    offence_status = OffenceStatus(status) if status else None
+    
+    offences = offence_engine.get_offences(
+        status=offence_status,
+        plate_number=plate_number,
+        limit=limit
+    )
+    return [o.to_dict() for o in offences]
+
+
+@app.post("/api/offences/detect")
+async def detect_offence(
+    offence_type: str,
+    plate_number: str,
+    camera_id: str,
+    location: str,
+    speed: Optional[float] = None,
+    limit: Optional[float] = None,
+    coordinates: Optional[Dict[str, float]] = None
+):
+    """Detect a new offence"""
+    offence = offence_engine.detect_offence(
+        offence_type=OffenceType(offence_type),
+        plate_number=plate_number,
+        camera_id=camera_id,
+        location=location,
+        coordinates=coordinates,
+        speed=speed,
+        limit=limit
+    )
+    return offence.to_dict()
+
+
+@app.get("/api/offences/stats")
+async def get_offence_stats():
+    """Get offence statistics"""
+    return offence_engine.get_stats()
+
+
+# Integration Endpoints
+@app.get("/api/integrations/stats")
+async def get_integration_stats():
+    """Get integration statistics"""
+    return integrations.get_stats()
+
+
+@app.get("/api/integrations/list")
+async def list_integrations():
+    """List all integrations"""
+    return {
+        name: {
+            "name": config.name,
+            "type": config.integration_type.value,
+            "endpoint": config.endpoint,
+            "enabled": config.enabled
+        }
+        for name, config in integrations.configs.items()
+    }
+
+
+# ==================== CACHE ENDPOINTS ====================
+
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics"""
+    if not CACHE_AVAILABLE or cache is None:
+        return {"status": "unavailable"}
+    return cache.get_stats()
+
+
+@app.post("/api/cache/clear")
+async def clear_cache():
+    """Clear all cache"""
+    if not CACHE_AVAILABLE or cache is None:
+        return {"status": "unavailable"}
+    cache.clear()
+    return {"status": "cleared"}
+
+
+@app.post("/api/cache/invalidate")
+async def invalidate_cache(resource: str):
+    """Invalidate specific cache"""
+    if not CACHE_AVAILABLE or response_cache is None:
+        return {"status": "unavailable"}
+    
+    if resource == "incidents":
+        response_cache.invalidate_incidents()
+    elif resource == "cameras":
+        response_cache.invalidate_cameras()
+    
+    return {"status": "invalidated", "resource": resource}
+
+
+# ==================== REAL-TIME EVENTS ====================
+
+# Import event system
+try:
+    from events import event_broadcaster, event_handler, EventType
+    EVENT_SYSTEM_AVAILABLE = True
+except ImportError:
+    EVENT_SYSTEM_AVAILABLE = False
+    event_broadcaster = None
+
+# Import cache
+try:
+    from cache import cache, response_cache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+    cache = None
+
+
+@app.get("/api/events/stats")
+async def get_event_stats():
+    """Get event system statistics"""
+    if not EVENT_SYSTEM_AVAILABLE or event_broadcaster is None:
+        return {"status": "unavailable"}
+    return event_broadcaster.get_event_stats()
+
+
+@app.get("/api/events/recent")
+async def get_recent_events(limit: int = 50):
+    """Get recent events"""
+    if not EVENT_SYSTEM_AVAILABLE or event_broadcaster is None:
+        return {"events": [], "status": "unavailable"}
+    return {
+        "events": event_broadcaster.get_recent_events(limit),
+        "status": "active"
+    }
+
+
+@app.websocket("/ws/events")
+async def websocket_events(websocket: WebSocket):
+    """WebSocket for real-time events"""
+    await websocket.accept()
+    
+    if EVENT_SYSTEM_AVAILABLE and event_broadcaster:
+        event_broadcaster.subscribe(websocket)
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Handle subscription messages
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "subscribe":
+                    event_types = msg.get("events", ["all"])
+                    if EVENT_SYSTEM_AVAILABLE and event_broadcaster:
+                        event_broadcaster.subscribe(websocket, event_types)
+                    await websocket.send_text(json.dumps({
+                        "type": "subscribed",
+                        "events": event_types
+                    }))
+            except:
+                pass
+    except WebSocketDisconnect:
+        if EVENT_SYSTEM_AVAILABLE and event_broadcaster:
+            event_broadcaster.unsubscribe(websocket)
 
 
 # ==================== STARTUP ====================

@@ -9,7 +9,10 @@ import uuid
 import hashlib
 import cv2
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+def utcnow():
+    return datetime.now(timezone.utc)
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -336,7 +339,7 @@ class AIDetectionPipeline:
         self.detection_history[camera_id].extend(events)
         
         # Keep only last 24 hours of data
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        cutoff_time = utcnow() - timedelta(hours=24)
         self.detection_history[camera_id] = [
             event for event in self.detection_history[camera_id]
             if event.timestamp > cutoff_time
@@ -401,7 +404,7 @@ class RiskScoringEngine:
             factors=factors,
             recommended_action=recommended_action,
             confidence=0.85,  # Model confidence
-            timestamp=datetime.utcnow()
+            timestamp=utcnow()
         )
     
     def _calculate_behavioral_risk(self, events: List[DetectionEvent]) -> float:
@@ -454,7 +457,7 @@ class RiskScoringEngine:
     
     def _calculate_temporal_risk(self, events: List[DetectionEvent], context: Dict[str, Any]) -> float:
         """Calculate temporal risk based on time patterns"""
-        current_hour = datetime.utcnow().hour
+        current_hour = utcnow().hour
         
         # Night hours are higher risk
         if 22 <= current_hour or current_hour <= 5:
@@ -562,7 +565,7 @@ class EvidenceManager:
         """Create tamper-proof evidence package"""
         
         package_id = str(uuid.uuid4())
-        created_at = datetime.utcnow()
+        created_at = utcnow()
         
         # Calculate retention period
         retention_until = self._calculate_retention_date(risk_assessment.risk_level)
@@ -616,7 +619,7 @@ class EvidenceManager:
             'action': 'review',
             'reviewer_id': reviewer_id,
             'decision': decision,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': utcnow().isoformat()
         })
         
         # Re-hash after modification
@@ -642,10 +645,10 @@ class EvidenceManager:
         package.status = EvidenceStatus.APPEALED
         package.appeal_status = 'submitted'
         package.metadata['appeal_reason'] = appeal_reason
-        package.metadata['appeal_date'] = datetime.utcnow().isoformat()
+        package.metadata['appeal_date'] = utcnow().isoformat()
         
         # Extend retention for appeal
-        package.retention_until = datetime.utcnow() + self.retention_policies['appeals_data']
+        package.retention_until = utcnow() + self.retention_policies['appeals_data']
         
         # Log appeal
         self._log_audit_event('appeal_submitted', {
@@ -663,9 +666,9 @@ class EvidenceManager:
     def _calculate_retention_date(self, risk_level: RiskLevel) -> datetime:
         """Calculate retention date based on risk level"""
         if risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
-            return datetime.utcnow() + self.retention_policies['offence_evidence']
+            return utcnow() + self.retention_policies['offence_evidence']
         else:
-            return datetime.utcnow() + self.retention_policies['non_offence']
+            return utcnow() + self.retention_policies['non_offence']
     
     def _get_camera_calibrations(self) -> Dict[str, Any]:
         """Get camera calibration data"""
@@ -678,7 +681,7 @@ class EvidenceManager:
     def _log_audit_event(self, event_type: str, data: Dict[str, Any]):
         """Log audit event for chain of custody"""
         audit_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': utcnow().isoformat(),
             'event_type': event_type,
             'data': data,
             'user_id': 'system',
@@ -723,7 +726,7 @@ class MilestoneManager:
             created_by=created_by,
             assigned_to=assigned_to,
             approved_by=None,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
             updated_at=None,
             due_date=due_date,
             completed_at=None,
@@ -761,7 +764,7 @@ class MilestoneManager:
             if hasattr(milestone, key):
                 setattr(milestone, key, value)
         
-        milestone.updated_at = datetime.utcnow()
+        milestone.updated_at = utcnow()
         
         self._log_audit_event('milestone_updated', {
             'milestone_id': milestone_id,
@@ -783,8 +786,8 @@ class MilestoneManager:
             return None
         
         milestone.status = MilestoneStatus.PENDING_APPROVAL
-        milestone.submitted_for_approval_at = datetime.utcnow()
-        milestone.updated_at = datetime.utcnow()
+        milestone.submitted_for_approval_at = utcnow()
+        milestone.updated_at = utcnow()
         
         self._log_audit_event('milestone_submitted', {
             'milestone_id': milestone_id,
@@ -812,8 +815,8 @@ class MilestoneManager:
         milestone.status = MilestoneStatus.APPROVED
         milestone.approved_by = approved_by
         milestone.approval_notes = notes
-        milestone.completed_at = datetime.utcnow()
-        milestone.updated_at = datetime.utcnow()
+        milestone.completed_at = utcnow()
+        milestone.updated_at = utcnow()
         
         self._log_audit_event('milestone_approved', {
             'milestone_id': milestone_id,
@@ -842,7 +845,7 @@ class MilestoneManager:
         milestone.status = MilestoneStatus.REJECTED
         milestone.approved_by = rejected_by
         milestone.rejection_reason = reason
-        milestone.updated_at = datetime.utcnow()
+        milestone.updated_at = utcnow()
         
         self._log_audit_event('milestone_rejected', {
             'milestone_id': milestone_id,
@@ -897,7 +900,7 @@ class MilestoneManager:
     def _log_audit_event(self, event_type: str, data: Dict[str, Any]):
         """Log audit event for milestone"""
         audit_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': utcnow().isoformat(),
             'event_type': event_type,
             'data': data,
             'user_id': data.get('created_by', data.get('submitted_by', data.get('approved_by', data.get('rejected_by', 'system')))),
@@ -924,7 +927,7 @@ class KenyaOverwatchProduction:
     async def process_camera_stream(self, camera_id: str, frame: np.ndarray):
         """Process real-time camera stream through AI pipeline"""
         
-        timestamp = datetime.utcnow()
+        timestamp = utcnow()
         
         try:
             # Step 1: AI Detection Pipeline
@@ -989,11 +992,11 @@ class KenyaOverwatchProduction:
             status=IncidentStatus.UNDER_REVIEW,
             risk_assessment=risk_assessment,
             evidence_packages=[evidence_package],
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
             reported_by='AI_System',
             requires_human_review=risk_assessment.risk_level != RiskLevel.LOW,
             human_review_completed=False,
-            appeal_deadline=datetime.utcnow() + timedelta(days=30) if severity != SeverityLevel.LOW else None
+            appeal_deadline=utcnow() + timedelta(days=30) if severity != SeverityLevel.LOW else None
         )
         
         self.active_incidents[incident_id] = incident
@@ -1067,7 +1070,7 @@ class KenyaOverwatchProduction:
             'risk_level': risk_assessment.risk_level,
             'recommended_action': risk_assessment.recommended_action,
             'detections': [asdict(event) for event in events],
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': utcnow().isoformat()
         }
         
         # Send to WebSocket clients
@@ -1081,7 +1084,7 @@ class KenyaOverwatchProduction:
             'incident_id': incident.id,
             'severity': incident.severity,
             'requires_review': incident.requires_human_review,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': utcnow().isoformat()
         }
         
         logger.info(f"Incident Created Notification: {incident.id}")

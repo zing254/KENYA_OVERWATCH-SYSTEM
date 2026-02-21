@@ -30,6 +30,13 @@ export default function CameraFeed({ cameraId, cameraName, onClose }: CameraFeed
   const [detections, setDetections] = useState<Detection[]>([])
   const [showDetections, setShowDetections] = useState(true)
   const [bookmarks, setBookmarks] = useState<number[]>([])
+  const [currentTimestamp, setCurrentTimestamp] = useState<string>('')
+
+  useEffect(() => {
+    setCurrentTimestamp(new Date().toLocaleString())
+    const timer = setInterval(() => setCurrentTimestamp(new Date().toLocaleString()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!showDetections || !isPlaying) return
@@ -113,7 +120,7 @@ export default function CameraFeed({ cameraId, cameraName, onClose }: CameraFeed
           <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
           <span className="text-white text-sm font-medium">LIVE</span>
         </div>
-        <div className="absolute top-4 right-4 text-white text-sm font-mono">{new Date().toLocaleString()}</div>
+        <div className="absolute top-4 right-4 text-white text-sm font-mono">{currentTimestamp || 'Loading...'}</div>
       </div>
 
       <div className="bg-gray-800 px-4 py-2">
