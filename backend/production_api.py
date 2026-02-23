@@ -109,6 +109,9 @@ MOCK_CITIZEN_REPORTS = [
     }
 ]
 
+# In-memory database for cameras
+cameras_db: Dict[str, dict] = {}
+
 # Configure production logging
 import os
 
@@ -1850,6 +1853,38 @@ async def get_camera(camera_id: str):
 async def toggle_camera(camera_id: str):
     """Toggle camera on/off"""
     return {"message": "Camera toggled", "camera_id": camera_id, "new_status": "active"}
+
+@app.post("/api/cameras", status_code=201)
+async def create_camera(camera: dict):
+    """Create a new camera"""
+    camera_id = camera.get("id", f"cam_{len(cameras_db) + 1}")
+    new_camera = {
+        "id": camera_id,
+        "name": camera.get("name", "New Camera"),
+        "location": camera.get("location", "Unknown"),
+        "latitude": camera.get("latitude", 0.0),
+        "longitude": camera.get("longitude", 0.0),
+        "status": camera.get("status", "offline"),
+        "fps": camera.get("fps", 30),
+        "resolution": camera.get("resolution", "1080p"),
+        "ai_enabled": camera.get("ai_enabled", False),
+    }
+    cameras_db[camera_id] = new_camera
+    return {"message": "Camera created", "camera": new_camera}
+
+# ==================== TEAMS ====================
+
+@app.get("/api/teams")
+async def get_teams(status: Optional[str] = None):
+    """Get all response teams"""
+    teams = [
+        {"id": "team_1", "name": "Alpha Response Unit", "type": "response", "status": "available", "members": 5, "location": "Nairobi CBD"},
+        {"id": "team_2", "name": "Beta Patrol", "type": "patrol", "status": "deployed", "members": 3, "location": "Westlands"},
+        {"id": "team_3", "name": "Gamma Rapid Response", "type": "rapid_response", "status": "available", "members": 4, "location": "Kasarani"},
+    ]
+    if status:
+        teams = [t for t in teams if t["status"] == status]
+    return {"teams": teams, "total": len(teams)}
 
 # ==================== DASHBOARD ====================
 
