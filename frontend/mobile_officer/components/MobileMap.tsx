@@ -124,7 +124,7 @@ export default function MobileMap({
 
       {/* Active Incidents */}
       {activeIncidents.map(incident => (
-        incident.coordinates && (
+        incident.coordinates && incident.coordinates.lat != null && incident.coordinates.lng != null && (
           <Marker 
             key={incident.id}
             position={[incident.coordinates.lat, incident.coordinates.lng]}
@@ -152,7 +152,7 @@ export default function MobileMap({
       ))}
 
       {/* Teams */}
-      {teams.filter(t => t.location).map(team => (
+      {teams.filter(t => t.location && t.location.lat != null && t.location.lng != null).map(team => (
         <Marker 
           key={team.id}
           position={[team.location!.lat, team.location!.lng]}

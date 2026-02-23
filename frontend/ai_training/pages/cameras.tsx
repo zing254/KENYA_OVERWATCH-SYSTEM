@@ -148,7 +148,7 @@ export default function CamerasPage() {
         {showMap && (
           <div className="h-64 border-b border-gray-700">
             <LiveMap
-              markers={cameras.map(cam => ({
+              markers={cameras.filter(cam => cam.coordinates && cam.coordinates.lat != null && cam.coordinates.lng != null).map(cam => ({
                 id: cam.id,
                 position: [cam.coordinates.lat, cam.coordinates.lng] as [number, number],
                 type: 'camera' as const,
