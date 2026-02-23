@@ -1834,12 +1834,16 @@ async def delete_user(user_id: str):
 @app.get("/api/cameras")
 async def get_cameras(status: Optional[str] = None):
     """Get all cameras"""
-    cameras = [
+    default_cameras = [
         {"id": "cam_1", "name": "Downtown Main", "location": "Nairobi CBD", "status": "active", "fps": 30, "resolution": "1080p"},
         {"id": "cam_2", "name": "Airport Terminal 1", "location": "JKI Airport", "status": "active", "fps": 25, "resolution": "4K"},
         {"id": "cam_3", "name": "Mombasa Port", "location": "Mombasa", "status": "active", "fps": 30, "resolution": "1080p"},
         {"id": "cam_4", "name": "Nakuru Highway", "location": "Nakuru", "status": "inactive", "fps": 0, "resolution": "720p"},
     ]
+    cameras = list(cameras_db.values()) if cameras_db else []
+    all_cameras = {c["id"]: c for c in default_cameras}
+    all_cameras.update({c["id"]: c for c in cameras})
+    cameras = list(all_cameras.values())
     if status:
         cameras = [c for c in cameras if c["status"] == status]
     return {"cameras": cameras, "total": len(cameras)}
@@ -1847,7 +1851,15 @@ async def get_cameras(status: Optional[str] = None):
 @app.get("/api/cameras/{camera_id}")
 async def get_camera(camera_id: str):
     """Get camera by ID"""
-    return {"id": camera_id, "name": "Camera", "location": "Location", "status": "active", "fps": 30, "resolution": "1080p"}
+    default_cameras = {"cam_1": {"id": "cam_1", "name": "Downtown Main", "location": "Nairobi CBD", "status": "active", "fps": 30, "resolution": "1080p"},
+                       "cam_2": {"id": "cam_2", "name": "Airport Terminal 1", "location": "JKI Airport", "status": "active", "fps": 25, "resolution": "4K"},
+                       "cam_3": {"id": "cam_3", "name": "Mombasa Port", "location": "Mombasa", "status": "active", "fps": 30, "resolution": "1080p"},
+                       "cam_4": {"id": "cam_4", "name": "Nakuru Highway", "location": "Nakuru", "status": "inactive", "fps": 0, "resolution": "720p"}}
+    if camera_id in cameras_db:
+        return cameras_db[camera_id]
+    if camera_id in default_cameras:
+        return default_cameras[camera_id]
+    raise HTTPException(status_code=404, detail="Camera not found")
 
 @app.post("/api/cameras/{camera_id}/toggle")
 async def toggle_camera(camera_id: str):
@@ -1872,6 +1884,27 @@ async def create_camera(camera: dict):
     cameras_db[camera_id] = new_camera
     return {"message": "Camera created", "camera": new_camera}
 
+@app.put("/api/cameras/{camera_id}")
+async def update_camera(camera_id: str, camera: dict):
+    """Update a camera"""
+    default_cameras = ["cam_1", "cam_2", "cam_3", "cam_4"]
+    if camera_id in default_cameras:
+        cameras_db[camera_id] = {"id": camera_id, "name": f"Camera {camera_id}", "location": "Updated", "status": "active", "fps": 30, "resolution": "1080p"}
+    if camera_id not in cameras_db:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    cameras_db[camera_id].update(camera)
+    return {"message": "Camera updated", "camera": cameras_db[camera_id]}
+
+@app.delete("/api/cameras/{camera_id}")
+async def delete_camera(camera_id: str):
+    """Delete a camera"""
+    default_cameras = ["cam_1", "cam_2", "cam_3", "cam_4"]
+    if camera_id in default_cameras and camera_id not in cameras_db:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    if camera_id in cameras_db:
+        del cameras_db[camera_id]
+    return {"message": "Camera deleted", "camera_id": camera_id}
+
 # ==================== TEAMS ====================
 
 @app.get("/api/teams")
@@ -1885,6 +1918,40 @@ async def get_teams(status: Optional[str] = None):
     if status:
         teams = [t for t in teams if t["status"] == status]
     return {"teams": teams, "total": len(teams)}
+
+@app.post("/api/teams", status_code=201)
+async def create_team(team: dict):
+    """Create a new response team"""
+    team_id = team.get("id", f"team_{len(teams_db) + 1}")
+    new_team = {
+        "id": team_id,
+        "name": team.get("name", "New Team"),
+        "type": team.get("type", "response"),
+        "status": team.get("status", "available"),
+        "members": team.get("members", 0),
+        "location": team.get("location", "Unknown"),
+    }
+    teams_db[team_id] = new_team
+    return {"message": "Team created", "team": new_team}
+
+@app.put("/api/teams/{team_id}")
+async def update_team(team_id: str, team: dict):
+    """Update a team"""
+    if team_id not in teams_db:
+        raise HTTPException(status_code=404, detail="Team not found")
+    teams_db[team_id].update(team)
+    return {"message": "Team updated", "team": teams_db[team_id]}
+
+@app.delete("/api/teams/{team_id}")
+async def delete_team(team_id: str):
+    """Delete a team"""
+    if team_id not in teams_db:
+        raise HTTPException(status_code=404, detail="Team not found")
+    del teams_db[team_id]
+    return {"message": "Team deleted", "team_id": team_id}
+
+# In-memory database for teams
+teams_db: Dict[str, dict] = {}
 
 # ==================== DASHBOARD ====================
 
