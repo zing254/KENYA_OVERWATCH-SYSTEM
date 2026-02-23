@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
-from secure_production_api import app
-from app.services.auth import AuthService, AuditLogger
-from app.config.database import get_db, init_db
-from app.models.database import User, Incident, EvidencePackage, Alert
+from production_api import app
+from ai.pipeline import AIPipeline, pipeline
+from ai.anpr import ANPR, anpr
+from alerting.manager import alert_manager
+from risk_engine.engine import risk_engine
+from offence_engine.engine import offence_engine
 
 # Test database session
 @pytest.fixture

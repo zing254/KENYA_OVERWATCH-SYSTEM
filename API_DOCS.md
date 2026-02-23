@@ -5,6 +5,10 @@
 http://localhost:8000/api
 ```
 
+## Interactive Documentation
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
 ## Authentication
 
 ### Login
@@ -153,3 +157,162 @@ ws://localhost:8000/ws/{username}
 - Auth endpoints: 5 requests/minute
 - API endpoints: 60 requests/minute
 - WebSocket: 1 connection per user
+
+## Cameras
+
+### List Cameras
+```http
+GET /api/cameras
+```
+Query Parameters:
+- `status` - Filter by status (active, inactive, maintenance)
+
+### Get Camera
+```http
+GET /api/cameras/{camera_id}
+```
+
+### Create Camera
+```http
+POST /api/cameras
+Content-Type: application/json
+
+{
+  "name": "Camera Name",
+  "location": "Location",
+  "latitude": -1.2864,
+  "longitude": 36.8232,
+  "status": "active"
+}
+```
+
+### Update Camera
+```http
+PUT /api/cameras/{camera_id}
+```
+
+### Toggle Camera
+```http
+POST /api/cameras/{camera_id}/toggle
+```
+
+## Teams
+
+### List Teams
+```http
+GET /api/teams
+```
+
+### Create Team
+```http
+POST /api/teams
+```
+
+### Dispatch Team
+```http
+POST /api/teams/{team_id}/dispatch
+```
+
+## Alerts
+
+### List Alerts
+```http
+GET /api/alerts
+```
+
+### Acknowledge Alert
+```http
+POST /api/alerts/{alert_id}/acknowledge
+```
+
+### Bulk Acknowledge
+```http
+POST /api/alerts/bulk-acknowledge
+```
+
+## AI
+
+### AI Status
+```http
+GET /api/ai/status
+```
+
+### Analyze Image
+```http
+POST /api/ai/analyze
+```
+
+### Pipeline Stats
+```http
+GET /api/ai/pipeline/stats
+```
+
+## ANPR
+
+### ANPR Statistics
+```http
+GET /api/anpr/stats
+```
+
+### Detect Plate
+```http
+POST /api/anpr/detect
+```
+
+### Validate Plate
+```http
+GET /api/anpr/validate-plate?plate=KAA001A
+```
+
+## Dashboard
+
+### Dashboard Stats
+```http
+GET /api/dashboard/stats
+```
+
+### Dashboard Summary
+```http
+GET /api/dashboard/summary
+```
+
+## Users
+
+### List Users
+```http
+GET /api/users
+```
+
+### Get User
+```http
+GET /api/users/{user_id}
+```
+
+### Create User
+```http
+POST /api/users
+```
+
+## Configuration
+
+### Get Config
+```http
+GET /api/config
+```
+
+### Update Config
+```http
+PATCH /api/config
+```
+
+## Cache
+
+### Get Cache Stats
+```http
+GET /api/cache-stats
+```
+
+### Clear Cache
+```http
+POST /api/cache/clear
+```
