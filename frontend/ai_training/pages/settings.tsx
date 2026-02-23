@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
 import { 
   Settings, Save, Server, Database, Shield, Bell, Eye, Key, Activity, CheckCircle, XCircle,
-  Camera, Volume2, Zap, AlertTriangle, Car, User, Target, Flame, Wifi, MapPin, Clock,
+  Camera, Volume2, Zap, AlertTriangle, Car, Person, Target, Flame, Wifi, MapPin, Clock,
   VolumeX, Video, Mic, Radio, MessageSquare
 } from 'lucide-react'
 
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-300">Detection Types</h3>
                   {[
-                    { key: 'detectPersons', label: 'Person Detection', icon: User, desc: 'Detect and track persons' },
+                    { key: 'detectPersons', label: 'Person Detection', icon: Person, desc: 'Detect and track persons' },
                     { key: 'detectVehicles', label: 'Vehicle Detection', icon: Car, desc: 'Detect vehicles on road' },
                     { key: 'detectLicensePlates', label: 'License Plate Recognition', icon: Target, desc: 'ANPR for plate detection' },
                     { key: 'detectWeapons', label: 'Weapon Detection', icon: Zap, desc: 'Detect weapons and dangerous items' },
@@ -392,7 +392,7 @@ export default function SettingsPage() {
                     { key: 'criticalAlerts', label: 'Critical Incidents', desc: 'High severity alerts', icon: Zap },
                     { key: 'trafficAlerts', label: 'Traffic Violations', desc: 'Speed & red light violations', icon: Car },
                     { key: 'vehicleOfInterestAlerts', label: 'Vehicle of Interest', desc: 'Flagged vehicle re-identification', icon: Target },
-                    { key: 'personAlerts', label: 'Person Alerts', desc: 'Unknown person detection', icon: User },
+                    { key: 'personAlerts', label: 'Person Alerts', desc: 'Unknown person detection', icon: Person },
                     { key: 'cameraOfflineAlerts', label: 'Camera Offline', desc: 'When cameras go offline', icon: Video },
                     { key: 'dispatchAlerts', label: 'Dispatch Alerts', desc: 'Team dispatch notifications', icon: Bell },
                   ].map(item => (
