@@ -185,7 +185,7 @@ export default function LiveMapPage() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-blue-200">Last Update</p>
-              <p className="text-white text-sm">{lastUpdate ? lastUpdate.toLocaleTimeString() : 'Loading...'}</p>
+              <p className="text-white text-sm">{lastUpdate ? lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' }) : 'Loading...'}</p>
             </div>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}

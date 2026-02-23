@@ -428,7 +428,7 @@ export default function ANPRDashboard() {
                         </span>
                         <span>{log.camera}</span>
                         <Clock className="w-3 h-3" />
-                        {new Date(log.timestamp).toLocaleTimeString()}
+                        {new Date(log.timestamp).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
                       </div>
                     </div>
                   ))

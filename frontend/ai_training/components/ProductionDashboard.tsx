@@ -285,7 +285,7 @@ export default function ProductionDashboard() {
               </div>
               <div className="text-right">
                 <p className={`text-sm font-medium ${getStatusColor(incident.status)}`}>{incident.status}</p>
-                <p className="text-gray-500 text-xs">{new Date(incident.created_at).toLocaleTimeString()}</p>
+                <p className="text-gray-500 text-xs">{new Date(incident.created_at).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}</p>
               </div>
             </div>
           ))}

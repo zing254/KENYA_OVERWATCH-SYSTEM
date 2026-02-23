@@ -696,7 +696,7 @@ export default function ResponderApp() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
                     <Clock className="w-3 h-3" />
-                    {new Date(incident.created_at).toLocaleTimeString()}
+                    {new Date(incident.created_at).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
                   </div>
                   {incident.risk_assessment && (
                     <div className="mt-2 text-xs">
@@ -880,7 +880,7 @@ export default function ResponderApp() {
                       <div className="text-xs text-blue-400 font-medium">{msg.sender}</div>
                       <div className="text-sm">{msg.message}</div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
+                        {new Date(msg.timestamp).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
                       </div>
                     </div>
                   ))

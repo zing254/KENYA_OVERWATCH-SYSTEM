@@ -145,7 +145,7 @@ export default function MobileOfficer() {
                         <p className="text-gray-400 text-sm">{alert.message}</p>
                         <div className="flex items-center gap-1 mt-2 text-gray-500 text-xs">
                           <Clock className="w-3 h-3" />
-                          {new Date(alert.created_at).toLocaleTimeString()}
+                          {new Date(alert.created_at).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
                         </div>
                       </div>
                       {!alert.acknowledged && (

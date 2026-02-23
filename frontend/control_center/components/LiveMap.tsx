@@ -345,7 +345,7 @@ export default function LiveMap({
             Auto-refresh: {Math.round(refreshInterval / 1000)}s
           </span>
           <span className="text-xs text-gray-400">
-            Last: {lastUpdate.toLocaleTimeString()}
+            Last: {lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
           </span>
         </div>
       )}
