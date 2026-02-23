@@ -5,12 +5,40 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+    types: [opened, synchronize, reopened]
 
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
 
 jobs:
+  # Code Review Check
+  code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check PR title
+        run: |
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Description: ${{ github.event.pull_request.body }}"
+      
+      - name: Require related issues
+        run: |
+          # This is a placeholder - GitHub Actions cannot enforce linked issues
+          # Use branch protection rules in GitHub settings
+          echo "Please link this PR to an issue"
+
+  # PR Labeler
+  label-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Label PR based on branch
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
   # Backend Tests
   backend-test:
     runs-on: ubuntu-latest
