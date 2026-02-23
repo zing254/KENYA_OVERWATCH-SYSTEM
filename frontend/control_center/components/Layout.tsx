@@ -5,7 +5,7 @@ import { ReactNode, useState } from 'react'
 import { 
   Shield, Home, Video, AlertTriangle, Users, Bell, BarChart3, 
   Settings, LogOut, Menu, X, Map, FileText, Car, Activity,
-  ChevronDown, Search, User, Send
+  ChevronDown, Search, User, Send, MapPin
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -13,12 +13,23 @@ interface LayoutProps {
   title?: string
 }
 
+const KENYAN_CITIES = [
+  { name: 'Nairobi', county: 'Nairobi' },
+  { name: 'Mombasa', county: 'Mombasa' },
+  { name: 'Kisumu', county: 'Kisumu' },
+  { name: 'Eldoret', county: 'Uasin Gishu' },
+  { name: 'Nakuru', county: 'Nakuru' },
+  { name: 'Kakamega', county: 'Kakamega' },
+  { name: 'Garissa', county: 'Garissa' },
+  { name: 'Nyeri', county: 'Nyeri' },
+]
+
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/cameras', label: 'Cameras', icon: Video },
   { href: '/incidents', label: 'Incidents', icon: AlertTriangle },
   { href: '/dispatch', label: 'Dispatch', icon: Send },
-  { href: '/teams', label: 'Teams', icon: Users },
+  { href: '/teams', label: 'Response Teams', icon: Users },
   { href: '/map', label: 'Map', icon: Map },
   { href: '/alerts', label: 'Alerts', icon: Bell },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -26,7 +37,7 @@ const navItems = [
   { href: '/reports', label: 'Reports', icon: FileText },
 ]
 
-const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps) => {
+const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' }: LayoutProps) => {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -35,7 +46,7 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
     <>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Kenya Overwatch Production System - Real-time AI Surveillance & Risk Management" />
+        <meta name="description" content="Kenya Overwatch National Command Center - Real-time AI Surveillance & Risk Management System" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,11 +54,11 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       
-      <div className="min-h-screen bg-gray-900 flex">
-        {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300 fixed h-full z-30`}>
-          {/* Logo */}
-          <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+      <div className="min-h-screen bg-urban-charcoal flex">
+        {/* Sidebar - Government Green Theme */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-government-navy to-government-official border-r border-kenya-red/30 flex flex-col transition-all duration-300 fixed h-full z-30`}>
+          {/* Logo - Kenyan Flag Inspired */}
+          <div className="p-4 border-b border-kenya-red/30 flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center gap-2">
                 <Shield className="w-8 h-8 text-blue-400" />

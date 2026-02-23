@@ -67,6 +67,47 @@ def serialize_for_json(obj: Any) -> Any:
         return obj
 
 # Global citizen reports storage
+# Kenyan Cities and Counties Data
+KENYAN_CITIES = [
+    {"name": "Nairobi", "county": "Nairobi County", "lat": -1.2921, "lng": 36.8219},
+    {"name": "Mombasa", "county": "Mombasa County", "lat": -4.0435, "lng": 39.6682},
+    {"name": "Kisumu", "county": "Kisumu County", "lat": -0.1022, "lng": 34.7617},
+    {"name": "Eldoret", "county": "Uasin Gishu County", "lat": 0.5143, "lng": 35.2698},
+    {"name": "Nakuru", "county": "Nakuru County", "lat": -0.3031, "lng": 36.0800},
+    {"name": "Garissa", "county": "Garissa County", "lat": -0.4536, "lng": 39.6401},
+    {"name": "Nyeri", "county": "Nyeri County", "lat": -0.4197, "lng": 36.9553},
+    {"name": "Kakamega", "county": "Kakamega County", "lat": 0.2827, "lng": 34.7519},
+    {"name": "Meru", "county": "Meru County", "lat": 0.0500, "lng": 37.6500},
+    {"name": "Kilifi", "county": "Kilifi County", "lat": -3.6305, "lng": 39.8499},
+    {"name": "Machakos", "county": "Machakos County", "lat": -1.5177, "lng": 37.2634},
+    {"name": "Migori", "county": "Migori County", "lat": -1.0634, "lng": 34.4731},
+    {"name": "Kisii", "county": "Kisii County", "lat": -0.6817, "lng": 34.7660},
+    {"name": "Kitale", "county": "Trans Nzoia County", "lat": 1.0156, "lng": 35.0062},
+    {"name": "Malindi", "county": "Kilifi County", "lat": -3.2138, "lng": 40.1169},
+    {"name": "Narok", "county": "Narok County", "lat": -1.0789, "lng": 35.8604},
+    {"name": "Kericho", "county": "Kericho County", "lat": -0.3689, "lng": 35.3313},
+    {"name": "Embu", "county": "Embu County", "lat": -0.5389, "lng": 37.4583},
+    {"name": "Thika", "county": "Kiambu County", "lat": -1.0334, "lng": 37.0692},
+    {"name": "Naivasha", "county": "Nakuru County", "lat": -0.7172, "lng": 36.4320},
+]
+
+# Kenyan Phone Number Format Helper
+def format_kenyan_phone(phone: str) -> str:
+    """Format phone number to Kenyan format (+254...)"""
+    digits = ''.join(filter(str.isdigit, phone))
+    if digits.startswith('254'):
+        return f"+{digits}"
+    elif digits.startswith('07'):
+        return f"+254{digits[1:]}"
+    elif digits.startswith('01'):
+        return f"+254{digits}"
+    return f"+254{digits[-9:]}"
+
+# Currency Formatter
+def format_kes(amount: float) -> str:
+    """Format amount in Kenyan Shillings"""
+    return f"KES {amount:,.2f}"
+
 citizen_reports_store = []
 
 # Mock citizen reports for demonstration
@@ -2958,6 +2999,19 @@ async def update_dispatch(dispatch_id: str, update_data: Dict[str, Any]):
     }
 
 # ==================== SYSTEM CONFIG ====================
+
+@app.get("/api/kenya/regions")
+async def get_kenya_regions():
+    """Get all Kenyan cities and counties"""
+    counties = list(set(c["county"] for c in KENYAN_CITIES))
+    return {
+        "cities": KENYAN_CITIES,
+        "counties": counties,
+        "timezone": "Africa/Nairobi",
+        "currency": "KES",
+        "country": "Kenya",
+        "dialing_code": "+254"
+    }
 
 @app.get("/api/config")
 async def get_system_config():
