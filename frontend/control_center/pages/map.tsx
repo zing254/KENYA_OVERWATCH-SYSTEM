@@ -56,18 +56,19 @@ export default function LiveMapPage() {
       const teams = teamsData.teams || teamsData || []
       
       // Fetch alerts
-      const alertsRes = await fetch('http://localhost:8000/api/alerts?acknowledged=false')
+      const alertsRes = await fetch(`${API_URL}/api/alerts?acknowledged=false`)
       const alerts = await alertsRes.json()
 
       const newMarkers: MapMarker[] = []
 
       // Add incident markers (real Nairobi locations)
       incidents.forEach((incident: any) => {
-        if (incident.location) {
+        const lat = incident.coordinates?.lat ?? incident.latitude
+        const lng = incident.coordinates?.lng ?? incident.longitude
+        if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
           newMarkers.push({
             id: incident.id,
-            position: [incident.coordinates?.lat || -1.2921 + (Math.random() - 0.5) * 0.1, 
-                       incident.coordinates?.lng || 36.8219 + (Math.random() - 0.5) * 0.1],
+            position: [lat, lng],
             type: 'incident',
             title: incident.title,
             description: incident.description,
@@ -90,13 +91,15 @@ export default function LiveMapPage() {
       ]
       
       cameraLocations.forEach(cam => {
-        newMarkers.push({
-          id: cam.id,
-          position: [cam.lat, cam.lng],
-          type: 'camera',
-          title: cam.name,
-          status: 'online'
-        })
+        if (cam.lat != null && cam.lng != null) {
+          newMarkers.push({
+            id: cam.id,
+            position: [cam.lat, cam.lng],
+            type: 'camera',
+            title: cam.name,
+            status: 'online'
+          })
+        }
       })
 
       // Add team markers
@@ -108,26 +111,32 @@ export default function LiveMapPage() {
       ]
       
       teamLocations.forEach(team => {
-        newMarkers.push({
-          id: team.id,
-          position: [team.lat, team.lng],
-          type: 'team',
-          title: team.name,
-          status: team.status
-        })
+        if (team.lat != null && team.lng != null) {
+          newMarkers.push({
+            id: team.id,
+            position: [team.lat, team.lng],
+            type: 'team',
+            title: team.name,
+            status: team.status
+          })
+        }
       })
 
       // Add alert markers
       alerts.slice(0, 5).forEach((alert: any) => {
-        newMarkers.push({
-          id: alert.id,
-          position: [-1.2921 + (Math.random() - 0.5) * 0.05, 36.8219 + (Math.random() - 0.5) * 0.05],
-          type: 'alert',
-          title: alert.title,
-          description: alert.message,
-          severity: alert.severity,
-          status: 'active'
-        })
+        const lat = -1.2921 + (Math.random() - 0.5) * 0.05
+        const lng = 36.8219 + (Math.random() - 0.5) * 0.05
+        if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+          newMarkers.push({
+            id: alert.id,
+            position: [lat, lng],
+            type: 'alert',
+            title: alert.title,
+            description: alert.message,
+            severity: alert.severity,
+            status: 'active'
+          })
+        }
       })
 
       // Add officer markers (simulated for demo)
@@ -138,13 +147,15 @@ export default function LiveMapPage() {
       ]
       
       officerLocations.forEach(officer => {
-        newMarkers.push({
-          id: officer.id,
-          position: [officer.lat, officer.lng],
-          type: 'officer',
-          title: officer.name,
-          status: 'active'
-        })
+        if (officer.lat != null && officer.lng != null) {
+          newMarkers.push({
+            id: officer.id,
+            position: [officer.lat, officer.lng],
+            type: 'officer',
+            title: officer.name,
+            status: 'active'
+          })
+        }
       })
 
       setMarkers(newMarkers)

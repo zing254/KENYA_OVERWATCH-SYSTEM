@@ -439,7 +439,7 @@ export default function LiveMap({
         )}
 
         {/* Markers */}
-        {filteredMarkers.map(marker => (
+        {filteredMarkers.filter(m => m.position && m.position[0] != null && m.position[1] != null && !isNaN(m.position[0]) && !isNaN(m.position[1])).map(marker => (
           <Marker
             key={marker.id}
             position={marker.position}
