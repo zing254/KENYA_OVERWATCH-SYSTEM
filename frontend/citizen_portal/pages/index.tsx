@@ -409,30 +409,30 @@ export default function CitizenPortal() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-earth-sand">
       <Head>
         <title>Kenya Overwatch - Citizen Report</title>
         <meta name="description" content="Report emergencies to Kenya Overwatch" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 text-white py-4 px-4 shadow-lg">
+      <header className="bg-gradient-to-r from-government-navy to-government-official text-white py-4 px-4 shadow-lg">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8" />
+            <Shield className="w-8 h-8 text-primary-500" />
             <div>
               <h1 className="text-xl font-bold">Kenya Overwatch</h1>
-              <p className="text-xs text-blue-200">Citizen Emergency Portal</p>
+              <p className="text-xs text-primary-200">Citizen Emergency Portal</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setShowAlerts(!showAlerts)}
-              className="relative p-2 hover:bg-blue-800 rounded-lg transition-colors"
+              className="relative p-2 hover:bg-government-official/50 rounded-lg transition-colors"
             >
               <Bell className="w-5 h-5" />
               {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{alerts.length}</span>
+                <span className="absolute -top-1 -right-1 bg-kenya-red text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{alerts.length}</span>
               )}
             </button>
             <div className="text-sm flex items-center gap-1">

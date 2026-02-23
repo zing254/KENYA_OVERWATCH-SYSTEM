@@ -18,7 +18,7 @@ const navItems = [
   { href: '/cameras', label: 'Cameras', icon: Video },
   { href: '/incidents', label: 'Incidents', icon: AlertTriangle },
   { href: '/dispatch', label: 'Dispatch', icon: Send },
-  { href: '/teams', label: 'Teams', icon: Users },
+  { href: '/teams', label: 'Response Teams', icon: Users },
   { href: '/map', label: 'Map', icon: Map },
   { href: '/alerts', label: 'Alerts', icon: Bell },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -26,7 +26,7 @@ const navItems = [
   { href: '/reports', label: 'Reports', icon: FileText },
 ]
 
-const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps) => {
+const Layout = ({ children, title = 'Kenya Overwatch - AI Training Center' }: LayoutProps) => {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -35,7 +35,7 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
     <>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Kenya Overwatch Production System - Real-time AI Surveillance & Risk Management" />
+        <meta name="description" content="Kenya Overwatch AI Training Center - Machine Learning Model Development & Training" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,21 +43,21 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       
-      <div className="min-h-screen bg-gray-900 flex">
-        {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300 fixed h-full z-30`}>
-          {/* Logo */}
-          <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+      <div className="min-h-screen bg-urban-charcoal flex">
+        {/* Sidebar - Government Green Theme */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-government-navy to-government-official border-r border-kenya-red/30 flex flex-col transition-all duration-300 fixed h-full z-30`}>
+          {/* Logo - Kenyan Flag Inspired */}
+          <div className="p-4 border-b border-kenya-red/30 flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center gap-2">
-                <Shield className="w-8 h-8 text-blue-400" />
+                <Shield className="w-8 h-8 text-green-500" />
                 <div>
                   <h1 className="text-white font-bold text-sm">Kenya Overwatch</h1>
-                  <p className="text-gray-400 text-xs">Production System</p>
+                  <p className="text-gray-400 text-xs">AI Training Center</p>
                 </div>
               </div>
             )}
-            {!sidebarOpen && <Shield className="w-8 h-8 text-blue-400 mx-auto" />}
+            {!sidebarOpen && <Shield className="w-8 h-8 text-green-500 mx-auto" />}
           </div>
 
           {/* Navigation */}
@@ -70,8 +70,8 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-400 hover:bg-government-navy/50 hover:text-white'
                   }`}
                   title={!sidebarOpen ? item.label : undefined}
                 >
@@ -98,11 +98,11 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
         {/* Main content */}
         <div className={`flex-1 flex flex-col ${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300`}>
           {/* Top header */}
-          <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
+          <header className="bg-government-navy border-b border-kenya-red/30 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+                className="p-2 hover:bg-government-official/50 rounded-lg text-gray-400 hover:text-white transition-colors"
               >
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -113,7 +113,7 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 w-64"
+                  className="bg-urban-slate border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 w-64"
                 />
               </div>
             </div>
@@ -135,9 +135,9 @@ const Layout = ({ children, title = 'Kenya Overwatch Production' }: LayoutProps)
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-700 rounded-lg"
+                  className="flex items-center gap-2 p-2 hover:bg-government-official/50 rounded-lg"
                 >
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
                   <span className="text-white text-sm hidden md:block">Admin</span>

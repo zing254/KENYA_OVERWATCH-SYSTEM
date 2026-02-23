@@ -364,33 +364,33 @@ export default function ResponderApp() {
   const myDispatches = dispatches.filter(d => d.team_id === myTeam?.id || d.status !== 'resolved')
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-urban-charcoal text-white">
       <Head>
-        <title>Kenya Overwatch - Responder</title>
+        <title>Kenya Overwatch - Responder App</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </Head>
 
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-20">
+      <header className="bg-government-navy border-b border-kenya-red/30 sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 hover:bg-gray-700 rounded">
+            <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 hover:bg-government-official/50 rounded">
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex items-center gap-2">
-              <Shield className="w-6 h-6 text-blue-400" />
-              <span className="font-bold hidden sm:inline">Responder</span>
+              <Shield className="w-6 h-6 text-primary-500" />
+              <span className="font-bold hidden sm:inline">Responder App</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 hover:bg-gray-700 rounded"
+              className="relative p-2 hover:bg-government-official/50 rounded"
             >
               <Bell className="w-5 h-5" />
               {notifications.filter(n => n.severity === 'critical' || n.severity === 'high').length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-kenya-red text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                   {notifications.filter(n => n.severity === 'critical' || n.severity === 'high').length}
                 </span>
               )}
