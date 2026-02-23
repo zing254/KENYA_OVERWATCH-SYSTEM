@@ -3194,6 +3194,81 @@ async def get_anpr_stats():
     return anpr.get_vehicle_stats()
 
 
+# ==================== AI TRAINING ENDPOINTS ====================
+
+@app.get("/api/ai/training/models")
+async def get_training_models():
+    """Get all AI training models"""
+    return {
+        "models": [
+            {"id": "person_detector", "name": "Person Detector", "type": "detection", "status": "ready", "accuracy": 94.5, "last_trained": "2026-02-20", "dataset_size": 45000, "epochs": 150},
+            {"id": "vehicle_detector", "name": "Vehicle Detector", "type": "detection", "status": "ready", "accuracy": 96.2, "last_trained": "2026-02-18", "dataset_size": 62000, "epochs": 200},
+            {"id": "weapon_detector", "name": "Weapon Detector", "type": "detection", "status": "training", "accuracy": 78.3, "last_trained": "2026-02-23", "dataset_size": 12000, "epochs": 45},
+            {"id": "anpr_model", "name": "License Plate Reader", "type": "ocr", "status": "ready", "accuracy": 98.7, "last_trained": "2026-02-15", "dataset_size": 85000, "epochs": 300},
+            {"id": "behavior_analyzer", "name": "Behavior Analyzer", "type": "classification", "status": "ready", "accuracy": 89.1, "last_trained": "2026-02-10", "dataset_size": 35000, "epochs": 180},
+            {"id": "incident_classifier", "name": "Incident Classifier", "type": "classification", "status": "training", "accuracy": 82.4, "last_trained": "2026-02-23", "dataset_size": 28000, "epochs": 67},
+        ]
+    }
+
+@app.get("/api/ai/training/datasets")
+async def get_training_datasets():
+    """Get all training datasets"""
+    return {
+        "datasets": [
+            {"id": "kenya_persons", "name": "Kenya Persons", "type": "images", "size": 2.4, "samples": 45000, "last_updated": "2026-02-20"},
+            {"id": "kenya_vehicles", "name": "Kenya Vehicles", "type": "images", "size": 4.8, "samples": 62000, "last_updated": "2026-02-18"},
+            {"id": "weapon_images", "name": "Weapons Dataset", "type": "images", "size": 1.2, "samples": 12000, "last_updated": "2026-02-23"},
+            {"id": "license_plates", "name": "Kenya Plates", "type": "images", "size": 6.1, "samples": 85000, "last_updated": "2026-02-15"},
+            {"id": "behavior_data", "name": "Behavior Samples", "type": "annotations", "size": 0.8, "samples": 35000, "last_updated": "2026-02-10"},
+            {"id": "incident_data", "name": "Incidents", "type": "annotations", "size": 0.5, "samples": 28000, "last_updated": "2026-02-23"},
+        ]
+    }
+
+@app.get("/api/ai/training/jobs")
+async def get_training_jobs():
+    """Get training job status"""
+    return {
+        "jobs": [
+            {"id": "job_001", "model": "Weapon Detector", "status": "running", "progress": 67, "started_at": "2026-02-23 10:00", "estimated_time": "2h 15m"},
+            {"id": "job_002", "model": "Incident Classifier", "status": "running", "progress": 34, "started_at": "2026-02-23 08:30", "estimated_time": "4h 45m"},
+            {"id": "job_003", "model": "Person Detector", "status": "completed", "progress": 100, "started_at": "2026-02-20 14:00", "estimated_time": "3h 20m"},
+        ]
+    }
+
+@app.post("/api/ai/training/start")
+async def start_training(model_id: str, dataset_id: str, epochs: int = 100):
+    """Start a new training job"""
+    job_id = f"job_{random.randint(1000, 9999)}"
+    return {
+        "message": "Training job started",
+        "job_id": job_id,
+        "model_id": model_id,
+        "dataset_id": dataset_id,
+        "epochs": epochs,
+        "status": "running"
+    }
+
+@app.get("/api/ai/training/metrics")
+async def get_training_metrics():
+    """Get training metrics"""
+    return {
+        "overall_accuracy": 91.2,
+        "models_trained": 4,
+        "models_training": 2,
+        "total_samples": 267000,
+        "accuracy_by_type": {
+            "detection": 89.7,
+            "ocr": 98.7,
+            "classification": 85.8
+        },
+        "training_history": [
+            {"date": "2026-02-20", "accuracy": 94.5, "loss": 0.12},
+            {"date": "2026-02-18", "accuracy": 96.2, "loss": 0.08},
+            {"date": "2026-02-15", "accuracy": 98.7, "loss": 0.05},
+        ]
+    }
+
+
 @app.get("/api/anpr/detections")
 async def get_anpr_detections(camera_id: Optional[str] = None):
     """Get detected license plates"""
