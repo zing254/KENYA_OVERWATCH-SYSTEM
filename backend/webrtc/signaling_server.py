@@ -8,7 +8,7 @@ import websockets
 import json
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Set, Optional
 import websockets.server
 
@@ -84,7 +84,7 @@ class WebRTCSignalingServer:
             "resolution": data.get("resolution", "720p"),
             "latitude": data.get("latitude"),
             "longitude": data.get("longitude"),
-            "last_seen": datetime.utcnow().isoformat()
+            "last_seen": datetime.now(timezone.utc).isoformat()
         }
         
         await websocket.send(json.dumps({
@@ -181,7 +181,7 @@ class WebRTCSignalingServer:
         if client_id in self.phone_streams:
             self.phone_streams[client_id]["latitude"] = data.get("latitude")
             self.phone_streams[client_id]["longitude"] = data.get("longitude")
-            self.phone_streams[client_id]["last_seen"] = datetime.utcnow().isoformat()
+            self.phone_streams[client_id]["last_seen"] = datetime.now(timezone.utc).isoformat()
             
             await self._notify_dashboards({
                 "type": "phone_location_update",

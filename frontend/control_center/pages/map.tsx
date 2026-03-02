@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import Layout from '@/components/Layout'
 import { RefreshCw, Layers, Navigation, Target, Eye, AlertTriangle, Shield, Users } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 // Dynamic import for Leaflet (client-side only)
 const LiveMap = dynamic(() => import('@/components/LiveMap'), {
   ssr: false,
@@ -42,16 +44,16 @@ export default function LiveMapPage() {
   const loadMapData = useCallback(async () => {
     try {
       // Fetch incidents
-      const incidentsRes = await fetch('http://localhost:8000/api/incidents?status=active')
+      const incidentsRes = await fetch(`${API_URL}/api/incidents?status=active`)
       const incidents = await incidentsRes.json()
       
       // Fetch cameras
-      const camerasRes = await fetch('http://localhost:8000/api/cameras')
+      const camerasRes = await fetch(`${API_URL}/api/cameras`)
       const camerasData = await camerasRes.json()
       const cameras = camerasData.cameras || camerasData || []
       
       // Fetch teams
-      const teamsRes = await fetch('http://localhost:8000/api/teams')
+      const teamsRes = await fetch(`${API_URL}/api/teams`)
       const teamsData = await teamsRes.json()
       const teams = teamsData.teams || teamsData || []
       

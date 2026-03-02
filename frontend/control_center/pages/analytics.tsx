@@ -8,13 +8,14 @@ import {
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 interface Stats {
   totalIncidents: number
   activeIncidents: number
   resolvedToday: number
   camerasOnline: number
+  camerasOffline?: number
   totalCameras: number
   responseTeams: number
   avgResponseTime: number

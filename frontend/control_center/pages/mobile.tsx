@@ -4,6 +4,8 @@ import { Alert, ProductionIncident, ResponseTeam } from '@/types'
 import { Bell, MapPin, Users, Shield, Clock, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react'
 import ApiService from '@/utils/api'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 export default function MobileOfficer() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [incidents, setIncidents] = useState<ProductionIncident[]>([])
@@ -21,7 +23,7 @@ export default function MobileOfficer() {
       const [alertsData, incidentsData, teamsData] = await Promise.all([
         ApiService.getAlerts({ acknowledged: false }),
         ApiService.getIncidents({ status: 'active' }),
-        fetch('http://localhost:8000/api/teams').then(r => r.json()).then(d => d.teams || d)
+        fetch(`${API_URL}/api/teams`).then(r => r.json()).then(d => d.teams || d)
       ])
       setAlerts(alertsData)
       setIncidents(incidentsData)

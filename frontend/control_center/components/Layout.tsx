@@ -5,7 +5,7 @@ import { ReactNode, useState } from 'react'
 import { 
   Shield, Home, Video, AlertTriangle, Users, Bell, BarChart3, 
   Settings, LogOut, Menu, X, Map, FileText, Car, Activity,
-  ChevronDown, Search, User, Send, MapPin
+  ChevronDown, Search, User, Send, MapPin, TrendingUp, Radio
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -13,31 +13,20 @@ interface LayoutProps {
   title?: string
 }
 
-const KENYAN_CITIES = [
-  { name: 'Nairobi', county: 'Nairobi' },
-  { name: 'Mombasa', county: 'Mombasa' },
-  { name: 'Kisumu', county: 'Kisumu' },
-  { name: 'Eldoret', county: 'Uasin Gishu' },
-  { name: 'Nakuru', county: 'Nakuru' },
-  { name: 'Kakamega', county: 'Kakamega' },
-  { name: 'Garissa', county: 'Garissa' },
-  { name: 'Nyeri', county: 'Nyeri' },
-]
-
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/cameras', label: 'Cameras', icon: Video },
-  { href: '/incidents', label: 'Incidents', icon: AlertTriangle },
-  { href: '/dispatch', label: 'Dispatch', icon: Send },
-  { href: '/teams', label: 'Response Teams', icon: Users },
-  { href: '/map', label: 'Map', icon: Map },
-  { href: '/alerts', label: 'Alerts', icon: Bell },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/offences', label: 'Offences', icon: Car },
+  { href: '/accidents', label: 'Accidents', icon: AlertTriangle },
+  { href: '/violations', label: 'Violations', icon: Car },
+  { href: '/roads', label: 'Roads', icon: Map },
+  { href: '/hotspots', label: 'Hotspots', icon: MapPin },
+  { href: '/cameras', label: 'Speed Cams', icon: Video },
+  { href: '/vehicles', label: 'Vehicles', icon: Car },
+  { href: '/dispatch', label: 'Dispatch', icon: Radio },
+  { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/reports', label: 'Reports', icon: FileText },
 ]
 
-const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' }: LayoutProps) => {
+const Layout = ({ children, title = 'NTSA Road Safety - National Command Center' }: LayoutProps) => {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -46,7 +35,7 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
     <>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Kenya Overwatch National Command Center - Real-time AI Surveillance & Risk Management System" />
+        <meta name="description" content="NTSA Road Safety - National Transport and Safety Authority Kenya" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -54,21 +43,21 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       
-      <div className="min-h-screen bg-urban-charcoal flex">
-        {/* Sidebar - Government Green Theme */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-government-navy to-government-official border-r border-kenya-red/30 flex flex-col transition-all duration-300 fixed h-full z-30`}>
-          {/* Logo - Kenyan Flag Inspired */}
-          <div className="p-4 border-b border-kenya-red/30 flex items-center justify-between">
+      <div className="min-h-screen bg-gray-900 flex">
+        {/* Sidebar - NTSA Official Theme */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-ntsa-primaryDark to-gray-900 border-r border-ntsa-primaryLight/30 flex flex-col transition-all duration-300 fixed h-full z-30`}>
+          {/* Logo - NTSA Official Branding */}
+          <div className="p-4 border-b border-ntsa-primaryLight/30 flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center gap-2">
-                <Shield className="w-8 h-8 text-blue-400" />
+                <Shield className="w-8 h-8 text-ntsa-primaryLight" />
                 <div>
-                  <h1 className="text-white font-bold text-sm">Kenya Overwatch</h1>
-                  <p className="text-gray-400 text-xs">Production System</p>
+                  <h1 className="text-white font-bold text-sm">NTSA Road Safety</h1>
+                  <p className="text-ntsa-primaryLight/70 text-xs">Kenya Overwatch</p>
                 </div>
               </div>
             )}
-            {!sidebarOpen && <Shield className="w-8 h-8 text-blue-400 mx-auto" />}
+            {!sidebarOpen && <Shield className="w-8 h-8 text-ntsa-primaryLight mx-auto" />}
           </div>
 
           {/* Navigation */}
@@ -81,8 +70,8 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-ntsa-primary text-white border-l-2 border-ntsa-primaryLight'
+                      : 'text-gray-400 hover:bg-ntsa-primaryDark/50 hover:text-white'
                   }`}
                   title={!sidebarOpen ? item.label : undefined}
                 >
@@ -108,12 +97,12 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
 
         {/* Main content */}
         <div className={`flex-1 flex flex-col ${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300`}>
-          {/* Top header */}
-          <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
+          {/* Top header - NTSA Theme */}
+          <header className="bg-gradient-to-r from-ntsa-primaryDark to-gray-900 border-b border-ntsa-primaryLight/30 px-6 py-3 flex items-center justify-between sticky top-0 z-20">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+                className="p-2 hover:bg-ntsa-primary/50 rounded-lg text-gray-400 hover:text-white transition-colors"
               >
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -123,21 +112,21 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search..."
-                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 w-64"
+                  placeholder="Search plate, location, incident..."
+                  className="bg-black/30 border border-ntsa-primaryLight/30 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-ntsa-primaryLight w-80"
                 />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Status indicator */}
+              {/* Status indicator - NTSA Theme */}
               <div className="flex items-center gap-2 text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-gray-400">System Online</span>
+                <span className="w-2 h-2 bg-ntsa-primaryLight rounded-full animate-pulse"></span>
+                <span className="text-ntsa-primaryLight">System Online</span>
               </div>
 
               {/* Notifications */}
-              <button className="relative p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors">
+              <button className="relative p-2 hover:bg-ntsa-primary/50 rounded-lg text-gray-400 hover:text-white transition-colors">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
@@ -146,12 +135,12 @@ const Layout = ({ children, title = 'Kenya Overwatch - National Command Center' 
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-700 rounded-lg"
+                  className="flex items-center gap-2 p-2 hover:bg-ntsa-primary/50 rounded-lg"
                 >
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-ntsa-primaryLight rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-white text-sm hidden md:block">Admin</span>
+                  <span className="text-white text-sm hidden md:block">Officer</span>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
 

@@ -4,71 +4,81 @@ module.exports = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    '../shared/components/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
       colors: {
-        // Kenyan Flag Colors
+        ntsa: {
+          primary: '#14532D',
+          primaryLight: '#22C55E',
+          primaryDark: '#0F2F1F',
+          accent: '#BB0000',
+          accentLight: '#DC2626',
+          black: '#000000',
+          white: '#FFFFFF',
+        },
         kenya: {
-          red: '#BB0000',      // Deep red from flag
-          green: '#006600',     // Forest green from flag
-          black: '#000000',     // Black from flag
-          white: '#FFFFFF',     // White from flag
+          red: '#BB0000',
+          green: '#006600',
+          black: '#000000',
+          white: '#FFFFFF',
         },
-        // Earth Tones (Savannah, Soil)
-        earth: {
-          gold: '#D4A853',     // Savannah gold
-          soil: '#8B4513',    // Soil brown
-          sunset: '#FF6B35',   // Sunset orange
-          sand: '#F5DEB3',     // Sand
-          clay: '#A0522D',     // Clay
+        status: {
+          success: '#22C55E',
+          warning: '#F59E0B',
+          danger: '#EF4444',
+          info: '#3B82F6',
         },
-        // Urban Nairobi Neutrals
-        urban: {
-          charcoal: '#1F2937',  // Charcoal
-          concrete: '#6B7280',   // Concrete grey
-          slate: '#374151',      // Dark slate
-          ash: '#9CA3AF',       // Ash grey
-        },
-        // Government/Institutional
-        government: {
-          navy: '#1E3A5F',      // Deep navy
-          official: '#2D5016',   // Official green
-          authority: '#7F1D1D',  // Authority red
-        },
-        // Primary (Intelligence/Security feel)
-        primary: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',      // Growth green
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
-        },
-        // Accent (Alert/Warning)
-        accent: {
-          50: '#fef2f2',
-          100: '#fee2e2',
-          500: '#BB0000',     // Kenyan red
-          600: '#991b1b',
-          700: '#7f1d1d',
-        },
-        danger: {
-          50: '#fef2f2',
-          100: '#fee2e2',
-          500: '#BB0000',     // Kenyan red
-          600: '#991b1b',
-          700: '#7f1d1d',
-        }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        serif: ['Merriweather', 'Georgia', 'serif'],
         display: ['Poppins', 'sans-serif'],
+      },
+      boxShadow: {
+        'ntsa': '0 4px 6px -1px rgba(20, 83, 45, 0.3), 0 2px 4px -1px rgba(20, 83, 45, 0.2)',
+        'ntsa-lg': '0 10px 15px -3px rgba(20, 83, 45, 0.4), 0 4px 6px -2px rgba(20, 83, 45, 0.2)',
+      },
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'glow': 'glow 2s ease-in-out infinite alternate',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'slide-down': 'slideDown 0.3s ease-out',
+        'fade-in': 'fadeIn 0.5s ease-out',
+        'scale-in': 'scaleIn 0.2s ease-out',
+        'shimmer': 'shimmer 2s linear infinite',
+        'spin-slow': 'spin 3s linear infinite',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        glow: {
+          '0%': { boxShadow: '0 0 5px rgba(34, 197, 94, 0.5)' },
+          '100%': { boxShadow: '0 0 20px rgba(34, 197, 94, 0.8), 0 0 40px rgba(34, 197, 94, 0.4)' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        slideDown: {
+          '0%': { transform: 'translateY(-10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
     },
   },

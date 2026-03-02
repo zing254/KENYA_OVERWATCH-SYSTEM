@@ -7,7 +7,7 @@ import asyncio
 import uuid
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import numpy as np
 import cv2
@@ -34,7 +34,7 @@ class EvidenceCollector:
         """Capture screenshot with metadata"""
         screenshot_id = str(uuid.uuid4())
         
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         filename = f"{incident_id}_{camera_id}_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = self.storage_path / filename
         
@@ -66,7 +66,7 @@ class EvidenceCollector:
         """Capture video snippet from frames buffer"""
         snippet_id = str(uuid.uuid4())
         
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         filename = f"{incident_id}_{camera_id}_{timestamp.strftime('%Y%m%d_%H%M%S')}.mp4"
         filepath = self.storage_path / filename
         
@@ -108,7 +108,7 @@ class EvidenceCollector:
         report = {
             "id": report_id,
             "incident_id": incident_id,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "metadata": metadata,
             "evidence": evidence_list,
             "summary": {
@@ -137,7 +137,7 @@ class EvidenceCollector:
     
     async def cleanup_old_evidence(self, days: int = 90):
         """Clean up evidence older than specified days"""
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         
         for filepath in self.storage_path.glob("*"):
             if filepath.is_file():

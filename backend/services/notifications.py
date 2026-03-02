@@ -4,7 +4,7 @@ Supports: Email, SMS, Push (FCM), WebSocket
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import json
 import asyncio
@@ -23,7 +23,7 @@ class Notification:
     message: str
     priority: str = "normal"  # low, normal, high, critical
     data: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     sent: bool = False
     error: Optional[str] = None
 

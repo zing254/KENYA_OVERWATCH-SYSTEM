@@ -5,7 +5,7 @@ Real-time GPS tracking for responders and citizens
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -26,7 +26,7 @@ class GPSPosition:
     speed: float = 0.0
     heading: float = 0.0
     battery_level: float = 100.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=datetime.now(timezone.utc))
 
 class GPSTrackingService:
     """
@@ -61,7 +61,7 @@ class GPSTrackingService:
             speed=speed,
             heading=heading,
             battery_level=battery_level,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)()
         )
         
         self.positions[user_id] = position
@@ -86,7 +86,7 @@ class GPSTrackingService:
         active_within_seconds: int = 300
     ) -> List[Dict[str, Any]]:
         """Get all active positions"""
-        cutoff = datetime.utcnow() - timedelta(seconds=active_within_seconds)
+        cutoff = datetime.now(timezone.utc)() - timedelta(seconds=active_within_seconds)
         
         results = []
         
@@ -241,7 +241,7 @@ class GPSTrackingService:
     
     async def cleanup_old_positions(self, hours: int = 24):
         """Remove old position data"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc)() - timedelta(hours=hours)
         
         for user_id in list(self.positions.keys()):
             if self.positions[user_id].timestamp < cutoff:

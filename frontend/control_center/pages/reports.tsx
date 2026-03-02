@@ -2,6 +2,8 @@ import Layout from '@/components/Layout'
 import { useState, useEffect } from 'react'
 import { BarChart3, TrendingUp, Calendar, Download, Filter } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 export default function Reports() {
   const [reportType, setReportType] = useState('incidents')
   const [dateRange, setDateRange] = useState('week')
@@ -15,7 +17,7 @@ export default function Reports() {
   const loadReport = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/api/analytics/trends?period=${dateRange}&metric=${reportType}`)
+      const response = await fetch(`${API_URL}/api/analytics/trends?period=${dateRange}&metric=${reportType}`)
       const data = await response.json()
       setReportData(data)
     } catch (error) {
@@ -27,7 +29,7 @@ export default function Reports() {
 
   const exportReport = async (format: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/export/${reportType}?format=${format}&limit=1000`)
+      const response = await fetch(`${API_URL}/api/export/${reportType}?format=${format}&limit=1000`)
       const data = await response.json()
       
       if (format === 'csv' && data.data) {

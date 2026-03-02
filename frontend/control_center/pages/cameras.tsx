@@ -8,18 +8,25 @@ import { Eye, Video, Grid, List, Search, Filter, RefreshCw, Settings, MapPin } f
 
 const LiveMap = dynamic(() => import('@/components/LiveMap'), { ssr: false })
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 interface Camera {
   id: string
   name: string
   location: string
-  coordinates: { lat: number; lng: number }
+  latitude?: number
+  longitude?: number
+  coordinates?: { lat: number; lng: number }
+  road_name?: string
+  type?: string
   status: string
-  ai_enabled: boolean
-  ai_models: string[]
-  resolution: string
-  fps: number
-  risk_score: number
-  detections_last_hour: number
+  ai_enabled?: boolean
+  ai_models?: string[]
+  resolution?: string
+  fps?: number
+  risk_score?: number
+  speed_limit?: number
+  last_update?: string
 }
 
 export default function CamerasPage() {
@@ -39,7 +46,7 @@ export default function CamerasPage() {
 
   const loadCameras = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/cameras')
+      const res = await fetch(`${API_URL}/api/cameras`)
       const data = await res.json()
       const cameraList = data.cameras || data || []
       setCameras(cameraList)

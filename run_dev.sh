@@ -1,10 +1,10 @@
 #!/bin/bash
-# Kenya Overwatch Development Mode
+# Kenya NTSA Road Safety - Development Mode
 
 set -e
 
 echo "=========================================="
-echo "  Kenya Overwatch - Development Mode"
+echo "  NTSA Road Safety - Development Mode"
 echo "=========================================="
 
 # Colors for output
@@ -31,7 +31,7 @@ fi
 # Start backend
 echo -e "${GREEN}Starting Backend API...${NC}"
 cd backend
-python production_api.py &
+python road_safety_api.py &
 BACKEND_PID=$!
 
 cd ..
@@ -48,8 +48,8 @@ FRONTEND_PID=$!
 echo ""
 echo "=========================================="
 echo -e "${GREEN}Services Started:${NC}"
-echo -e "  Backend API: ${YELLOW}http://localhost:8000${NC}"
-echo -e "  API Docs:    ${YELLOW}http://localhost:8000/docs${NC}"
+echo -e "  Backend API: ${YELLOW}http://localhost:8001${NC}"
+echo -e "  API Docs:    ${YELLOW}http://localhost:8001/docs${NC}"
 echo -e "  Frontend:    ${YELLOW}http://localhost:3000${NC}"
 echo "=========================================="
 echo ""

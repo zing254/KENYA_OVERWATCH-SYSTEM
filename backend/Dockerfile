@@ -80,11 +80,11 @@ OVERWATCH_LOG_LEVEL=INFO
 OVERWATCH_CONFIG_PATH=/app/config/production.yaml
 
 # Expose ports
-EXPOSE 8000 8080
+EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:8001/api/health || exit 1
 
 # Switch to non-root user
 USER overwatch
@@ -93,4 +93,4 @@ USER overwatch
 VOLUME ["/app/logs", "/app/evidence", "/app/audit", "/app/config"]
 
 # Start command
-CMD ["gunicorn", "production_api:app", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "--log-level", "info"]
+CMD ["python", "-m", "uvicorn", "road_safety_api:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info"]

@@ -1,0 +1,1127 @@
+"""
+Kenya National Road Safety Authority (NTSA) Overwatch API
+Real-time Road Safety Monitoring, Accident Detection, and Traffic Violation Management
+Version: 2.0.0 - Enhanced Security Edition
+"""
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query, Depends, Request, APIRouter
+from fastapi.responses import JSONResponse
+from typing import Dict, List, Optional, Any
+import asyncio
+import json
+import time
+import uuid
+import random
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+from datetime import datetime, timedelta, timezone
+from dataclasses import asdict
+
+from road_safety_engine import (
+    road_safety_engine,
+    RoadAccident,
+    TrafficViolation,
+    Vehicle,
+    Driver,
+    SpeedDetection,
+    Coordinates,
+    AccidentType,
+    CauseType,
+    SeverityLevel,
+    IncidentStatus,
+    ViolationStatus,
+    VehicleType,
+    KENYA_ROADS,
+    ACCIDENT_HOTSPOTS,
+    SPEED_LIMITS,
+)
+
+# Import validation models
+from models import (
+    AccidentCreate,
+    ViolationCreate,
+    ViolationReview,
+    AlertCreate,
+    CitizenReportCreate,
+    SpeedDetectionInput,
+    TeamDispatch,
+)
+from auth import router as auth_router, get_current_user, UserResponse
+
+# Import ANPR module
+from anpr_api import router as anpr_router
+
+# Import security middleware
+from security_middleware import apply_security_middleware, audit_logger
+
+def utcnow():
+    return datetime.now(timezone.utc)
+
+app = FastAPI(
+    title="Kenya NTSA Road Safety API",
+    description="National Transport and Safety Authority - Road Safety Monitoring System",
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
+
+# Apply security middleware (CORS, rate limiting, logging, etc.)
+apply_security_middleware(app)
+
+# ==================== API VERSIONING ====================
+api_v1 = APIRouter(prefix="/api/v1", tags=["v1"])
+
+# ==================== CENTRALIZED ERROR HANDLING ====================
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code,
+            "timestamp": utcnow().isoformat()
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "status_code": 500,
+            "timestamp": utcnow().isoformat()
+        }
+    )
+
+# Include authentication routes
+app.include_router(auth_router)
+
+# Include ANPR routes
+app.include_router(anpr_router)
+
+# Import reports module
+from reports_api import router as reports_router
+app.include_router(reports_router)
+
+# Import service integration routes
+from services.service_routes import router as service_router
+app.include_router(service_router)
+
+# ==================== HELPER FUNCTIONS ====================
+def serialize_for_json(obj: Any) -> Any:
+    """Convert objects to JSON-serializable format"""
+    if obj is None:
+        return None
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, '__dataclass_fields__'):
+        result = {}
+        for field in obj.__dataclass_fields__:
+            value = getattr(obj, field)
+            result[field] = serialize_for_json(value)
+        return result
+    elif isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [serialize_for_json(item) for item in obj]
+    elif hasattr(obj, 'value'):
+        return obj.value
+    else:
+        return obj
+
+# ==================== ROOT & HEALTH ====================
+@app.get("/")
+async def root():
+    return {
+        "system": "Kenya NTSA Road Safety Overwatch",
+        "version": "2.0.0",
+        "api_versions": ["v1", "v2"],
+        "authority": "National Transport and Safety Authority",
+        "status": "operational",
+        "security": "enabled",
+        "timestamp": utcnow().isoformat()
+    }
+
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "api_version": "v2",
+        "services": {
+            "road_safety_engine": "up",
+            "accident_db": "up",
+            "violation_db": "up",
+            "speed_detection": "up",
+            "websocket": "up"
+        },
+        "timestamp": utcnow().isoformat()
+    }
+
+@app.get("/api/v1/health")
+async def health_check_v1():
+    """V1 Health check - returns version info"""
+    return {
+        "status": "healthy",
+        "api_version": "v1",
+        "timestamp": utcnow().isoformat()
+    }
+
+# ==================== DASHBOARD ====================
+@app.get("/api/dashboard/stats")
+async def get_dashboard_stats():
+    stats = road_safety_engine.get_dashboard_stats()
+    return serialize_for_json(stats)
+
+@app.get("/api/dashboard/summary")
+async def get_dashboard_summary():
+    accidents = road_safety_engine.get_all_accidents(limit=10)
+    violations = road_safety_engine.get_all_violations(limit=10)
+    
+    return serialize_for_json({
+        "active_incidents": len([a for a in accidents if a.status in [IncidentStatus.REPORTED, IncidentStatus.DISPATCHED]]),
+        "today_accidents": road_safety_engine.stats["total_accidents_today"],
+        "today_violations": road_safety_engine.stats["total_violations_today"],
+        "pending_violations": len([v for v in violations if v.status == ViolationStatus.DETECTED]),
+        "total_casualties_today": road_safety_engine.stats["total_casualties_today"],
+        "avg_response_time": road_safety_engine.stats["avg_response_time"],
+        "recent_accidents": accidents[:5],
+        "recent_violations": violations[:5],
+    })
+
+# ==================== ACCIDENTS ====================
+@app.get("/api/accidents")
+async def list_accidents(
+    status: Optional[str] = None,
+    severity: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    offset: int = 0
+):
+    accidents = road_safety_engine.get_all_accidents(
+        status=IncidentStatus(status) if status else None,
+        limit=limit + offset
+    )
+    
+    if severity:
+        accidents = [a for a in accidents if a.severity.value == severity]
+    
+    return serialize_for_json({
+        "total": len(accidents),
+        "accidents": accidents[offset:offset+limit]
+    })
+
+@app.get("/api/accidents/{accident_id}")
+async def get_accident(accident_id: str):
+    accident = road_safety_engine.get_accident(accident_id)
+    if not accident:
+        raise HTTPException(status_code=404, detail="Accident not found")
+    return serialize_for_json(accident)
+
+@app.post("/api/accidents", status_code=201)
+async def create_accident(data: AccidentCreate):
+    """Create a new accident report with validation"""
+    try:
+        accident = road_safety_engine.create_accident_report(
+            accident_type=AccidentType(data.accident_type.value),
+            cause=CauseType(data.cause.value),
+            location=data.location,
+            road_name=data.road_name,
+            coordinates=Coordinates(
+                lat=data.lat,
+                lng=data.lng
+            ),
+            severity=SeverityLevel(data.severity.value),
+            vehicles_involved=data.vehicles,
+            description=data.description,
+            weather=data.weather,
+            road_conditions=data.road_conditions
+        )
+        return serialize_for_json(accident)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/accidents/hotspots")
+async def get_accident_hotspots():
+    return serialize_for_json(ACCIDENT_HOTSPOTS)
+
+# ==================== VIOLATIONS ====================
+@app.get("/api/violations")
+async def list_violations(
+    status: Optional[str] = None,
+    plate_number: Optional[str] = None,
+    violation_type: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    offset: int = 0
+):
+    violations = road_safety_engine.get_all_violations(
+        status=ViolationStatus(status) if status else None,
+        plate_number=plate_number,
+        limit=limit + offset
+    )
+    
+    if violation_type:
+        violations = [v for v in violations if v.violation_type.value == violation_type]
+    
+    return serialize_for_json({
+        "total": len(violations),
+        "violations": violations[offset:offset+limit]
+    })
+
+@app.get("/api/violations/{violation_id}")
+async def get_violation(violation_id: str):
+    violation = road_safety_engine.get_violation(violation_id)
+    if not violation:
+        raise HTTPException(status_code=404, detail="Violation not found")
+    return serialize_for_json(violation)
+
+@app.post("/api/violations", status_code=201)
+async def create_violation(data: ViolationCreate):
+    """Create a new violation with validation"""
+    try:
+        violation = road_safety_engine.record_violation(
+            violation_type=CauseType(data.violation_type.value),
+            plate_number=data.plate_number,
+            vehicle_type=VehicleType(data.vehicle_type.value),
+            location=data.location,
+            road_name=data.road_name,
+            coordinates=Coordinates(
+                lat=data.lat,
+                lng=data.lng
+            ),
+            camera_id=data.camera_id,
+            speed_detected=data.speed_detected,
+            speed_limit=data.speed_limit,
+            evidence_image=data.evidence_image
+        )
+        return serialize_for_json(violation)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/violations/{violation_id}/review")
+async def review_violation(violation_id: str, data: ViolationReview):
+    """Review a violation"""
+    violation = road_safety_engine.get_violation(violation_id)
+    if not violation:
+        raise HTTPException(status_code=404, detail="Violation not found")
+    
+    if data.decision == "approve":
+        violation.status = ViolationStatus.ISSUED
+        violation.issued_at = utcnow()
+        violation.due_date = utcnow() + timedelta(days=30)
+        violation.officer_id = data.officer_id
+    else:
+        violation.status = ViolationStatus.CANCELLED
+    
+    violation.notes = data.notes
+    
+    return serialize_for_json(violation)
+
+@app.post("/api/violations/{violation_id}/pay")
+async def pay_violation(violation_id: str):
+    violation = road_safety_engine.get_violation(violation_id)
+    if not violation:
+        raise HTTPException(status_code=404, detail="Violation not found")
+    
+    violation.status = ViolationStatus.PAID
+    violation.paid_at = utcnow()
+    
+    return serialize_for_json(violation)
+
+@app.get("/api/violations/stats/revenue")
+async def get_violation_revenue():
+    violations = road_safety_engine.get_all_violations()
+    issued = [v for v in violations if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]]
+    
+    return serialize_for_json({
+        "total_fines_issued": sum(v.fine_amount for v in issued),
+        "total_fines_paid": sum(v.fine_amount for v in issued if v.status == ViolationStatus.PAID),
+        "total_fines_pending": sum(v.fine_amount for v in issued if v.status == ViolationStatus.ISSUED),
+        "total_points_deducted": sum(v.penalty_points for v in issued),
+    })
+
+# ==================== VEHICLES ====================
+@app.get("/api/vehicles")
+async def list_vehicles(limit: int = 100):
+    """List all registered vehicles"""
+    vehicles = list(road_safety_engine.vehicles.values())[:limit]
+    return serialize_for_json({
+        "total": len(road_safety_engine.vehicles),
+        "vehicles": vehicles
+    })
+
+@app.get("/api/vehicles/{plate_number}")
+async def get_vehicle(plate_number: str):
+    """Get vehicle by plate number"""
+    vehicle = road_safety_engine.get_vehicle(plate_number)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return serialize_for_json(vehicle)
+
+@app.get("/api/vehicles/{plate_number}/violations")
+async def get_vehicle_violations(plate_number: str):
+    violations = road_safety_engine.get_all_violations(plate_number=plate_number)
+    return serialize_for_json({
+        "plate_number": plate_number,
+        "total_violations": len(violations),
+        "violations": violations
+    })
+
+# ==================== DRIVERS ====================
+@app.get("/api/drivers/{license_number}")
+async def get_driver(license_number: str):
+    driver = road_safety_engine.get_driver(license_number)
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    return serialize_for_json(driver)
+
+@app.get("/api/drivers/{license_number}/violations")
+async def get_driver_violations(license_number: str):
+    violations = road_safety_engine.get_all_violations()
+    return serialize_for_json({
+        "license_number": license_number,
+        "total_violations": len(violations),
+        "violations": violations
+    })
+
+# ==================== SPEED DETECTION ====================
+@app.post("/api/speed/detect")
+async def detect_speed(data: SpeedDetectionInput):
+    """Detect speed and create violation if exceeding limit"""
+    detection, violation = road_safety_engine.detect_speed(
+        camera_id=data.camera_id,
+        plate_number=data.plate_number.upper(),
+        vehicle_type=VehicleType(data.vehicle_type.value),
+        speed_detected=data.speed_detected,
+        location=data.location,
+        coordinates=Coordinates(
+            lat=data.lat,
+            lng=data.lng
+        ),
+        image_front=data.image_front,
+        image_rear=data.image_rear
+    )
+    
+    return serialize_for_json({
+        "detection": detection,
+        "violation": violation
+    })
+
+@app.get("/api/speed/detections")
+async def list_speed_detections(limit: int = 100):
+    detections = list(road_safety_engine.speed_detections.values())
+    detections.sort(key=lambda d: d.timestamp, reverse=True)
+    return serialize_for_json({
+        "total": len(detections),
+        "detections": detections[:limit]
+    })
+
+# ==================== ROADS ====================
+@app.get("/api/roads")
+async def list_roads():
+    roads = road_safety_engine.get_dashboard_stats()["roads"]
+    return serialize_for_json(roads)
+
+@app.get("/api/roads/segments")
+async def list_road_segments():
+    segments = list(road_safety_engine.road_segments.values())
+    return serialize_for_json(segments)
+
+@app.get("/api/roads/{road_name}/stats")
+async def get_road_stats(road_name: str):
+    segment = None
+    for seg in road_safety_engine.road_segments.values():
+        if seg.name.lower() in road_name.lower():
+            segment = seg
+            break
+    
+    if not segment:
+        raise HTTPException(status_code=404, detail="Road segment not found")
+    
+    accidents = [a for a in road_safety_engine.get_all_accidents() if a.road_name.lower() == road_name.lower()]
+    violations = [v for v in road_safety_engine.get_all_violations() if v.road_name.lower() == road_name.lower()]
+    
+    return serialize_for_json({
+        "segment": segment,
+        "accidents_30d": len(accidents),
+        "violations_30d": len(violations),
+        "average_daily_traffic": segment.average_daily_traffic,
+        "risk_level": segment.current_risk_level.value,
+    })
+
+# ==================== ANALYTICS ====================
+@app.get("/api/analytics/trends")
+async def get_trends(hours: int = 24):
+    return serialize_for_json(road_safety_engine.get_dashboard_stats()["trend"])
+
+@app.get("/api/analytics/accidents/by-type")
+async def get_accidents_by_type():
+    return serialize_for_json(road_safety_engine.get_dashboard_stats()["accidents"]["by_type"])
+
+@app.get("/api/analytics/accidents/by-cause")
+async def get_accidents_by_cause():
+    return serialize_for_json(road_safety_engine.get_dashboard_stats()["accidents"]["by_cause"])
+
+@app.get("/api/analytics/violations/by-type")
+async def get_violations_by_type():
+    return serialize_for_json(road_safety_engine.get_dashboard_stats()["violations"]["by_type"])
+
+# Enhanced Analytics Endpoints
+@app.get("/api/analytics/overview")
+async def get_analytics_overview():
+    """Get comprehensive analytics overview"""
+    accidents = road_safety_engine.get_all_accidents()
+    violations = road_safety_engine.get_all_violations()
+    
+    # Time-based analysis
+    now = utcnow()
+    last_7_days = []
+    last_30_days = []
+    
+    for i in range(7):
+        day = now - timedelta(days=i)
+        day_accidents = [a for a in accidents if a.reported_at.date() == day.date()]
+        day_violations = [v for v in violations if v.detected_at.date() == day.date()]
+        last_7_days.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "accidents": len(day_accidents),
+            "violations": len(day_violations),
+            "casualties": sum(a.casualties for a in day_accidents),
+            "injuries": sum(a.injuries for a in day_accidents)
+        })
+    
+    for i in range(30):
+        day = now - timedelta(days=i)
+        day_accidents = [a for a in accidents if a.reported_at.date() == day.date()]
+        day_violations = [v for v in violations if v.detected_at.date() == day.date()]
+        last_30_days.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "accidents": len(day_accidents),
+            "violations": len(day_violations),
+            "casualties": sum(a.casualties for a in day_accidents),
+            "injuries": sum(a.injuries for a in day_accidents)
+        })
+    
+    # Severity distribution
+    severity_dist = {}
+    for severity in SeverityLevel:
+        count = len([a for a in accidents if a.severity == severity])
+        severity_dist[severity.value] = count
+    
+    # Status distribution
+    status_dist = {}
+    for status in IncidentStatus:
+        count = len([a for a in accidents if a.status == status])
+        status_dist[status.value] = count
+    
+    # Top hotspots
+    hotspot_counts = {}
+    for a in accidents:
+        key = a.location
+        hotspot_counts[key] = hotspot_counts.get(key, 0) + 1
+    
+    top_hotspots = sorted(hotspot_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    return {
+        "period": {
+            "last_7_days": list(reversed(last_7_days)),
+            "last_30_days": list(reversed(last_30_days))
+        },
+        "severity_distribution": severity_dist,
+        "status_distribution": status_dist,
+        "top_hotspots": [{"location": h[0], "count": h[1]} for h in top_hotspots],
+        "summary": {
+            "total_accidents": len(accidents),
+            "total_violations": len(violations),
+            "total_casualties": sum(a.casualties for a in accidents),
+            "total_injuries": sum(a.injuries for a in accidents),
+            "avg_daily_accidents": len(accidents) / 30,
+            "avg_daily_violations": len(violations) / 30
+        }
+    }
+
+@app.get("/api/analytics/roads/{road_name}/analysis")
+async def get_road_analysis(road_name: str):
+    """Get detailed analysis for a specific road"""
+    accidents = road_safety_engine.get_all_accidents()
+    violations = road_safety_engine.get_all_violations()
+    
+    road_accidents = [a for a in accidents if road_name.lower() in a.road_name.lower()]
+    road_violations = [v for v in violations if road_name.lower() in v.road_name.lower()]
+    
+    # Time distribution
+    hourly_accidents = {}
+    hourly_violations = {}
+    
+    for a in road_accidents:
+        hour = a.reported_at.hour
+        hourly_accidents[hour] = hourly_accidents.get(hour, 0) + 1
+    
+    for v in road_violations:
+        hour = v.detected_at.hour
+        hourly_violations[hour] = hourly_violations.get(hour, 0) + 1
+    
+    return {
+        "road_name": road_name,
+        "total_accidents": len(road_accidents),
+        "total_violations": len(road_violations),
+        "total_casualties": sum(a.casualties for a in road_accidents),
+        "total_injuries": sum(a.injuries for a in road_accidents),
+        "by_hour": {
+            "accidents": {str(h): hourly_accidents.get(h, 0) for h in range(24)},
+            "violations": {str(h): hourly_violations.get(h, 0) for h in range(24)}
+        },
+        "by_severity": {s.value: len([a for a in road_accidents if a.severity == s]) for s in SeverityLevel},
+        "by_type": {},
+        "avg_response_time": "8.5 minutes"
+    }
+
+@app.get("/api/analytics/revenue")
+async def get_revenue_analytics():
+    """Get revenue analytics and fines collection"""
+    violations = road_safety_engine.get_all_violations()
+    
+    now = utcnow()
+    
+    # Daily revenue
+    daily_revenue = {}
+    weekly_revenue = {}
+    monthly_revenue = {}
+    yearly_revenue = {}
+    
+    for v in violations:
+        if v.status == ViolationStatus.PAID and v.paid_at:
+            day_key = v.paid_at.strftime("%Y-%m-%d")
+            week_key = v.paid_at.strftime("%Y-W%W")
+            month_key = v.paid_at.strftime("%Y-%m")
+            year_key = v.paid_at.strftime("%Y")
+            
+            daily_revenue[day_key] = daily_revenue.get(day_key, 0) + v.fine_amount
+            weekly_revenue[week_key] = weekly_revenue.get(week_key, 0) + v.fine_amount
+            monthly_revenue[month_key] = monthly_revenue.get(month_key, 0) + v.fine_amount
+            yearly_revenue[year_key] = yearly_revenue.get(year_key, 0) + v.fine_amount
+    
+    # By violation type
+    by_type = {}
+    for v in violations:
+        vtype = v.violation_type.value
+        if vtype not in by_type:
+            by_type[vtype] = {"count": 0, "total_fine": 0, "collected": 0}
+        by_type[vtype]["count"] += 1
+        by_type[vtype]["total_fine"] += v.fine_amount
+        if v.status == ViolationStatus.PAID:
+            by_type[vtype]["collected"] += v.fine_amount
+    
+    return {
+        "daily": dict(sorted(daily_revenue.items(), reverse=True)[:30]),
+        "weekly": dict(sorted(weekly_revenue.items(), reverse=True)[:12]),
+        "monthly": dict(sorted(monthly_revenue.items(), reverse=True)[:12]),
+        "yearly": yearly_revenue,
+        "by_violation_type": by_type,
+        "summary": {
+            "total_issued": sum(v.fine_amount for v in violations if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]),
+            "total_collected": sum(v.fine_amount for v in violations if v.status == ViolationStatus.PAID),
+            "total_pending": sum(v.fine_amount for v in violations if v.status == ViolationStatus.ISSUED),
+            "collection_rate": len([v for v in violations if v.status == ViolationStatus.PAID]) / max(len(violations), 1) * 100
+        }
+    }
+
+@app.get("/api/analytics/response-time")
+async def get_response_time_analytics():
+    """Get response time analytics"""
+    accidents = road_safety_engine.get_all_accidents()
+    
+    # Calculate average response times
+    response_times = []
+    for a in accidents:
+        if a.response_time_minutes:
+            response_times.append(a.response_time_minutes)
+    
+    if not response_times:
+        return {"message": "No response time data available"}
+    
+    return {
+        "average": sum(response_times) / len(response_times),
+        "min": min(response_times),
+        "max": max(response_times),
+        "count": len(response_times),
+        "by_severity": {
+            s.value: {
+                "count": len([a for a in accidents if a.severity == s and a.response_time_minutes]),
+                "avg": sum(a.response_time_minutes for a in accidents if a.severity == s and a.response_time_minutes) / max(len([a for a in accidents if a.severity == s and a.response_time_minutes]), 1)
+            } for s in SeverityLevel
+        }
+    }
+
+# ==================== NOTIFICATIONS ====================
+@app.get("/api/notifications/stats")
+async def get_notification_stats():
+    """Get notification statistics"""
+    from services.notification_service import notification_service
+    return notification_service.get_stats()
+
+@app.get("/api/notifications/history")
+async def get_notification_history(limit: int = 100):
+    """Get notification history"""
+    from services.notification_service import notification_service
+    return notification_service.get_history(limit)
+
+@app.post("/api/notifications/send")
+async def send_notification(
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    sms_message: Optional[str] = None,
+    email_subject: Optional[str] = None,
+    email_body: Optional[str] = None
+):
+    """Send a custom notification"""
+    from services.notification_service import notification_service
+    
+    result = await notification_service.send(
+        phone=phone,
+        email=email,
+        sms=sms_message,
+        subject=email_subject,
+        email_body=email_body
+    )
+    return result
+
+# ==================== ENUMS ====================
+@app.get("/api/enums/accident-types")
+async def get_accident_types():
+    return [t.value for t in AccidentType]
+
+@app.get("/api/enums/cause-types")
+async def get_cause_types():
+    return [t.value for t in CauseType]
+
+@app.get("/api/enums/severity-levels")
+async def get_severity_levels():
+    return [t.value for t in SeverityLevel]
+
+@app.get("/api/enums/vehicle-types")
+async def get_vehicle_types():
+    return [t.value for t in VehicleType]
+
+# ==================== CAMERAS ====================
+MOCK_CAMERAS = [
+    {"id": "cam_001", "name": "Mombasa Road - Junction", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "road_name": "A109", "type": "speed", "status": "online", "speed_limit": 100, "last_update": utcnow().isoformat()},
+    {"id": "cam_002", "name": "Thika Superhighway - Exit", "location": "Thika Road", "latitude": -1.0800, "longitude": 37.1000, "road_name": "A2", "type": "ANPR", "status": "online", "speed_limit": 80, "last_update": utcnow().isoformat()},
+    {"id": "cam_003", "name": "Kenyatta Ave - CBD", "location": "Kenyatta Avenue", "latitude": -1.2864, "longitude": 36.8232, "road_name": "Kenyatta Ave", "type": "red_light", "status": "online", "speed_limit": 50, "last_update": utcnow().isoformat()},
+    {"id": "cam_004", "name": "Ngong Road - Roundabout", "location": "Ngong Road", "latitude": -1.3100, "longitude": 36.7800, "road_name": "Ngong Road", "type": "surveillance", "status": "online", "speed_limit": 60, "last_update": utcnow().isoformat()},
+    {"id": "cam_005", "name": "Nairobi Expressway - Entry", "location": "Expressway", "latitude": -1.3200, "longitude": 36.8900, "road_name": "Expressway", "type": "speed", "status": "online", "speed_limit": 80, "last_update": utcnow().isoformat()},
+    {"id": "cam_006", "name": "Nakuru Town - CBD", "location": "Nakuru", "latitude": -0.3031, "longitude": 36.0800, "road_name": "A104", "type": "red_light", "status": "maintenance", "speed_limit": 50, "last_update": utcnow().isoformat()},
+    {"id": "cam_007", "name": "Mombasa Road - Airport", "location": "Airport Road", "latitude": -1.3500, "longitude": 36.9500, "road_name": "A109", "type": "ANPR", "status": "online", "speed_limit": 100, "last_update": utcnow().isoformat()},
+    {"id": "cam_008", "name": "Kisumu Airport Road", "location": "Kisumu", "latitude": -0.1000, "longitude": 34.7500, "road_name": "A1", "type": "speed", "status": "offline", "speed_limit": 80, "last_update": utcnow().isoformat()},
+]
+
+@app.get("/api/cameras")
+async def list_cameras(status: Optional[str] = None, type: Optional[str] = None):
+    cameras = MOCK_CAMERAS
+    if status:
+        cameras = [c for c in cameras if c["status"] == status]
+    if type:
+        cameras = [c for c in cameras if c["type"] == type]
+    return cameras
+
+@app.get("/api/cameras/{camera_id}")
+async def get_camera(camera_id: str):
+    camera = next((c for c in MOCK_CAMERAS if c["id"] == camera_id), None)
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return camera
+
+@app.get("/api/cameras/{camera_id}/latest")
+async def get_camera_latest(camera_id: str):
+    camera = next((c for c in MOCK_CAMERAS if c["id"] == camera_id), None)
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return {"image_url": f"/static/cameras/{camera_id}_latest.jpg", "timestamp": utcnow().isoformat()}
+
+# ==================== TEAMS ====================
+MOCK_TEAMS = [
+    {"id": "team_001", "name": "Alpha Team", "type": "police", "status": "available", "base": "CBD Station", "members": 4, "latitude": -1.2864, "longitude": 36.8232},
+    {"id": "team_002", "name": "Beta Team", "type": "ambulance", "status": "available", "base": "Kenyatta Hospital", "members": 3, "latitude": -1.3000, "longitude": 36.8000},
+    {"id": "team_003", "name": "Gamma Team", "type": "fire", "status": "dispatched", "base": "Industrial Area", "members": 6, "latitude": -1.3200, "longitude": 36.8500, "current_incident_id": "acc_001", "eta": "5 min"},
+    {"id": "team_004", "name": "Delta Team", "type": "traffic", "status": "on_scene", "base": "Mombasa Road", "members": 2, "latitude": -1.3300, "longitude": 36.9800, "current_incident_id": "acc_002"},
+    {"id": "team_005", "name": "Epsilon Team", "type": "police", "status": "off_duty", "base": "Thika Station", "members": 4, "latitude": -1.0800, "longitude": 37.1000},
+    {"id": "team_006", "name": "Zeta Team", "type": "ambulance", "status": "available", "base": "Nairobi Hospital", "members": 3, "latitude": -1.2800, "longitude": 36.8200},
+]
+
+@app.get("/api/teams")
+async def list_teams(type: Optional[str] = None, status: Optional[str] = None):
+    teams = MOCK_TEAMS
+    if type:
+        teams = [t for t in teams if t["type"] == type]
+    if status:
+        teams = [t for t in teams if t["status"] == status]
+    return teams
+
+@app.get("/api/teams/{team_id}")
+async def get_team(team_id: str):
+    team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team
+
+@app.post("/api/teams/{team_id}/dispatch")
+async def dispatch_team(team_id: str, data: TeamDispatch):
+    """Dispatch a team to an incident"""
+    team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    team["status"] = "dispatched"
+    team["current_incident_id"] = data.incident_id
+    team["eta"] = data.eta
+    
+    return {
+        "id": f"dispatch_{uuid.uuid4().hex[:8]}",
+        "team_id": team_id,
+        "incident_id": data.incident_id,
+        "status": "dispatched",
+        "assigned_at": utcnow().isoformat(),
+        "eta": team["eta"]
+    }
+
+# ==================== ALERTS ====================
+MOCK_ALERTS = [
+    {"id": "alert_001", "title": "Heavy Traffic", "message": "Mombasa Road experiencing heavy traffic due to accident", "severity": "medium", "type": "road", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "created_at": utcnow().isoformat(), "is_active": True},
+    {"id": "alert_002", "title": "Weather Warning", "message": "Heavy rainfall expected in Nairobi region", "severity": "high", "type": "weather", "location": "Nairobi", "latitude": -1.2864, "longitude": 36.8232, "created_at": utcnow().isoformat(), "is_active": True},
+    {"id": "alert_003", "title": "Road Closure", "message": "Ngong Road closed for repairs between Roundabout and Karen", "severity": "critical", "type": "road", "location": "Ngong Road", "latitude": -1.3100, "longitude": 36.7800, "created_at": utcnow().isoformat(), "is_active": True},
+]
+
+@app.get("/api/alerts")
+async def list_alerts(severity: Optional[str] = None, type: Optional[str] = None, active: bool = True):
+    alerts = MOCK_ALERTS
+    if severity:
+        alerts = [a for a in alerts if a["severity"] == severity]
+    if type:
+        alerts = [a for a in alerts if a["type"] == type]
+    if active is not None:
+        alerts = [a for a in alerts if a["is_active"] == active]
+    return alerts
+
+@app.post("/api/alerts", status_code=201)
+async def create_alert(data: AlertCreate):
+    """Create a new alert with validation"""
+    alert = {
+        "id": f"alert_{uuid.uuid4().hex[:8]}",
+        "title": data.title,
+        "message": data.message,
+        "severity": data.severity,
+        "type": data.alert_type,
+        "location": data.location,
+        "latitude": data.latitude,
+        "longitude": data.longitude,
+        "created_at": utcnow().isoformat(),
+        "is_active": True
+    }
+    MOCK_ALERTS.append(alert)
+    return alert
+
+@app.post("/api/alerts/{alert_id}/dismiss")
+async def dismiss_alert(alert_id: str):
+    alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert["is_active"] = False
+    return {"message": "Alert dismissed"}
+
+# ==================== CITIZEN REPORTS ====================
+CITIZEN_REPORTS = []
+
+@app.post("/api/citizen/reports", status_code=201)
+async def create_citizen_report(data: CitizenReportCreate):
+    """Create a citizen report with validation"""
+    report = {
+        "id": f"report_{uuid.uuid4().hex[:8]}",
+        "type": data.report_type,
+        "description": data.description,
+        "location": data.location,
+        "latitude": data.latitude,
+        "longitude": data.longitude,
+        "first_name": data.first_name if not data.anonymous else "",
+        "last_name": data.last_name if not data.anonymous else "",
+        "phone_number": data.phone_number if not data.anonymous else "",
+        "anonymous": data.anonymous,
+        "attachments": data.attachments,
+        "status": "pending",
+        "created_at": utcnow().isoformat()
+    }
+    CITIZEN_REPORTS.append(report)
+    return report
+
+@app.get("/api/citizen/reports")
+async def list_citizen_reports(status: Optional[str] = None):
+    reports = CITIZEN_REPORTS
+    if status:
+        reports = [r for r in reports if r["status"] == status]
+    return {"total": len(reports), "reports": reports}
+
+@app.get("/api/citizen/reports/{report_id}")
+async def get_citizen_report(report_id: str):
+    report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+# ==================== GENERATE MOCK DATA ====================
+@app.post("/api/admin/generate-mock-data")
+async def generate_mock_data():
+    road_safety_engine.generate_mock_data()
+    return {"message": "Mock data generated successfully"}
+
+# ==================== DATABASE MANAGEMENT ====================
+@app.get("/api/admin/database/stats")
+async def get_database_stats():
+    """Get database statistics"""
+    from database_service import get_statistics
+    return get_statistics()
+
+@app.post("/api/admin/database/backup")
+async def backup_database(backup_name: Optional[str] = None):
+    """Create database backup"""
+    from database_service import backup_database as backup_db
+    from database_service import initialize_from_engine
+    
+    # First save current engine data
+    initialize_from_engine({
+        "vehicles": {v.plate_number: v.__dict__ for v in road_safety_engine.vehicles.values()},
+        "accidents": road_safety_engine.accidents.values(),
+        "violations": road_safety_engine.violations.values(),
+        "drivers": road_safety_engine.drivers,
+        "speed_detections": road_safety_engine.speed_detections
+    })
+    
+    backup_path = backup_db(backup_name)
+    return {"message": "Database backed up successfully", "backup_file": backup_path}
+
+@app.post("/api/admin/database/restore")
+async def restore_database(backup_file: str):
+    """Restore database from backup"""
+    from database_service import restore_database as restore_db
+    success = restore_db(backup_file)
+    if success:
+        return {"message": "Database restored successfully"}
+    raise HTTPException(status_code=400, detail="Failed to restore database")
+
+@app.post("/api/admin/database/clear")
+async def clear_database():
+    """Clear database"""
+    from database_service import clear_database
+    clear_database()
+    return {"message": "Database cleared successfully"}
+
+# ==================== WEBSOCKET ====================
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+        self.authenticated_connections: Dict[str, Dict] = {}
+    
+    async def connect(self, websocket: WebSocket, client_id: str, token: Optional[str] = None):
+        """Connect with optional authentication - token required in production"""
+        await websocket.accept()
+        
+        # Check if authentication is required
+        import os
+        env = os.environ.get("OVERWATCH_ENV", "development")
+        require_auth = env == "production"
+        
+        # Try to authenticate
+        authenticated = False
+        user_id = None
+        role = None
+        
+        if token:
+            try:
+                from auth import verify_access_token
+                payload = verify_access_token(token)
+                authenticated = True
+                user_id = payload.sub
+                role = payload.role
+            except Exception as e:
+                if require_auth:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Invalid or expired token"
+                    })
+                    await websocket.close(code=4001)
+                    return
+        elif require_auth:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Authentication required"
+            })
+            await websocket.close(code=4001)
+            return
+        
+        self.active_connections[client_id] = websocket
+        self.authenticated_connections[client_id] = {
+            "connected_at": datetime.now(timezone.utc),
+            "authenticated": authenticated,
+            "user_id": user_id,
+            "role": role,
+            "channels": []
+        }
+        
+        # Send auth status
+        await websocket.send_json({
+            "type": "connected",
+            "authenticated": authenticated,
+            "user_id": user_id,
+            "role": role
+        })
+    
+    def disconnect(self, client_id: str):
+        if client_id in self.active_connections:
+            del self.active_connections[client_id]
+        if client_id in self.authenticated_connections:
+            del self.authenticated_connections[client_id]
+    
+    async def send_personal_message(self, message: dict, client_id: str):
+        if client_id in self.active_connections:
+            await self.active_connections[client_id].send_json(message)
+    
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+    
+    def is_authenticated(self, client_id: str) -> bool:
+        return self.authenticated_connections.get(client_id, {}).get("authenticated", False)
+    
+    def get_authenticated_users(self) -> Dict[str, Dict]:
+        """Get all authenticated connections"""
+        return {
+            cid: info for cid, info in self.authenticated_connections.items()
+            if info.get("authenticated")
+        }
+
+manager = ConnectionManager()
+
+# ==================== CCTV & STREAMS ====================
+@app.get("/api/cctv/simulate/{camera_id}/frame")
+async def simulate_camera_frame(camera_id: str):
+    """Simulate a camera frame"""
+    from services.cctv_simulation import cctv_simulator
+    frame = cctv_simulator.generate_frame(camera_id)
+    return {
+        "camera_id": frame.camera_id,
+        "timestamp": frame.timestamp,
+        "frame_number": frame.frame_number,
+        "vehicle_count": frame.vehicle_count,
+        "average_speed": frame.average_speed,
+        "detections": frame.detections,
+        "anomaly_detected": frame.anomaly_detected,
+        "image_quality": frame.image_quality
+    }
+
+@app.post("/api/cctv/simulate/{camera_id}/start")
+async def start_cctv_stream(camera_id: str):
+    """Start a simulated camera stream"""
+    from services.cctv_simulation import cctv_simulator
+    cctv_simulator.start_stream(camera_id)
+    return {"message": "Stream started", "camera_id": camera_id}
+
+@app.post("/api/cctv/simulate/{camera_id}/stop")
+async def stop_cctv_stream(camera_id: str):
+    """Stop a simulated camera stream"""
+    from services.cctv_simulation import cctv_simulator
+    cctv_simulator.stop_stream(camera_id)
+    return {"message": "Stream stopped", "camera_id": camera_id}
+
+@app.get("/api/cctv/anpr/process/{camera_id}")
+async def process_anpr(camera_id: str):
+    """Process ANPR on simulated frame"""
+    from services.cctv_simulation import cctv_simulator, anpr_simulator
+    frame = cctv_simulator.generate_frame(camera_id)
+    result = anpr_simulator.process_frame(frame)
+    return result
+
+@app.get("/api/cctv/anpr/stats")
+async def get_anpr_stats():
+    """Get ANPR statistics"""
+    from services.cctv_simulation import anpr_simulator
+    return anpr_simulator.get_statistics()
+
+@app.get("/api/cctv/traffic/peak-hours")
+async def get_peak_hours():
+    """Get peak traffic hours"""
+    from services.cctv_simulation import traffic_analyzer
+    return traffic_analyzer.get_peak_hours()
+
+@app.get("/api/cctv/traffic/score/{hour}")
+async def get_traffic_score(hour: int):
+    """Get traffic score for an hour"""
+    from services.cctv_simulation import traffic_analyzer
+    return {"hour": hour, "score": traffic_analyzer.get_traffic_score(hour)}
+
+# ==================== RUN ====================
+
+# Background task to broadcast updates
+async def broadcast_updates():
+    """Broadcast real-time updates to all connected clients"""
+    while True:
+        await asyncio.sleep(30)
+        try:
+            stats = road_safety_engine.get_dashboard_stats()
+            await manager.broadcast({
+                "type": "stats_update",
+                "data": serialize_for_json(stats),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+        except Exception as e:
+            logger.error(f"Error broadcasting updates: {e}")
+
+# Real-time event notification system
+async def notify_accident_created(accident_data: dict):
+    """Notify all clients about new accident"""
+    await manager.broadcast({
+        "type": "accident_created",
+        "data": accident_data,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+async def notify_violation_created(violation_data: dict):
+    """Notify all clients about new violation"""
+    await manager.broadcast({
+        "type": "violation_created",
+        "data": violation_data,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+async def notify_alert_created(alert_data: dict):
+    """Notify all clients about new alert"""
+    await manager.broadcast({
+        "type": "alert_created",
+        "data": alert_data,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+async def notify_speed_violation(detection_data: dict, violation_data: dict):
+    """Notify about speed violation"""
+    await manager.broadcast({
+        "type": "speed_violation",
+        "detection": detection_data,
+        "violation": violation_data,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+# WebSocket channel types
+WEBSOCKET_CHANNELS = {
+    "accidents": "Real-time accident updates",
+    "violations": "Real-time violation updates", 
+    "alerts": "Real-time alert broadcasts",
+    "speed": "Speed detection events",
+    "dashboard": "Dashboard statistics",
+    "admin:all": "All admin events (requires auth)",
+    "admin:users": "User management events",
+}
+
+# ==================== RUN ====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

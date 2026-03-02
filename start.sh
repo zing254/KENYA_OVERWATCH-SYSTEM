@@ -1,10 +1,10 @@
 #!/bin/bash
-# Kenya Overwatch Production Startup Script
+# Kenya NTSA Road Safety - Production Startup Script
 
 set -e
 
 echo "=========================================="
-echo "  Kenya Overwatch - Production System"
+echo "  NTSA Road Safety - Production System"
 echo "=========================================="
 
 # Check if .env exists
@@ -31,8 +31,8 @@ python -m alembic upgrade head || echo "Migrations skipped (database may not be 
 # Start the API server
 echo ""
 echo "Starting API server..."
-echo "API available at: http://localhost:8000"
-echo "API docs at: http://localhost:8000/docs"
+echo "API available at: http://localhost:8001"
+echo "API docs at: http://localhost:8001/docs"
 echo ""
 
-python production_api.py
+python road_safety_api.py

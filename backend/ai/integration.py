@@ -5,7 +5,7 @@ Provides unified AI interface for the system
 
 from typing import Any, Dict, Optional
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class KenyaOverwatchAI:
@@ -19,7 +19,7 @@ class KenyaOverwatchAI:
         """Process a video frame"""
         return {
             "detections": [],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "processing_time_ms": 0
         }
     
@@ -28,7 +28,7 @@ class KenyaOverwatchAI:
         return {
             "objects": [],
             "anpr_results": [],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
     def get_status(self) -> Dict[str, Any]:

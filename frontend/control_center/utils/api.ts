@@ -1,7 +1,7 @@
 import { ProductionIncident, EvidencePackage, SystemMetrics, Alert, Milestone } from '@/types'
 import toast from 'react-hot-toast'
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 export interface ApiError extends Error {
   status?: number

@@ -41,6 +41,16 @@ class DetectionType(Enum):
     FIGHT = "fight"
     THEFT = "theft"
     TRAFFIC_VIOLATION = "traffic_violation"
+    SPEEDING = "speeding"
+    LANE_VIOLATION = "lane_violation"
+    RED_LIGHT_VIOLATION = "red_light_violation"
+    DANGEROUS_OVERTAKING = "dangerous_overtaking"
+    STOPPED_VEHICLE = "stopped_vehicle"
+    PEDESTRIAN_CROSSING = "pedestrian_crossing"
+    ACCIDENT = "accident"
+    HAZARD = "hazard"
+    POTHOLE = "pothole"
+    DEBRIS = "debris"
 
 
 class AlertSeverity(Enum):
@@ -256,8 +266,9 @@ class MotionDetector:
         fg_mask = self.background_subtractor.apply(frame)
         
         _, thresh = cv2.threshold(fg_mask, self.threshold, 255, cv2.THRESH_BINARY)
-        thresh = cv2.erode(thresh, None, iterations=2)
-        thresh = cv2.dilate(thresh, None, iterations=2)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        thresh = cv2.erode(thresh, kernel, iterations=2)
+        thresh = cv2.dilate(thresh, kernel, iterations=2)
         
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
@@ -341,7 +352,7 @@ class AnomalyDetector:
         
         position_variance = np.var([p[0] for p in positions]) + np.var([p[1] for p in positions])
         
-        return position_variance < 1000
+        return bool(position_variance < 1000)
     
     def detect_abandoned_object(self, detections: List[Detection], min_duration_seconds: int = 30) -> Optional[Detection]:
         """Detect abandoned objects"""
@@ -564,3 +575,160 @@ class AIPipeline:
 
 
 pipeline = AIPipeline()
+
+
+class TrafficAnalyzer:
+    """Analyze traffic patterns and detect incidents"""
+    
+    def __init__(self):
+        self.vehicle_speeds: Dict[str, deque] = {}
+        self.vehicle_positions: Dict[str, deque] = {}
+        self.stopped_vehicles: Dict[str, datetime] = {}
+        self.lane_violations: Dict[str, int] = {}
+        self.speed_limits: Dict[str, float] = {}
+        self.accident_heuristics: Dict[str, List] = {}
+        
+    def analyze_vehicle(
+        self,
+        track_id: int,
+        vehicle_type: DetectionType,
+        bounding_box: BoundingBox,
+        camera_id: str,
+        frame_timestamp: datetime,
+        frame_width: int,
+        frame_height: int
+    ) -> Tuple[Optional[Detection], Dict]:
+        """Analyze vehicle behavior and detect incidents"""
+        track_key = f"{camera_id}_{track_id}"
+        
+        if track_key not in self.vehicle_positions:
+            self.vehicle_positions[track_key] = deque(maxlen=30)
+            self.vehicle_speeds[track_key] = deque(maxlen=10)
+        
+        positions = self.vehicle_positions[track_key]
+        speeds = self.vehicle_speeds[track_key]
+        
+        center = bounding_box.center
+        positions.append({
+            "x": center[0],
+            "y": center[1],
+            "timestamp": frame_timestamp
+        })
+        
+        if len(positions) >= 2:
+            prev = positions[-2]
+            curr = positions[-1]
+            
+            dx = curr["x"] - prev["x"]
+            dy = curr["y"] - prev["y"]
+            dt = (curr["timestamp"] - prev["timestamp"]).total_seconds()
+            
+            if dt > 0:
+                pixel_speed = ((dx ** 2 + dy ** 2) ** 0.5) / dt
+                real_speed = self._pixel_to_kmh(pixel_speed, frame_height)
+                speeds.append(real_speed)
+                
+                result = {"speed_kmh": real_speed, "incidents": []}
+                
+                speed_limit = self.speed_limits.get(camera_id, 50.0)
+                if real_speed > speed_limit * 1.1:
+                    excess = real_speed - speed_limit
+                    if excess > 20:
+                        result["incidents"].append({
+                            "type": DetectionType.SPEEDING,
+                            "confidence": min(0.95, 0.5 + excess / 100),
+                            "speed": real_speed,
+                            "limit": speed_limit
+                        })
+                
+                if len(speeds) >= 5:
+                    avg_speed = sum(list(speeds)[-5:]) / 5
+                    if avg_speed < 2 and track_key not in self.stopped_vehicles:
+                        self.stopped_vehicles[track_key] = frame_timestamp
+                    elif avg_speed >= 5 and track_key in self.stopped_vehicles:
+                        stopped_duration = (frame_timestamp - self.stopped_vehicles[track_key]).total_seconds()
+                        if stopped_duration > 30:
+                            result["incidents"].append({
+                                "type": DetectionType.STOPPED_VEHICLE,
+                                "confidence": min(0.95, 0.3 + stopped_duration / 300),
+                                "duration_seconds": stopped_duration
+                            })
+                        del self.stopped_vehicles[track_key]
+                
+                return None, result
+        
+        return None, {"speed_kmh": 0, "incidents": []}
+    
+    def _pixel_to_kmh(self, pixel_speed: float, frame_height: int) -> float:
+        """Convert pixel speed to km/h (simplified estimation)"""
+        pixels_per_meter = frame_height / 10
+        mps = pixel_speed / pixels_per_meter
+        return mps * 3.6
+    
+    def set_speed_limit(self, camera_id: str, limit: float):
+        """Set speed limit for a camera location"""
+        self.speed_limits[camera_id] = limit
+    
+    def check_accident_heuristic(
+        self,
+        camera_id: str,
+        detections: List[Detection],
+        frame_width: int = 1920,
+        frame_height: int = 1080
+    ) -> Optional[Detection]:
+        """Check for accident conditions"""
+        now = datetime.now()
+        
+        stopped_count = 0
+        pedestrian_nearby = False
+        
+        for d in detections:
+            if d.detection_type == DetectionType.VEHICLE:
+                track_key = f"{camera_id}_{d.track_id}"
+                if track_key in self.stopped_vehicles:
+                    stopped_duration = (now - self.stopped_vehicles[track_key]).total_seconds()
+                    if stopped_duration > 10:
+                        stopped_count += 1
+            elif d.detection_type == DetectionType.PERSON:
+                pedestrian_nearby = True
+        
+        if stopped_count >= 2 and pedestrian_nearby:
+            return Detection(
+                detection_type=DetectionType.ACCIDENT,
+                confidence=0.85,
+                bounding_box=BoundingBox(x=0, y=0, w=frame_width, h=frame_height),
+                timestamp=now,
+                camera_id=camera_id,
+                attributes={"vehicles_involved": stopped_count, "pedestrians": True}
+            )
+        
+        return None
+    
+    def detect_hazard(
+        self,
+        detections: List[Detection],
+        stationary_seconds: int = 10
+    ) -> List[Detection]:
+        """Detect road hazards"""
+        hazards = []
+        now = datetime.now()
+        
+        for d in detections:
+            if d.detection_type in [DetectionType.SUSPICIOUS_OBJECT, DetectionType.ANIMAL]:
+                if (now - d.timestamp).total_seconds() > stationary_seconds:
+                    hazard_type = DetectionType.HAZARD
+                    if d.detection_type == DetectionType.ANIMAL:
+                        hazard_type = DetectionType.HAZARD
+                    hazards.append(Detection(
+                        detection_type=hazard_type,
+                        confidence=d.confidence,
+                        bounding_box=d.bounding_box,
+                        timestamp=d.timestamp,
+                        camera_id=d.camera_id,
+                        attributes={"source_detection": d.detection_type.value}
+                    ))
+        
+        return hazards
+
+
+traffic_analyzer = TrafficAnalyzer()

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Bell, X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 interface Notification {
   id: string
   type: 'alert' | 'incident' | 'system' | 'evidence'
@@ -23,7 +25,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/notifications?limit=20')
+        const response = await fetch(`${API_URL}/api/notifications?limit=20`)
         const data = await response.json()
         setNotifications(data.notifications || [])
         setUnreadCount(data.unread_count || 0)
@@ -41,7 +43,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`http://localhost:8000/api/notifications/${id}/read`, { method: 'POST' })
+      await fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'POST' })
       setNotifications(prev => 
         prev.map(n => n.id === id ? { ...n, read: true } : n)
       )
@@ -53,7 +55,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
 
   const markAllAsRead = async () => {
     try {
-      await fetch('http://localhost:8000/api/notifications/read-all', { method: 'POST' })
+      await fetch(`${API_URL}/api/notifications/read-all`, { method: 'POST' })
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch (error) {

@@ -5,7 +5,7 @@ Tracks offenders and triggers alerts when re-identified
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -39,7 +39,7 @@ class FlaggedInterest:
     last_seen_latitude: float = 0.0
     last_seen_longitude: float = 0.0
     last_seen_timestamp: datetime = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now(timezone.utc))
     image_url: str = ""
 
 class FlaggedInterestService:
@@ -72,7 +72,7 @@ class FlaggedInterestService:
             incident_id=incident_id,
             notes=notes,
             image_url=image_url,
-            last_seen_timestamp=datetime.utcnow()
+            last_seen_timestamp=datetime.now(timezone.utc)()
         )
         
         self.flagged_interests[flagged.id] = flagged
@@ -98,7 +98,7 @@ class FlaggedInterestService:
                 flagged.last_seen_location = location
                 flagged.last_seen_latitude = latitude
                 flagged.last_seen_longitude = longitude
-                flagged.last_seen_timestamp = timestamp or datetime.utcnow()
+                flagged.last_seen_timestamp = timestamp or datetime.now(timezone.utc)()
                 
                 reidentification_event = {
                     "id": str(uuid.uuid4()),
@@ -108,7 +108,7 @@ class FlaggedInterestService:
                     "location": location,
                     "latitude": latitude,
                     "longitude": longitude,
-                    "timestamp": (timestamp or datetime.utcnow()).isoformat(),
+                    "timestamp": (timestamp or datetime.now(timezone.utc)()).isoformat(),
                     "detection_count": flagged.detection_count,
                     "priority": flagged.priority.value,
                     "is_reidentification": True
@@ -129,7 +129,7 @@ class FlaggedInterestService:
                         "last_seen": {
                             "camera": camera_id,
                             "location": location,
-                            "timestamp": (timestamp or datetime.utcnow()).isoformat()
+                            "timestamp": (timestamp or datetime.now(timezone.utc)()).isoformat()
                         }
                     },
                     "event": reidentification_event,

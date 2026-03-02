@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
 import { Bell, AlertTriangle, Info, CheckCircle, XCircle, Eye, Filter } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 interface Alert {
   id: string

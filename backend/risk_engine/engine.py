@@ -320,11 +320,11 @@ class RiskEngine:
             factors.historical_risk,
         ]
         
-        variance = np.var(factor_values)
+        variance = float(np.var(factor_values))
         
         confidence = 1.0 - (variance * 2)
         
-        return max(0.5, min(0.95, confidence))
+        return float(max(0.5, min(0.95, confidence)))
     
     def _get_risk_level(self, score: float) -> RiskLevel:
         """Get risk level from score"""
