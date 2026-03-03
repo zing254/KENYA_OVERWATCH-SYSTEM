@@ -411,19 +411,19 @@ export default function CitizenPortal() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Head>
-        <title>TaifaRoad - Kenya Road Safety</title>
-        <meta name="description" content="Report road incidents to NTSA Kenya" />
+        <title>MKENYA RSA - Citizen Road Safety App</title>
+        <meta name="description" content="MKENYA RSA - Report road incidents and get safety alerts" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* NTSA Header - Official Branding */}
+      {/* MKENYA RSA Header - Official Branding */}
       <header className="bg-gradient-to-r from-ntsa-primary via-ntsa-primaryDark to-ntsa-primary text-white py-4 px-4 shadow-lg border-b-4 border-ntsa-primaryLight">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-ntsa-primaryLight" />
             <div>
-              <h1 className="text-xl font-bold">Ulinzi 112 - Emergency Response</h1>
-              <p className="text-xs text-ntsa-primaryLight/80">National Transport and Safety Authority</p>
+              <h1 className="text-xl font-bold">MKENYA RSA</h1>
+              <p className="text-xs text-ntsa-primaryLight/80">Citizen Road Safety App</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

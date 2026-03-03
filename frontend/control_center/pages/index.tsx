@@ -3,7 +3,7 @@ import RoadSafetyDashboard from '@/components/RoadSafetyDashboard'
 
 export default function Home() {
   return (
-    <Layout title="NTSA Road Safety - Control Center">
+    <Layout title="KENYA OVERWATCH SYSTEM - Command Center">
       <RoadSafetyDashboard />
     </Layout>
   )

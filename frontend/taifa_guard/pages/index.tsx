@@ -366,12 +366,12 @@ export default function ResponderApp() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Head>
-        <title>TaifaGuard - NTSA Officer App</title>
+        <title>TAIFA RSG - Road Safety Guard</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </Head>
 
-      {/* NTSA Header - Official Branding */}
+      {/* TAIFA RSG Header - Official Branding */}
       <header className="bg-gradient-to-r from-ntsa-primaryDark via-ntsa-primary to-ntsa-primaryDark border-b-2 border-ntsa-primaryLight/30 sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -380,7 +380,7 @@ export default function ResponderApp() {
             </button>
             <div className="flex items-center gap-2">
               <Shield className="w-6 h-6 text-ntsa-primaryLight" />
-              <span className="font-bold hidden sm:inline text-white">NTSA Officer</span>
+              <span className="font-bold hidden sm:inline text-white">TAIFA RSG</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -426,7 +426,7 @@ export default function ResponderApp() {
         </div>
       </header>
 
-      {/* Sidebar - NTSA Theme */}
+      {/* Sidebar - TAIFA RSG Theme */}
       {showSidebar && (
         <div className="fixed inset-0 z-30 flex">
           <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowSidebar(false)}></div>
@@ -434,7 +434,7 @@ export default function ResponderApp() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Shield className="w-6 h-6 text-ntsa-primaryLight" />
-                <h2 className="font-bold text-lg text-white">NTSA Menu</h2>
+                <h2 className="font-bold text-lg text-white">TAIFA RSG</h2>
               </div>
               <button onClick={() => setShowSidebar(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>

@@ -1,4 +1,4 @@
-from .monitor import MonitoringService, Metric, Alert
+from .monitor import MonitoringService, Metric, Alert, MetricType, AlertSeverity
 from .config import MonitoringConfig
 
-__all__ = ["MonitoringService", "Metric", "Alert", "MonitoringConfig"]
+__all__ = ["MonitoringService", "Metric", "Alert", "MetricType", "AlertSeverity", "MonitoringConfig"]

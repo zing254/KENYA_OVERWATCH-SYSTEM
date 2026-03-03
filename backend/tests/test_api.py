@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
-from production_api import app
+from road_safety_api import app
 from ai.pipeline import AIPipeline, pipeline
 from ai.anpr import ANPR, anpr
 from alerting.manager import alert_manager

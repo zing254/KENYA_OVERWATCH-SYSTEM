@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { AlertTriangle, AlertCircle, MapPin, Car, Activity, Shield, FileText, Settings, Radio, Map, BarChart3, Zap, Users, TrendingUp, DollarSign, Clock, MapPinned, Camera, Eye, Bell } from 'lucide-react'
 
-const NTSA_COLORS = {
+const KENYA_OVERWATCH_COLORS = {
   primary: '#14532D',
   primaryLight: '#22C55E',
   accent: '#BB0000',
@@ -14,7 +14,7 @@ const NTSA_COLORS = {
   info: '#3B82F6',
 }
 
-const COLORS = [NTSA_COLORS.danger, NTSA_COLORS.warning, NTSA_COLORS.info, NTSA_COLORS.primaryLight]
+const COLORS = [KENYA_OVERWATCH_COLORS.danger, KENYA_OVERWATCH_COLORS.warning, KENYA_OVERWATCH_COLORS.info, KENYA_OVERWATCH_COLORS.primaryLight]
 
 interface Accident {
   id: string
@@ -650,7 +650,7 @@ export default function RoadSafetyDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* NTSA Header - Official Branding */}
+      {/* KENYA OVERWATCH Header - Official Branding */}
       <header className="bg-gradient-to-r from-ntsa-primaryDark via-ntsa-primary to-ntsa-primaryDark border-b-2 border-ntsa-primaryLight px-6 py-4 shadow-lg">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -658,8 +658,8 @@ export default function RoadSafetyDashboard() {
               <Shield className="w-8 h-8 text-ntsa-primaryLight" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">NTSA Road Safety</h1>
-              <p className="text-ntsa-primaryLight/80 text-sm">National Command Center | Kenya Overwatch</p>
+              <h1 className="text-2xl font-bold text-white">KENYA OVERWATCH SYSTEM</h1>
+              <p className="text-ntsa-primaryLight/80 text-sm">National Command Center</p>
             </div>
           </div>
           

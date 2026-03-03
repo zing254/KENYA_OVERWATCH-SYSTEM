@@ -26,7 +26,7 @@ const navItems = [
   { href: '/reports', label: 'Reports', icon: FileText },
 ]
 
-const Layout = ({ children, title = 'NTSA Road Safety - National Command Center' }: LayoutProps) => {
+const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }: LayoutProps) => {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -35,7 +35,7 @@ const Layout = ({ children, title = 'NTSA Road Safety - National Command Center'
     <>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="NTSA Road Safety - National Transport and Safety Authority Kenya" />
+        <meta name="description" content="KENYA OVERWATCH SYSTEM - Road Safety Command Center" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -44,16 +44,16 @@ const Layout = ({ children, title = 'NTSA Road Safety - National Command Center'
       </Head>
       
       <div className="min-h-screen bg-gray-900 flex">
-        {/* Sidebar - NTSA Official Theme */}
+        {/* Sidebar - KENYA OVERWATCH Theme */}
         <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-ntsa-primaryDark to-gray-900 border-r border-ntsa-primaryLight/30 flex flex-col transition-all duration-300 fixed h-full z-30`}>
-          {/* Logo - NTSA Official Branding */}
+          {/* Logo - KENYA OVERWATCH Branding */}
           <div className="p-4 border-b border-ntsa-primaryLight/30 flex items-center justify-between">
             {sidebarOpen && (
               <div className="flex items-center gap-2">
                 <Shield className="w-8 h-8 text-ntsa-primaryLight" />
                 <div>
-                  <h1 className="text-white font-bold text-sm">NTSA Road Safety</h1>
-                  <p className="text-ntsa-primaryLight/70 text-xs">Kenya Overwatch</p>
+                  <h1 className="text-white font-bold text-sm">KENYA OVERWATCH</h1>
+                  <p className="text-ntsa-primaryLight/70 text-xs">Command Center</p>
                 </div>
               </div>
             )}
