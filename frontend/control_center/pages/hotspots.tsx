@@ -39,7 +39,7 @@ export default function HotspotsPage() {
   const criticalHotspots = mockHotspots.filter(h => h.risk_score >= 0.75).length
 
   return (
-    <Layout title="Accident Hotspots - NTSA Road Safety">
+    <Layout title="Accident Hotspots - KENYA OVERWATCH">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -138,7 +138,7 @@ export default function HotspotsPage() {
 
         {/* Recommendations */}
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-          <h3 className="text-white font-semibold mb-4">NTSA Recommendations</h3>
+          <h3 className="text-white font-semibold mb-4">KENYA OVERWATCH Recommendations</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
               <h4 className="text-red-400 font-medium mb-2">High Priority</h4>

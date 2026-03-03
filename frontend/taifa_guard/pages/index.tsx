@@ -51,6 +51,8 @@ interface Incident {
     risk_score: number
     risk_level: string
   }
+  phone_number?: string
+  reporter_phone?: string
 }
 
 interface Team {

@@ -75,7 +75,7 @@ export default function ViolationsPage() {
   const paidFines = mockViolations.filter(v => v.status === 'paid').reduce((sum, v) => sum + v.fine_amount, 0)
 
   return (
-    <Layout title="Traffic Violations - NTSA Road Safety">
+    <Layout title="Traffic Violations - KENYA OVERWATCH">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

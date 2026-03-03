@@ -85,7 +85,7 @@ export default function AccidentsPage() {
   const totalInjuries = accidents.reduce((sum, a) => sum + (a.injuries || 0), 0)
 
   return (
-    <Layout title="Accidents - NTSA Road Safety">
+    <Layout title="Accidents - KENYA OVERWATCH">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

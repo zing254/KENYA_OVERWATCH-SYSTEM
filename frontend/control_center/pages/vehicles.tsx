@@ -47,7 +47,7 @@ export default function VehiclesPage() {
   }
 
   return (
-    <Layout title="Vehicle Registry - NTSA Road Safety">
+    <Layout title="Vehicle Registry - KENYA OVERWATCH">
       <div className="space-y-6">
         {/* Search */}
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
