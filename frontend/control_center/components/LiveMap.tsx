@@ -223,7 +223,7 @@ export default function LiveMap({
   const [activeLayer, setActiveLayer] = useState<string>('all')
   const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>('standard')
   const [mapReady, setMapReady] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedRoute, setSelectedRoute] = useState<[number, number][] | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -345,7 +345,7 @@ export default function LiveMap({
             Auto-refresh: {Math.round(refreshInterval / 1000)}s
           </span>
           <span className="text-xs text-gray-400">
-            Last: {lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' })}
+            Last: {lastUpdate ? lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' }) : '--:--:--'}
           </span>
         </div>
       )}

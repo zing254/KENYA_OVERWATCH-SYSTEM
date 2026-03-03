@@ -119,6 +119,7 @@ export default function RoadSafetyDashboard() {
   const [hotspots] = useState<Hotspot[]>(mockHotspots)
   const [activeTab, setActiveTab] = useState<string>('dashboard')
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const [mounted, setMounted] = useState(false)
   const [stats, setStats] = useState({
     todayAccidents: 0,
     todayViolations: 0,
@@ -131,6 +132,7 @@ export default function RoadSafetyDashboard() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
   useEffect(() => {
+    setMounted(true)
     setCurrentTime(new Date())
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
@@ -668,8 +670,17 @@ export default function RoadSafetyDashboard() {
 
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <p className="text-white font-medium">{formatDate(currentTime)}</p>
-              <p className="text-ntsa-primaryLight text-xl font-mono">{formatTime(currentTime)}</p>
+              {mounted ? (
+                <>
+                  <p className="text-white font-medium">{formatDate(currentTime)}</p>
+                  <p className="text-ntsa-primaryLight text-xl font-mono">{formatTime(currentTime)}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-white font-medium">Loading...</p>
+                  <p className="text-ntsa-primaryLight text-xl font-mono">--:--:--</p>
+                </>
+              )}
             </div>
             <div className="w-10 h-10 bg-ntsa-primaryLight rounded-full flex items-center justify-center">
               <Shield className="w-5 h-5 text-white" />
