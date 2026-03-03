@@ -30,29 +30,29 @@ class CrashAnalysisResult:
 class CrashCauseAnalyzer:
     CAUSE_CATEGORIES = {
         "human_error": {
-            "speeding": CrashCause("H001", "human_error", "Excessive speed", 0.85, factors=["time_of_day", "road_type"]),
-            "distracted_driving": CrashCause("H002", "human_error", "Distracted driving", 0.75, factors=["mobile_phone", "passengers"]),
-            "fatigue": CrashCause("H003", "human_error", "Driver fatigue", 0.70, factors=["time_of_day", "trip_duration"]),
-            "drunk_driving": CrashCause("H004", "human_error", "Driving under influence", 0.95, factors=["alcohol_level", "time"]),
-            "reckless_overtaking": CrashCause("H005", "human_error", "Dangerous overtaking", 0.80, factors=["road_visibility", "traffic"]),
+            "speeding": CrashCause("H001", "human_error", "Excessive speed", 0.85, related_factors=["time_of_day", "road_type"]),
+            "distracted_driving": CrashCause("H002", "human_error", "Distracted driving", 0.75, related_factors=["mobile_phone", "passengers"]),
+            "fatigue": CrashCause("H003", "human_error", "Driver fatigue", 0.70, related_factors=["time_of_day", "trip_duration"]),
+            "drunk_driving": CrashCause("H004", "human_error", "Driving under influence", 0.95, related_factors=["alcohol_level", "time"]),
+            "reckless_overtaking": CrashCause("H005", "human_error", "Dangerous overtaking", 0.80, related_factors=["road_visibility", "traffic"]),
         },
         "vehicle_failure": {
-            "brake_failure": CrashCause("V001", "vehicle_failure", "Brake system failure", 0.90, factors=["maintenance", "age"]),
-            "tire_failure": CrashCause("V002", "vehicle_failure", "Tire blowout/failure", 0.75, factors=["tire_condition", "load"]),
-            "steering_failure": CrashCause("V003", "vehicle_failure", "Steering mechanism failure", 0.85, factors=["maintenance"]),
-            "light_failure": CrashCause("V004", "vehicle_failure", "Lighting system failure", 0.60, factors=["maintenance", "weather"]),
+            "brake_failure": CrashCause("V001", "vehicle_failure", "Brake system failure", 0.90, related_factors=["maintenance", "age"]),
+            "tire_failure": CrashCause("V002", "vehicle_failure", "Tire blowout/failure", 0.75, related_factors=["tire_condition", "load"]),
+            "steering_failure": CrashCause("V003", "vehicle_failure", "Steering mechanism failure", 0.85, related_factors=["maintenance"]),
+            "light_failure": CrashCause("V004", "vehicle_failure", "Lighting system failure", 0.60, related_factors=["maintenance", "weather"]),
         },
         "road_conditions": {
-            "potholes": CrashCause("R001", "road_conditions", "Road surface damage", 0.65, factors=["maintenance", "traffic"]),
-            "poor_markings": CrashCause("R002", "road_conditions", "Inadequate road markings", 0.55, factors=["maintenance", "night"]),
-            "narrow_road": CrashCause("R003", "road_conditions", "Insufficient road width", 0.50, factors=["traffic_volume"]),
-            "lack_of_barriers": CrashCause("R004", "road_conditions", "Missing safety barriers", 0.70, factors=["road_type", "elevation"]),
+            "potholes": CrashCause("R001", "road_conditions", "Road surface damage", 0.65, related_factors=["maintenance", "traffic"]),
+            "poor_markings": CrashCause("R002", "road_conditions", "Inadequate road markings", 0.55, related_factors=["maintenance", "night"]),
+            "narrow_road": CrashCause("R003", "road_conditions", "Insufficient road width", 0.50, related_factors=["traffic_volume"]),
+            "lack_of_barriers": CrashCause("R004", "road_conditions", "Missing safety barriers", 0.70, related_factors=["road_type", "elevation"]),
         },
         "environmental": {
-            "heavy_rain": CrashCause("E001", "environmental", "Adverse weather - rain", 0.75, factors=["visibility", "road_surface"]),
-            "fog": CrashCause("E002", "environmental", "Reduced visibility - fog", 0.80, factors=["time_of_day", "location"]),
-            "glare": CrashCause("E003", "environmental", "Sun glare", 0.45, factors=["time_of_day"]),
-            "flooding": CrashCause("E004", "environmental", "Water logging/flooding", 0.70, factors=["drainage", "rainfall"]),
+            "heavy_rain": CrashCause("E001", "environmental", "Adverse weather - rain", 0.75, related_factors=["visibility", "road_surface"]),
+            "fog": CrashCause("E002", "environmental", "Reduced visibility - fog", 0.80, related_factors=["time_of_day", "location"]),
+            "glare": CrashCause("E003", "environmental", "Sun glare", 0.45, related_factors=["time_of_day"]),
+            "flooding": CrashCause("E004", "environmental", "Water logging/flooding", 0.70, related_factors=["drainage", "rainfall"]),
         }
     }
 
