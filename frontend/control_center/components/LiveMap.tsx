@@ -220,6 +220,7 @@ export default function LiveMap({
   showSatellite = true,
   showNavigation = true,
 }: LiveMapProps) {
+  const [mounted, setMounted] = useState(false)
   const [activeLayer, setActiveLayer] = useState<string>('all')
   const [mapType, setMapType] = useState<keyof typeof MAP_LAYERS>('standard')
   const [mapReady, setMapReady] = useState(false)
@@ -227,6 +228,10 @@ export default function LiveMap({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedRoute, setSelectedRoute] = useState<[number, number][] | null>(null)
   const mapRef = useRef<L.Map | null>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const getIcon = (marker: MapMarker) => {
     if (marker.icon) return marker.icon
@@ -345,7 +350,7 @@ export default function LiveMap({
             Auto-refresh: {Math.round(refreshInterval / 1000)}s
           </span>
           <span className="text-xs text-gray-400">
-            Last: {lastUpdate ? lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' }) : '--:--:--'}
+            Last: {mounted && lastUpdate ? lastUpdate.toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi' }) : '--:--:--'}
           </span>
         </div>
       )}

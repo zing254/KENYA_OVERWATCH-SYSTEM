@@ -247,12 +247,23 @@ export default function RoadSafetyDashboard() {
 
   const formatTime = (date: Date | null) => {
     if (!date) return '--:--:--'
-    return date.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return date.toLocaleTimeString('en-KE', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      timeZone: 'Africa/Nairobi'
+    })
   }
 
   const formatDate = (date: Date | null) => {
     if (!date) return '...'
-    return date.toLocaleDateString('en-KE', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    return date.toLocaleDateString('en-KE', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      timeZone: 'Africa/Nairobi'
+    })
   }
 
   const renderDashboard = () => (
