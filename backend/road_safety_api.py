@@ -2547,6 +2547,97 @@ kenya_overwatch_active_teams {random.randint(3, 10)}
     return PlainTextResponse(metrics, media_type="text/plain")
 
 
+# ==================== EXPORT & REPORTING ====================
+@app.get("/api/export/incidents")
+async def export_incidents(format: str = "json"):
+    """Export incidents data in various formats"""
+    incidents = MOCK_INCIDENTS
+    
+    if format == "csv":
+        csv_data = "id,type,location,severity,status,created_at\n"
+        for inc in incidents:
+            csv_data += f'{inc.get("incident_id", "")},{inc.get("incident_type", "")},{inc.get("location", "")},{inc.get("severity", "")},{inc.get("status", "")},{inc.get("created_at", "")}\n'
+        return PlainTextResponse(csv_data, media_type="text/csv")
+    
+    return {"total": len(incidents), "incidents": incidents}
+
+
+@app.get("/api/export/violations")
+async def export_violations(format: str = "json"):
+    """Export violations data in various formats"""
+    violations = MOCK_VIOLATIONS
+    
+    if format == "csv":
+        csv_data = "id,type,vehicle_plate,speed_detected,speed_limit,location,status,created_at\n"
+        for v in violations:
+            csv_data += f'{v.get("violation_id", "")},{v.get("violation_type", "")},{v.get("vehicle_plate", "")},{v.get("speed_detected", "")},{v.get("speed_limit", "")},{v.get("location", "")},{v.get("status", "")},{v.get("created_at", "")}\n'
+        return PlainTextResponse(csv_data, media_type="text/csv")
+    
+    return {"total": len(violations), "violations": violations}
+
+
+@app.get("/api/export/citizen-reports")
+async def export_citizen_reports(format: str = "json"):
+    """Export citizen reports in various formats"""
+    reports = CITIZEN_REPORTS
+    
+    if format == "csv":
+        csv_data = "id,type,location,status,anonymous,created_at\n"
+        for r in reports:
+            csv_data += f'{r.get("id", "")},{r.get("type", "")},{r.get("location", "")},{r.get("status", "")},{r.get("anonymous", "")},{r.get("created_at", "")}\n'
+        return PlainTextResponse(csv_data, media_type="text/csv")
+    
+    return {"total": len(reports), "reports": reports}
+
+
+@app.get("/api/reports/generate")
+async def generate_report(
+    report_type: str = Query(..., description="Type of report: incidents, violations, summary"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    format: str = Query("json", description="Output format: json, csv")
+):
+    """Generate comprehensive reports"""
+    from datetime import datetime
+    
+    try:
+        start = datetime.fromisoformat(start_date) if start_date else datetime.now()
+        end = datetime.fromisoformat(end_date) if end_date else datetime.now()
+    except:
+        start = datetime.now()
+        end = datetime.now()
+    
+    if report_type == "incidents":
+        data = MOCK_INCIDENTS
+    elif report_type == "violations":
+        data = MOCK_VIOLATIONS
+    elif report_type == "summary":
+        data = {
+            "total_incidents": len(MOCK_INCIDENTS),
+            "total_violations": len(MOCK_VIOLATIONS),
+            "total_citizen_reports": len(CITIZEN_REPORTS),
+            "total_vehicles": len(MOCK_VEHICLES),
+            "total_drivers": len(MOCK_DRIVERS),
+            "generated_at": utcnow().isoformat()
+        }
+    else:
+        data = []
+    
+    if format == "csv" and isinstance(data, list):
+        csv_data = "data\n"
+        for item in data:
+            csv_data += f"{json.dumps(item)}\n"
+        return PlainTextResponse(csv_data, media_type="text/csv")
+    
+    return {
+        "report_type": report_type,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "generated_at": utcnow().isoformat(),
+        "data": data
+    }
+
+
 # ==================== RUN ====================
 if __name__ == "__main__":
     import uvicorn
