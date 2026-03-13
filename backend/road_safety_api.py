@@ -6,6 +6,7 @@ Version: 2.0.0 - Enhanced Security Edition
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query, Depends, Request, APIRouter
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, Any
 import asyncio
@@ -164,6 +165,26 @@ apply_security_middleware(app)
 api_v1 = APIRouter(prefix="/api/v1", tags=["v1"])
 
 # ==================== CENTRALIZED ERROR HANDLING ====================
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error.get("loc", []) if loc not in ("body", "query", "path"))
+        errors.append({
+            "field": field,
+            "message": error.get("msg", "Validation error"),
+            "type": error.get("type")
+        })
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "Validation error",
+            "details": errors,
+            "status_code": 422,
+            "timestamp": utcnow().isoformat()
+        }
+    )
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
