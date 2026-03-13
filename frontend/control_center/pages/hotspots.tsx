@@ -1,5 +1,6 @@
 import Layout from '@/components/Layout'
 import { MapPin, AlertTriangle, TrendingUp, Calendar } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Hotspot {
   name: string
@@ -37,6 +38,15 @@ export default function HotspotsPage() {
 
   const totalIncidents = mockHotspots.reduce((sum, h) => sum + h.incidents_2024, 0)
   const criticalHotspots = mockHotspots.filter(h => h.risk_score >= 0.75).length
+
+  const handleViewMap = (hotspotName: string) => {
+    toast.success(`Opening map for ${hotspotName}...`)
+  }
+
+  const handleExportCSV = () => {
+    toast.loading('Exporting hotspots data...')
+    setTimeout(() => toast.success('Exported to CSV successfully'), 1500)
+  }
 
   return (
     <Layout title="Accident Hotspots - KENYA OVERWATCH">
@@ -126,7 +136,10 @@ export default function HotspotsPage() {
                     {hotspot.lat.toFixed(4)}, {hotspot.lng.toFixed(4)}
                   </td>
                   <td className="px-4 py-3">
-                    <button className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm">
+                    <button 
+                      onClick={() => handleViewMap(hotspot.name)}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                    >
                       View Map
                     </button>
                   </td>

@@ -1,15 +1,39 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Bell, X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
+const playSound = (soundType: string, volume: number = 1.0) => {
+  if (typeof window === 'undefined') return
+
+  const sounds: Record<string, string> = {
+    emergency: '/sounds/emergency.mp3',
+    alert: '/sounds/alert.mp3',
+    warning: '/sounds/warning.mp3',
+    notification: '/sounds/notification.mp3',
+    incident: '/sounds/incident.mp3',
+    dispatch: '/sounds/dispatch.mp3',
+    road_sign: '/sounds/road_sign.mp3',
+    speed_camera: '/sounds/speed_camera.mp3',
+  }
+
+  const soundPath = sounds[soundType]
+  if (soundPath) {
+    const audio = new Audio(soundPath)
+    audio.volume = volume
+    audio.play().catch(e => console.error('Error playing sound:', e))
+  }
+}
+
 interface Notification {
-  id: string
+  notification_id: string
   type: 'alert' | 'incident' | 'system' | 'evidence'
   title: string
   message: string
   read: boolean
   timestamp: string
+  notification_type?: string
+  severity?: string
 }
 
 interface NotificationPanelProps {
@@ -22,30 +46,94 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/notifications?limit=20`)
-        const data = await response.json()
-        setNotifications(data.notifications || [])
-        setUnreadCount(data.unread_count || 0)
-      } catch (error) {
-        console.error('Failed to fetch notifications:', error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/notifications?limit=20&user_id=admin`)
+      const data = await response.json()
+      setNotifications(data.notifications || [])
+      setUnreadCount(data.unread_count || 0)
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [])
 
+  useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, refreshInterval)
     return () => clearInterval(interval)
-  }, [refreshInterval])
+  }, [fetchNotifications, refreshInterval])
+
+  const handleWebSocketMessage = useCallback((data: any) => {
+    if (data.type === 'notification') {
+      const notif = data.data
+      const newNotification: Notification = {
+        notification_id: notif.notification_id,
+        type: notif.notification_type || 'alert',
+        title: notif.title,
+        message: notif.message,
+        read: false,
+        timestamp: notif.timestamp,
+        notification_type: notif.notification_type,
+        severity: notif.severity
+      }
+      setNotifications(prev => [newNotification, ...prev].slice(0, 50))
+      setUnreadCount(prev => prev + 1)
+      
+      const soundMap: Record<string, string> = {
+        'emergency': 'emergency',
+        'critical': 'emergency',
+        'alert': 'alert',
+        'incident': 'incident',
+        'warning': 'warning',
+        'dispatch': 'dispatch',
+        'road_sign': 'road_sign',
+        'speed_camera': 'speed_camera'
+      }
+      const soundType = soundMap[notif.notification_type] || soundMap[notif.severity] || 'notification'
+      playSound(soundType, 0.7)
+    } else if (data.type === 'sound_alert') {
+      const sound = data.data
+      playSound(sound.sound_type, sound.volume)
+    }
+  }, [])
+
+  useEffect(() => {
+    const wsUrl = API_URL.replace('http', 'ws') + `/api/v1/notifications/ws/notifications/admin`
+    const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      console.log('Notifications WebSocket connected')
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleWebSocketMessage(data)
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error)
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
+
+    ws.onclose = () => {
+      console.log('Notifications WebSocket disconnected')
+    }
+
+    return () => {
+      ws.close()
+    }
+  }, [handleWebSocketMessage])
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'POST' })
+      await fetch(`${API_URL}/api/notifications/${id}/read?user_id=admin`, { method: 'POST' })
       setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
+        prev.map(n => n.notification_id === id ? { ...n, read: true } : n)
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (error) {
@@ -55,7 +143,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
 
   const markAllAsRead = async () => {
     try {
-      await fetch(`${API_URL}/api/notifications/read-all`, { method: 'POST' })
+      await fetch(`${API_URL}/api/notifications/read-all?user_id=admin`, { method: 'POST' })
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch (error) {
@@ -127,7 +215,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
             ) : (
               notifications.map(notification => (
                 <div 
-                  key={notification.id}
+                  key={notification.notification_id}
                   className={`p-3 border-b border-gray-700 hover:bg-gray-750 ${
                     !notification.read ? 'bg-gray-750' : ''
                   }`}
@@ -149,7 +237,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
                     </div>
                     {!notification.read && (
                       <button
-                        onClick={() => markAsRead(notification.id)}
+                        onClick={() => markAsRead(notification.notification_id)}
                         className="flex-shrink-0 text-gray-400 hover:text-white"
                       >
                         <X className="w-4 h-4" />

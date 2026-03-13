@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kenya-overwatch
+  labels:
+    app.kubernetes.io/name: kenya-overwatch
+    app.kubernetes.io/component: namespace
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kenya-overwatch-config
+  namespace: kenya-overwatch
+data:
+  DATABASE_URL: "postgresql://overwatch:overwatch_secure_pass@postgres:5432/overwatch_db"
+  REDIS_URL: "redis://redis:6379/0"
+  OVERWATCH_ENV: "production"
+  OVERWATCH_DEBUG: "false"
+  API_URL: "http://backend:8001"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kenya-overwatch-secrets
+  namespace: kenya-overwatch
+type: Opaque
+stringData:
+  JWT_SECRET_KEY: "your-jwt-secret-key-change-in-production"
+  API_SECRET_KEY: "your-api-secret-key-change-in-production"
+  SENTRY_DSN: ""
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+  selector:
+    app: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-center
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: control-center
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taifa-guard
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: taifa-guard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taifaroad
+  namespace: kenya-overwatch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: taifaroad

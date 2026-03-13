@@ -15,50 +15,22 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
+# PyTorch 2.6+ compatibility fix
+import torch
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
+from ..enums import AlertSeverity, DetectionType
+
 logger = logging.getLogger(__name__)
-
-
-class DetectionType(Enum):
-    """Types of AI detections"""
-    PERSON = "person"
-    VEHICLE = "vehicle"
-    WEAPON = "weapon"
-    ANIMAL = "animal"
-    SUSPICIOUS_OBJECT = "suspicious_object"
-    FIRE = "fire"
-    SMOKE = "smoke"
-    LICENSE_PLATE = "license_plate"
-    FACE = "face"
-    ABANDONED_OBJECT = "abandoned_object"
-    INTRUSION = "intrusion"
-    CROWD = "crowd"
-    FIGHT = "fight"
-    THEFT = "theft"
-    TRAFFIC_VIOLATION = "traffic_violation"
-    SPEEDING = "speeding"
-    LANE_VIOLATION = "lane_violation"
-    RED_LIGHT_VIOLATION = "red_light_violation"
-    DANGEROUS_OVERTAKING = "dangerous_overtaking"
-    STOPPED_VEHICLE = "stopped_vehicle"
-    PEDESTRIAN_CROSSING = "pedestrian_crossing"
-    ACCIDENT = "accident"
-    HAZARD = "hazard"
-    POTHOLE = "pothole"
-    DEBRIS = "debris"
-
-
-class AlertSeverity(Enum):
-    """Alert severity levels"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
 
 
 @dataclass

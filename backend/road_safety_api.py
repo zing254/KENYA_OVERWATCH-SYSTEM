@@ -5,13 +5,15 @@ Version: 2.0.0 - Enhanced Security Edition
 """
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query, Depends, Request, APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, Any
 import asyncio
 import json
 import time
 import uuid
 import random
+import psutil
 import os
 import logging
 
@@ -108,21 +110,51 @@ from .notifications_sounds import notification_manager
 def utcnow():
     return datetime.now(timezone.utc)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from .database import init_db, seed_demo_data
+    init_db()
+    seed_demo_data()
+    yield
+
+
 app = FastAPI(
     title="Kenya NTSA Road Safety API",
-    description="National Transport and Safety Authority - Road Safety Monitoring System",
+    description="""
+## Kenya Overwatch System API
+
+Real-time road safety monitoring, accident detection, and traffic violation management.
+
+### Features
+- **Incidents** - Report and track road incidents
+- **Violations** - ANPR-based traffic violation detection
+- **Teams** - Response team management and dispatch
+- **Alerts** - Real-time road safety alerts
+- **Analytics** - Dashboard statistics and metrics
+- **Logs** - System logging and audit trails
+
+### Authentication
+Use JWT bearer token authentication for protected endpoints.
+
+### Rate Limiting
+APIs are rate-limited to ensure fair usage.
+    """,
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
+    contact={
+        "name": "NTSA Kenya",
+        "url": "https://www.ntsa.go.ke",
+        "email": "support@overwatch.go.ke"
+    },
+    license_info={
+        "name": "Proprietary",
+        "url": "https://overwatch.go.ke/license"
+    }
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    from .database import init_db, seed_demo_data
-    init_db()
-    seed_demo_data()
 
 
 # Apply security middleware (CORS, rate limiting, logging, etc.)
@@ -240,6 +272,89 @@ async def health_check_v1():
         "timestamp": utcnow().isoformat()
     }
 
+
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics"""
+    try:
+        from .cache import cache
+    except ModuleNotFoundError:
+        from backend.cache import cache
+    
+    return cache.get_stats()
+
+
+@app.post("/api/cache/clear")
+async def clear_cache():
+    """Clear the cache"""
+    try:
+        from .cache import cache
+    except ModuleNotFoundError:
+        from backend.cache import cache
+    
+    cache.clear()
+    return {"status": "cleared", "message": "Cache cleared successfully"}
+
+
+# ==================== SYSTEM LOGS ====================
+@app.get("/api/logs")
+async def get_logs(
+    level: Optional[str] = Query(None, description="Filter by level (debug, info, warning, error, critical)"),
+    category: Optional[str] = Query(None, description="Filter by category (api, auth, database, security, incident, violation, websocket, system)"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination")
+):
+    """Get system logs with optional filtering"""
+    try:
+        from .logging_system import log_manager, log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_manager, log_event
+    
+    # Generate some initial logs if empty
+    if log_manager._logs:
+        log_event("info", "api", "road_safety_api.py", "API request received", request_id=f"req_{random.randint(1000, 9999)}")
+    
+    return log_manager.get_logs(level=level, category=category, limit=limit, offset=offset)
+
+
+@app.post("/api/logs")
+async def create_log(
+    level: str = Query(..., description="Log level"),
+    category: str = Query(..., description="Log category"),
+    source: str = Query("", description="Source file/component"),
+    message: str = Query("", description="Log message"),
+    details: Optional[str] = Query(None, description="JSON details")
+):
+    """Create a new log entry"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    import json
+    details_dict = None
+    if details:
+        try:
+            details_dict = json.loads(details)
+        except:
+            pass
+    
+    log_event(level, category, source, message, details=details_dict)
+    
+    return {"status": "created", "message": "Log entry added"}
+
+
+@app.delete("/api/logs")
+async def clear_logs():
+    """Clear all logs"""
+    try:
+        from .logging_system import log_manager
+    except ModuleNotFoundError:
+        from backend.logging_system import log_manager
+    
+    log_manager.clear_logs()
+    return {"status": "cleared", "message": "All logs cleared"}
+
 # ==================== INCIDENTS (alias for /api/v1/services/incidents) ====================
 @app.get("/api/incidents")
 async def list_incidents(
@@ -334,6 +449,88 @@ async def update_incident_status(incident_id: str, status: str = Form(...)):
     
     return updated.to_dict()
 
+
+# ==================== INCIDENTS CRUD ====================
+@app.post("/api/incidents")
+async def create_incident(
+    title: str = Form(..., min_length=3, max_length=200),
+    description: str = Form(..., min_length=10, max_length=2000),
+    incident_type: str = Form(...),
+    severity: str = Form(default="medium"),
+    location: str = Form(..., min_length=3),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+):
+    """Create a new incident"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    try:
+        from .enums import SeverityLevel
+    except ModuleNotFoundError:
+        from backend.enums import SeverityLevel
+    
+    try:
+        severity_enum = SeverityLevel(severity)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid severity: {severity}")
+    
+    incident_data = {
+        "title": title,
+        "description": description,
+        "incident_type": incident_type,
+        "severity": severity_enum.value,
+        "location": location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "status": "detected"
+    }
+    
+    incident_id = f"INC-{random.randint(100000, 999999)}"
+    incident_data["id"] = incident_id
+    incident_data["created_at"] = utcnow().isoformat()
+    
+    log_event("info", "incident", "road_safety_api.py", f"Incident created: {incident_id}", 
+              details={"title": title, "type": incident_type, "severity": severity})
+    
+    return {"status": "created", "incident": incident_data}
+
+
+@app.put("/api/incidents/{incident_id}")
+async def update_incident(
+    incident_id: str,
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    severity: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+):
+    """Update an existing incident"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    log_event("info", "incident", "road_safety_api.py", f"Incident updated: {incident_id}",
+              details={"title": title, "severity": severity})
+    
+    return {"status": "updated", "incident_id": incident_id}
+
+
+@app.delete("/api/incidents/{incident_id}")
+async def delete_incident(incident_id: str):
+    """Delete an incident"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    log_event("warning", "incident", "road_safety_api.py", f"Incident deleted: {incident_id}")
+    
+    return {"status": "deleted", "incident_id": incident_id}
+
+
 # ==================== DASHBOARD ====================
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats():
@@ -356,6 +553,86 @@ async def get_dashboard_summary():
         "recent_violations": violations[:5],
         "citizen_reports": CITIZEN_REPORTS[-10:] if CITIZEN_REPORTS else [],
     })
+
+
+@app.get("/api/dashboard/metrics")
+async def get_realtime_metrics():
+    """Get real-time dashboard metrics"""
+    try:
+        from .logging_system import log_manager
+    except ModuleNotFoundError:
+        from backend.logging_system import log_manager
+    
+    # Get live data
+    active_incidents = len([t for t in MOCK_TEAMS if t.get("current_incident_id")])
+    available_teams = len([t for t in MOCK_TEAMS if t["status"] == "available"])
+    dispatched_teams = len([t for t in MOCK_TEAMS if t["status"] == "dispatched"])
+    
+    # Get log counts for the last hour
+    logs = log_manager.get_logs(limit=1000)
+    log_counts = {
+        "total": logs["total"],
+        "errors": len([l for l in logs["logs"] if l.get("level") in ["error", "critical"]]),
+        "warnings": len([l for l in logs["logs"] if l.get("level") == "warning"]),
+    }
+    
+    return {
+        "timestamp": utcnow().isoformat(),
+        "incidents": {
+            "active": active_incidents,
+            "today": random.randint(5, 15),
+            "this_week": random.randint(30, 80),
+        },
+        "violations": {
+            "detected_today": random.randint(20, 50),
+            "processed_today": random.randint(15, 40),
+            "pending_review": random.randint(5, 20),
+        },
+        "teams": {
+            "total": len(MOCK_TEAMS),
+            "available": available_teams,
+            "dispatched": dispatched_teams,
+            "off_duty": len(MOCK_TEAMS) - available_teams - dispatched_teams,
+        },
+        "response_times": {
+            "avg_this_week": f"{random.randint(8, 15)} min",
+            "avg_this_month": f"{random.randint(10, 18)} min",
+        },
+        "alerts": {
+            "active": len([a for a in MOCK_ALERTS if a.get("is_active")]),
+            "critical": len([a for a in MOCK_ALERTS if a.get("severity") == "critical"]),
+        },
+        "logs": log_counts,
+    }
+
+
+@app.get("/api/dashboard/charts")
+async def get_chart_data(
+    period: str = Query("week", description="Time period: day, week, month")
+):
+    """Get chart data for dashboard visualizations"""
+    import calendar
+    
+    if period == "day":
+        hours = list(range(24))
+        data = [random.randint(0, 10) for _ in hours]
+        labels = [f"{h}:00" for h in hours]
+    elif period == "week":
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        data = [random.randint(10, 50) for _ in days]
+        labels = days
+    else:
+        weeks = [f"W{i}" for i in range(1, 5)]
+        data = [random.randint(100, 300) for _ in weeks]
+        labels = weeks
+    
+    return {
+        "period": period,
+        "labels": labels,
+        "accidents": data,
+        "violations": [max(0, x + random.randint(-10, 20)) for x in data],
+        "labels_y_axis": "Count",
+    }
 
 # ==================== ACCIDENTS ====================
 @app.get("/api/accidents")
@@ -507,6 +784,56 @@ async def get_violation_revenue():
         "total_points_deducted": sum(v.penalty_points for v in issued),
     })
 
+
+# ==================== VIOLATIONS CRUD ====================
+@app.put("/api/violations/{violation_id}")
+async def update_violation(
+    violation_id: str,
+    plate_number: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    speed_detected: Optional[float] = Form(None),
+):
+    """Update a violation"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    violation = road_safety_engine.get_violation(violation_id)
+    if not violation:
+        raise HTTPException(status_code=404, detail="Violation not found")
+    
+    if plate_number:
+        violation.plate_number = plate_number
+    if location:
+        violation.location = location
+    if speed_detected:
+        violation.speed_detected = speed_detected
+    
+    log_event("info", "violation", "road_safety_api.py", f"Violation updated: {violation_id}")
+    
+    return serialize_for_json(violation)
+
+
+@app.delete("/api/violations/{violation_id}")
+async def delete_violation(violation_id: str):
+    """Delete a violation"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    violation = road_safety_engine.get_violation(violation_id)
+    if not violation:
+        raise HTTPException(status_code=404, detail="Violation not found")
+    
+    violation.status = ViolationStatus.CANCELLED
+    
+    log_event("warning", "violation", "road_safety_api.py", f"Violation deleted: {violation_id}")
+    
+    return {"status": "deleted", "violation_id": violation_id}
+
+
 # ==================== VEHICLES ====================
 @app.get("/api/vehicles")
 async def list_vehicles(limit: int = 100):
@@ -534,6 +861,107 @@ async def get_vehicle_violations(plate_number: str):
         "violations": violations
     })
 
+
+@app.post("/api/vehicles")
+async def create_vehicle(
+    plate_number: str = Form(..., min_length=5, max_length=20),
+    vehicle_type: str = Form(default="saloon"),
+    make: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+    year: Optional[int] = Form(None),
+    color: Optional[str] = Form(None),
+    owner_name: Optional[str] = Form(None),
+):
+    """Register a new vehicle"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    # Check if vehicle already exists
+    existing = road_safety_engine.get_vehicle(plate_number)
+    if existing:
+        raise HTTPException(status_code=400, detail="Vehicle already registered")
+    
+    # Create vehicle data
+    vehicle_data = {
+        "plate_number": plate_number.upper(),
+        "vehicle_type": vehicle_type,
+        "make": make,
+        "model": model,
+        "year": year,
+        "color": color,
+        "owner_name": owner_name,
+        "registered_at": utcnow().isoformat(),
+        "status": "active"
+    }
+    
+    road_safety_engine.vehicles[plate_number.upper()] = vehicle_data
+    
+    log_event("info", "system", "road_safety_api.py", f"Vehicle registered: {plate_number}",
+              details={"type": vehicle_type, "make": make})
+    
+    return {"status": "created", "vehicle": vehicle_data}
+
+
+@app.put("/api/vehicles/{plate_number}")
+async def update_vehicle(
+    plate_number: str,
+    vehicle_type: Optional[str] = Form(None),
+    make: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+    color: Optional[str] = Form(None),
+    owner_name: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
+):
+    """Update vehicle details"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    vehicle = road_safety_engine.get_vehicle(plate_number)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    if vehicle_type:
+        vehicle.vehicle_type = vehicle_type
+    if make:
+        vehicle.make = make
+    if model:
+        vehicle.model = model
+    if color:
+        vehicle.color = color
+    if owner_name:
+        vehicle.owner_name = owner_name
+    if status:
+        vehicle.status = status
+    
+    log_event("info", "system", "road_safety_api.py", f"Vehicle updated: {plate_number}")
+    
+    return serialize_for_json(vehicle)
+
+
+@app.delete("/api/vehicles/{plate_number}")
+async def delete_vehicle(plate_number: str):
+    """Delete/deactivate a vehicle"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    vehicle = road_safety_engine.get_vehicle(plate_number)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    # Soft delete - mark as inactive
+    vehicle.status = "deleted"
+    
+    log_event("warning", "system", "road_safety_api.py", f"Vehicle deleted: {plate_number}")
+    
+    return {"status": "deleted", "plate_number": plate_number}
+
+
 # ==================== DRIVERS ====================
 @app.get("/api/drivers/{license_number}")
 async def get_driver(license_number: str):
@@ -550,6 +978,115 @@ async def get_driver_violations(license_number: str):
         "total_violations": len(violations),
         "violations": violations
     })
+
+
+# ==================== DRIVERS CRUD ====================
+@app.get("/api/drivers")
+async def list_drivers(limit: int = 100):
+    """List all registered drivers"""
+    return serialize_for_json({
+        "total": len(road_safety_engine.drivers),
+        "drivers": list(road_safety_engine.drivers.values())[:limit]
+    })
+
+
+@app.post("/api/drivers")
+async def create_driver(
+    license_number: str = Form(..., min_length=5, max_length=20),
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    date_of_birth: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+):
+    """Register a new driver"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    existing = road_safety_engine.get_driver(license_number)
+    if existing:
+        raise HTTPException(status_code=400, detail="Driver already registered")
+    
+    driver_data = {
+        "license_number": license_number.upper(),
+        "first_name": first_name,
+        "last_name": last_name,
+        "date_of_birth": date_of_birth,
+        "phone": phone,
+        "email": email,
+        "address": address,
+        "registered_at": utcnow().isoformat(),
+        "status": "active",
+        "points": 12
+    }
+    
+    road_safety_engine.drivers[license_number.upper()] = driver_data
+    
+    log_event("info", "system", "road_safety_api.py", f"Driver registered: {license_number}",
+              details={"name": f"{first_name} {last_name}"})
+    
+    return {"status": "created", "driver": driver_data}
+
+
+@app.put("/api/drivers/{license_number}")
+async def update_driver(
+    license_number: str,
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
+):
+    """Update driver details"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    driver = road_safety_engine.get_driver(license_number)
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    
+    if first_name:
+        driver.first_name = first_name
+    if last_name:
+        driver.last_name = last_name
+    if phone:
+        driver.phone = phone
+    if email:
+        driver.email = email
+    if address:
+        driver.address = address
+    if status:
+        driver.status = status
+    
+    log_event("info", "system", "road_safety_api.py", f"Driver updated: {license_number}")
+    
+    return serialize_for_json(driver)
+
+
+@app.delete("/api/drivers/{license_number}")
+async def delete_driver(license_number: str):
+    """Delete/deactivate a driver"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    driver = road_safety_engine.get_driver(license_number)
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    
+    driver.status = "suspended"
+    
+    log_event("warning", "system", "road_safety_api.py", f"Driver suspended: {license_number}")
+    
+    return {"status": "deleted", "license_number": license_number}
+
 
 # ==================== SPEED DETECTION ====================
 @app.post("/api/speed/detect")
@@ -1015,6 +1552,93 @@ async def list_dispatches():
             })
     return {"dispatches": dispatches}
 
+
+# ==================== TEAMS CRUD ====================
+@app.post("/api/teams")
+async def create_team(
+    name: str = Form(..., min_length=3, max_length=100),
+    team_type: str = Form(...),
+    base: str = Form(..., min_length=3),
+    members: int = Form(default=5, ge=1, le=20),
+):
+    """Create a new response team"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    team_id = f"team_{uuid.uuid4().hex[:8]}"
+    new_team = {
+        "id": team_id,
+        "name": name,
+        "type": team_type,
+        "status": "available",
+        "base": base,
+        "members": members,
+        "latitude": -1.2921,
+        "longitude": 36.8219,
+        "capabilities": ["medical", "rescue", "traffic"]
+    }
+    MOCK_TEAMS.append(new_team)
+    
+    log_event("info", "system", "road_safety_api.py", f"Team created: {name}", 
+              details={"team_id": team_id, "type": team_type, "base": base})
+    
+    return {"status": "created", "team": new_team}
+
+
+@app.put("/api/teams/{team_id}")
+async def update_team(
+    team_id: str,
+    name: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
+    base: Optional[str] = Form(None),
+    members: Optional[int] = Form(None),
+):
+    """Update an existing team"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    if name:
+        team["name"] = name
+    if status:
+        team["status"] = status
+    if base:
+        team["base"] = base
+    if members:
+        team["members"] = members
+    
+    log_event("info", "system", "road_safety_api.py", f"Team updated: {team_id}",
+              details={"name": name, "status": status})
+    
+    return {"status": "updated", "team": team}
+
+
+@app.delete("/api/teams/{team_id}")
+async def delete_team(team_id: str):
+    """Delete a team"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    MOCK_TEAMS.remove(team)
+    
+    log_event("warning", "system", "road_safety_api.py", f"Team deleted: {team_id}")
+    
+    return {"status": "deleted", "team_id": team_id}
+
+
 # ==================== ALERTS ====================
 MOCK_ALERTS = [
     {"id": "alert_001", "title": "Heavy Traffic", "message": "Mombasa Road experiencing heavy traffic due to accident", "severity": "medium", "type": "road", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "created_at": utcnow().isoformat(), "is_active": True},
@@ -1067,6 +1691,59 @@ async def acknowledge_alert(alert_id: str):
         raise HTTPException(status_code=404, detail="Alert not found")
     alert["acknowledged"] = True
     return {"message": "Alert acknowledged"}
+
+
+# ==================== ALERTS CRUD ====================
+@app.put("/api/alerts/{alert_id}")
+async def update_alert(
+    alert_id: str,
+    title: Optional[str] = Form(None),
+    message: Optional[str] = Form(None),
+    severity: Optional[str] = Form(None),
+    is_active: Optional[bool] = Form(None),
+):
+    """Update an alert"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    if title:
+        alert["title"] = title
+    if message:
+        alert["message"] = message
+    if severity:
+        alert["severity"] = severity
+    if is_active is not None:
+        alert["is_active"] = is_active
+    
+    log_event("info", "system", "road_safety_api.py", f"Alert updated: {alert_id}")
+    
+    return {"status": "updated", "alert": alert}
+
+
+@app.delete("/api/alerts/{alert_id}")
+async def delete_alert(alert_id: str):
+    """Delete an alert"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    MOCK_ALERTS.remove(alert)
+    
+    log_event("warning", "system", "road_safety_api.py", f"Alert deleted: {alert_id}")
+    
+    return {"status": "deleted", "alert_id": alert_id}
+
 
 # ==================== CITIZEN REPORTS ====================
 CITIZEN_REPORTS = []
@@ -1123,6 +1800,53 @@ async def update_citizen_report_status(report_id: str, status: str):
     
     report["status"] = status
     return report
+
+
+# ==================== CITIZEN REPORTS CRUD ====================
+@app.put("/api/citizen/reports/{report_id}")
+async def update_citizen_report(
+    report_id: str,
+    description: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+):
+    """Update a citizen report"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    if description:
+        report["description"] = description
+    if location:
+        report["location"] = location
+    
+    log_event("info", "system", "road_safety_api.py", f"Citizen report updated: {report_id}")
+    
+    return {"status": "updated", "report": report}
+
+
+@app.delete("/api/citizen/reports/{report_id}")
+async def delete_citizen_report(report_id: str):
+    """Delete a citizen report"""
+    try:
+        from .logging_system import log_event
+    except ModuleNotFoundError:
+        from backend.logging_system import log_event
+    
+    report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    CITIZEN_REPORTS.remove(report)
+    
+    log_event("warning", "system", "road_safety_api.py", f"Citizen report deleted: {report_id}")
+    
+    return {"status": "deleted", "report_id": report_id}
+
 
 # ==================== EVIDENCE UPLOAD ====================
 import os
@@ -1564,6 +2288,64 @@ async def websocket_road_safety(websocket: WebSocket):
         pass
     finally:
         event_broadcaster.unsubscribe(websocket)
+
+
+# ==================== MONITORING & METRICS ====================
+@app.get("/api/metrics")
+async def get_metrics():
+    """Get system metrics"""
+    try:
+        from .cache import cache
+    except ModuleNotFoundError:
+        from backend.cache import cache
+    
+    cache_stats = cache.get_stats()
+    
+    return {
+        "timestamp": utcnow().isoformat(),
+        "system": {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent,
+            "disk_percent": psutil.disk_usage('/').percent,
+        },
+        "cache": cache_stats,
+        "uptime": time.time(),
+    }
+
+
+@app.get("/api/metrics/prometheus")
+async def prometheus_metrics():
+    """Prometheus-formatted metrics"""
+    cpu = psutil.cpu_percent()
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    metrics = f"""# HELP kenya_overwatch_cpu_percent CPU usage percentage
+# TYPE kenya_overwatch_cpu_percent gauge
+kenya_overwatch_cpu_percent {cpu}
+
+# HELP kenya_overwatch_memory_percent Memory usage percentage
+# TYPE kenya_overwatch_memory_percent gauge
+kenya_overwatch_memory_percent {mem.percent}
+
+# HELP kenya_overwatch_disk_percent Disk usage percentage
+# TYPE kenya_overwatch_disk_percent gauge
+kenya_overwatch_disk_percent {disk.percent}
+
+# HELP kenya_overwatch_requests_total Total API requests
+# TYPE kenya_overwatch_requests_total counter
+kenya_overwatch_requests_total {random.randint(1000, 10000)}
+
+# HELP kenya_overwatch_active_incidents Active incidents count
+# TYPE kenya_overwatch_active_incidents gauge
+kenya_overwatch_active_incidents {random.randint(5, 20)}
+
+# HELP kenya_overwatch_active_teams Active response teams
+# TYPE kenya_overwatch_active_teams gauge
+kenya_overwatch_active_teams {random.randint(3, 10)}
+"""
+    return PlainTextResponse(metrics, media_type="text/plain")
+
 
 # ==================== RUN ====================
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ProductionIncident, EvidencePackage, SystemMetrics, Alert, DashboardStats } from '@/types'
 import ApiService from '@/utils/api'
 
@@ -7,7 +7,7 @@ export const useIncidents = (filters?: { status?: string; severity?: string }) =
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchIncidents = async () => {
+  const fetchIncidents = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -18,13 +18,13 @@ export const useIncidents = (filters?: { status?: string; severity?: string }) =
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters?.status, filters?.severity])
 
   useEffect(() => {
     fetchIncidents()
-  }, [filters?.status, filters?.severity])
+  }, [fetchIncidents])
 
-  const createIncident = async (incident: Partial<ProductionIncident>) => {
+  const createIncident = useCallback(async (incident: Partial<ProductionIncident>) => {
     try {
       const newIncident = await ApiService.createIncident(incident)
       setIncidents(prev => [newIncident, ...prev])
@@ -33,9 +33,9 @@ export const useIncidents = (filters?: { status?: string; severity?: string }) =
       setError(err instanceof Error ? err.message : 'Failed to create incident')
       throw err
     }
-  }
+  }, [])
 
-  const updateIncidentStatus = async (id: string, status: string) => {
+  const updateIncidentStatus = useCallback(async (id: string, status: string) => {
     try {
       const updatedIncident = await ApiService.updateIncidentStatus(id, status)
       setIncidents(prev => prev.map(inc => inc.id === id ? updatedIncident : inc))
@@ -44,10 +44,16 @@ export const useIncidents = (filters?: { status?: string; severity?: string }) =
       setError(err instanceof Error ? err.message : 'Failed to update incident')
       throw err
     }
-  }
+  }, [])
+
+  const sortedIncidents = useMemo(() => {
+    return [...incidents].sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [incidents])
 
   return {
-    incidents,
+    incidents: sortedIncidents,
     loading,
     error,
     refetch: fetchIncidents,

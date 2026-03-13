@@ -7,39 +7,11 @@ import logging
 import uuid
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timezone
-from enum import Enum
 from dataclasses import dataclass, field, asdict
 
+from backend.enums import IncidentType, SeverityLevel, IncidentStatus
+
 logger = logging.getLogger(__name__)
-
-
-class IncidentType(str, Enum):
-    ACCIDENT = "accident"
-    OVERSPEEDING = "overspeeding"
-    LANE_VIOLATION = "lane_violation"
-    DANGEROUS_OVERTAKING = "dangerous_overtaking"
-    BREAKDOWN = "breakdown"
-    HAZARD = "hazard"
-    RED_LIGHT_VIOLATION = "red_light_violation"
-    USING_PHONE = "using_phone"
-    NO_SEATBELT = "no_seatbelt"
-
-
-class SeverityLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class IncidentStatus(str, Enum):
-    DETECTED = "detected"
-    VERIFIED = "verified"
-    ASSIGNED = "assigned"
-    ENROUTE = "enroute"
-    ONSCENE = "onscene"
-    RESOLVED = "resolved"
-    REJECTED = "rejected"
 
 
 # Base severity by incident type
@@ -139,16 +111,31 @@ class Incident:
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
-        data = asdict(self)
-        data['type'] = self.type.value
-        data['severity'] = self.severity.value
-        data['status'] = self.status.value
+        data = {
+            'id': self.id,
+            'type': self.type.value if self.type else None,
+            'severity': self.severity.value if self.severity else None,
+            'status': self.status.value if self.status else None,
+            'address': self.address,
+            'road_name': self.road_name,
+            'county': self.county,
+            'description': self.description,
+            'evidence_urls': self.evidence_urls,
+            'camera_id': self.camera_id,
+            'detected_by': self.detected_by,
+            'ai_confidence': self.ai_confidence,
+            'casualties': self.casualties,
+            'injuries': self.injuries,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'assigned_team_id': self.assigned_team_id,
+            'metadata': self.metadata,
+        }
         if isinstance(self.location, Coordinates):
-            data['location'] = asdict(self.location)
-        data['created_at'] = self.created_at.isoformat()
-        data['updated_at'] = self.updated_at.isoformat()
-        if self.resolved_at:
-            data['resolved_at'] = self.resolved_at.isoformat()
+            data['location'] = {'lat': self.location.lat, 'lng': self.location.lng, 'altitude': self.location.altitude, 'accuracy': self.location.accuracy}
+        elif self.location:
+            data['location'] = self.location
         return data
 
 
@@ -352,3 +339,50 @@ class IncidentService:
 
 # Global instance
 incident_service = IncidentService()
+
+# Add sample incidents for testing
+from datetime import datetime, timezone
+sample_incidents = [
+    {
+        "incident_type": IncidentType.ACCIDENT,
+        "location": Coordinates(lat=-1.2864, lng=36.8232),
+        "address": "Kenyatta Avenue, Nairobi CBD",
+        "road_name": "Kenyatta Avenue",
+        "county": "Nairobi",
+        "description": "Multi-vehicle collision involving 3 cars",
+        "severity_modifier": SeverityLevel.HIGH,
+    },
+    {
+        "incident_type": IncidentType.ACCIDENT,
+        "location": Coordinates(lat=-1.3300, lng=36.9800),
+        "address": "Mombasa Road Junction",
+        "road_name": "A109 Mombasa Road",
+        "county": "Nairobi",
+        "description": "Head-on collision, multiple casualties reported",
+        "severity_modifier": SeverityLevel.CRITICAL,
+    },
+    {
+        "incident_type": IncidentType.OVERSPEEDING,
+        "location": Coordinates(lat=-1.0800, lng=37.1000),
+        "address": "Thika Superhighway Exit",
+        "road_name": "A2 Thika Road",
+        "county": "Kiambu",
+        "description": "Speeding violation detected - 120km/h in 80km/h zone",
+        "severity_modifier": SeverityLevel.MEDIUM,
+    },
+    {
+        "incident_type": IncidentType.HAZARD,
+        "location": Coordinates(lat=-1.3100, lng=36.7800),
+        "address": "Ngong Road Roundabout",
+        "road_name": "Ngong Road",
+        "county": "Nairobi",
+        "description": "Pothole causing vehicles to swerve",
+        "severity_modifier": SeverityLevel.LOW,
+    },
+]
+
+for inc in sample_incidents:
+    try:
+        incident_service.create_incident(**inc)
+    except Exception as e:
+        pass  # Ignore duplicates

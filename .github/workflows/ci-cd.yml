@@ -39,6 +39,29 @@ jobs:
         run: |
           isort --check ai/ security/ backend/ ops/
 
+  # TypeScript Type Checking
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/control_center/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd frontend/control_center
+          npm ci
+      
+      - name: Run TypeScript type check
+        run: |
+          cd frontend/control_center
+          npx tsc --noEmit
+
   # Backend Tests
   backend-test:
     runs-on: ubuntu-latest
@@ -64,8 +87,12 @@ jobs:
       - name: Run backend tests
         run: |
           source backend/venv/bin/activate
-          pytest tests/ -v --ignore=tests/test_api.py || true
-          python -m pytest ai/ -v --tb=short || true
+          pytest tests/ -v --tb=short
+      
+      - name: Run AI module tests
+        run: |
+          source backend/venv/bin/activate
+          python -m pytest ai/ -v --tb=short
 
   # Frontend Tests
   frontend-test:
@@ -89,7 +116,12 @@ jobs:
       - name: Run frontend tests
         run: |
           cd frontend/control_center
-          npm test -- --coverage --passWithNoTests || true
+          npm test -- --coverage
+      
+      - name: Build frontend
+        run: |
+          cd frontend/control_center
+          npm run build
 
   # Security scanning
   security:
@@ -112,11 +144,37 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r backend/requirements.txt || true
+      
+      - name: Check for secrets
+        run: |
+          pip install git-credentials-detector || true
+          git clone --depth 1 https://github.com/trufflesecurity/trufflehog.git /tmp/trufflehog || true
+          pip install truffleHog || true
+          trufflehog filesystem . --json 2>/dev/null || true
+
+  # Container Security Scanning
+  container-security:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
   # Build Docker images
   build:
     runs-on: ubuntu-latest
-    needs: [code-quality, backend-test, frontend-test, security]
+    needs: [code-quality, type-check, backend-test, frontend-test, security, container-security]
     
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +199,22 @@ jobs:
           tags: kenya-overwatch-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      
+      - name: Build taifa-guard image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend/taifa_guard
+          push: false
+          tags: kenya-overwatch-taifa-guard:latest
+          cache-from: type=gha
+      
+      - name: Build taifaroad image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend/taifaroad
+          push: false
+          tags: kenya-overwatch-taifaroad:latest
+          cache-from: type=gha
 
   # Deploy to staging (on develop branch)
   deploy-staging:

@@ -116,7 +116,14 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
   
   const handleZoomIn = () => setZoom(prev => Math.min(4, prev + 0.25))
   const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.25))
-  const handleReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); setPtzPosition({ x: 50, y: 50 }) }
+  const handleReset = () => { 
+    setZoom(1); 
+    setPan({ x: 0, y: 0 }); 
+    setPtzPosition({ x: 50, y: 50 });
+    setCurrentTime(0);
+    setPlaybackSpeed(1);
+    setIsPlaying(true);
+  }
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen)
   const addBookmark = () => setBookmarks(prev => [...prev, currentTime].sort((a, b) => a - b))
 
@@ -288,7 +295,7 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
           <button onClick={handleZoomIn} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Zoom in">
             <ZoomIn className="w-5 h-5" />
           </button>
-          <button onClick={handleReset} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Reset">
+          <button onClick={handleReset} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Reset to Real-Time">
             <RotateCcw className="w-5 h-5" />
           </button>
           <button onClick={() => setShowDetections(!showDetections)} className={`p-2 rounded ${showDetections ? 'text-green-400 bg-gray-700' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`} title="Toggle detections">

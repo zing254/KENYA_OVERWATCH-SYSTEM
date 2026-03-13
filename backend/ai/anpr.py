@@ -18,6 +18,14 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
+# PyTorch 2.6+ compatibility fix
+import torch
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
 logger = logging.getLogger(__name__)
 
 

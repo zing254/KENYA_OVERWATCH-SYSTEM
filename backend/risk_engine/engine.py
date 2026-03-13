@@ -4,14 +4,13 @@ Real-time risk assessment and scoring
 """
 
 import hashlib
+import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +85,7 @@ class RiskAssessment:
 
 
 class RiskEngine:
-    """Main risk assessment engine"""
+    """Main risk assessment engine with performance optimizations"""
     
     def __init__(self):
         self.high_threshold = 0.7
@@ -137,7 +136,16 @@ class RiskEngine:
             "mathare": {"lat": -1.2267, "lng": 36.8789, "risk": 0.50},
         }
         
+        # Assessment history with size limits to prevent memory growth
         self.assessment_history: Dict[str, List[RiskAssessment]] = {}
+        self.max_history_per_camera = 1000  # Keep last 1000 assessments per camera
+        
+        # Assessment cache to avoid recomputing identical assessments
+        self.assessment_cache: Dict[str, RiskAssessment] = {}
+        self.assessment_cache_ttl = 60  # Cache for 60 seconds
+        
+        # Pre-calculate squared thresholds for faster distance checks
+        self.hotspot_threshold_sq = 0.02 ** 2
         
     def assess_risk(
         self,
@@ -148,11 +156,24 @@ class RiskEngine:
         detections: Optional[List[Dict]] = None,
         time_of_day: Optional[datetime] = None,
     ) -> RiskAssessment:
-        """Perform comprehensive risk assessment"""
+        """Perform comprehensive risk assessment with caching"""
         
         if time_of_day is None:
             time_of_day = datetime.now()
         
+        # Generate cache key for identical assessments
+        cache_key = self._generate_assessment_cache_key(
+            incident_type, location, coordinates, camera_id, detections, time_of_day
+        )
+        
+        # Check cache first
+        if cache_key in self.assessment_cache:
+            cached = self.assessment_cache[cache_key]
+            # Check if cache entry is recent enough (within TTL)
+            if datetime.now(timezone.utc) < cached.timestamp + timedelta(seconds=self.assessment_cache_ttl):
+                return cached
+        
+        # Perform assessment
         factors = RiskFactors()
         reason_codes = []
         
@@ -213,14 +234,43 @@ class RiskEngine:
             expires_at=time_of_day + timedelta(minutes=15),
         )
         
+        # Store in cache
+        self.assessment_cache[cache_key] = assessment
+        
+        # Cleanup cache if too large (simple LRU-like eviction)
+        if len(self.assessment_cache) > 10000:
+            # Remove oldest entries (simple approach)
+            keys_to_remove = list(self.assessment_cache.keys())[:1000]
+            for key in keys_to_remove:
+                del self.assessment_cache[key]
+        
         if camera_id:
             if camera_id not in self.assessment_history:
                 self.assessment_history[camera_id] = []
             self.assessment_history[camera_id].append(assessment)
+            
+            # Limit history size per camera (keep most recent)
+            if len(self.assessment_history[camera_id]) > self.max_history_per_camera:
+                self.assessment_history[camera_id] = self.assessment_history[camera_id][-self.max_history_per_camera:]
         
-        logger.info(f"Risk assessment: {risk_score:.2f} ({risk_level.value}) for {incident_type} at {location}")
+        logger.debug(f"Risk assessment: {risk_score:.2f} ({risk_level.value}) for {incident_type} at {location}")
         
         return assessment
+    
+    def _generate_assessment_cache_key(self, incident_type: str, location: str, 
+                                       coordinates: Optional[Dict], camera_id: Optional[str], 
+                                       detections: Optional[List[Dict]], time_of_day: datetime) -> str:
+        """Generate cache key for assessment"""
+        key_data = {
+            "type": incident_type,
+            "location": location,
+            "coords": coordinates,
+            "camera": camera_id,
+            "detections": detections,
+            "hour": time_of_day.hour,
+            "weekday": time_of_day.weekday(),
+        }
+        return hashlib.md5(json.dumps(key_data, sort_keys=True, default=str).encode()).hexdigest()
     
     def _calculate_temporal_risk(self, timestamp: datetime) -> float:
         """Calculate temporal risk factor"""
@@ -311,7 +361,8 @@ class RiskEngine:
         return 0.3
     
     def _calculate_confidence(self, factors: RiskFactors) -> float:
-        """Calculate confidence in the assessment"""
+        """Calculate confidence in the assessment (optimized without numpy)"""
+        # Manual variance calculation for 5 elements is faster than numpy
         factor_values = [
             factors.temporal_risk,
             factors.spatial_risk,
@@ -320,7 +371,11 @@ class RiskEngine:
             factors.historical_risk,
         ]
         
-        variance = float(np.var(factor_values))
+        # Calculate mean
+        mean = sum(factor_values) / 5.0
+        
+        # Calculate variance manually (faster for small fixed-size arrays)
+        variance = sum((x - mean) ** 2 for x in factor_values) / 5.0
         
         confidence = 1.0 - (variance * 2)
         

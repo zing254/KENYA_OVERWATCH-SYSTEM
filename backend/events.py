@@ -29,6 +29,10 @@ class EventType(Enum):
     TEAM_DISPATCHED = "team_dispatched"
     TEAM_LOCATION_UPDATE = "team_location_update"
     SYSTEM_STATUS = "system_status"
+    CITIZEN_REPORT = "citizen_report"
+    HAZARD_DETECTED = "hazard_detected"
+    WEATHER_ALERT = "weather_alert"
+    TRAFFIC_INCIDENT = "traffic_incident"
 
 
 @dataclass
@@ -56,6 +60,10 @@ class EventBroadcaster:
             EventType.OFFENCE_DETECTED.value: [],
             EventType.TEAM_DISPATCHED.value: [],
             EventType.CAMERA_STATUS_CHANGE.value: [],
+            EventType.CITIZEN_REPORT.value: [],
+            EventType.HAZARD_DETECTED.value: [],
+            EventType.WEATHER_ALERT.value: [],
+            EventType.TRAFFIC_INCIDENT.value: [],
         }
         self.event_history: List[SystemEvent] = []
         self.max_history = 1000
@@ -152,6 +160,14 @@ class EventBroadcaster:
             event_type=EventType.OFFENCE_DETECTED,
             data=offence,
             source="offence_engine",
+        ))
+    
+    async def broadcast_citizen_report(self, report: Dict):
+        """Broadcast citizen report"""
+        await self.broadcast(SystemEvent(
+            event_type=EventType.CITIZEN_REPORT,
+            data=report,
+            source="citizen_portal",
         ))
     
     def get_recent_events(self, limit: int = 50) -> List[Dict]:

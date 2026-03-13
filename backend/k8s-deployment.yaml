@@ -25,9 +25,20 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferred:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: kenya-overwatch
+                  component: backend
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: api
         image: kenya-overwatch/backend:2.0.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
           name: http
@@ -65,27 +76,37 @@ spec:
               key: minio-secret-key
         resources:
           requests:
-            cpu: 500m
+            cpu: 750m
             memory: 1Gi
+            ephemeral-storage: 2Gi
           limits:
-            cpu: 2000m
-            memory: 4Gi
+            cpu: 3000m
+            memory: 6Gi
+            ephemeral-storage: 10Gi
+        startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
         livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
         readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
         volumeMounts:
         - name: logs
           mountPath: /app/logs

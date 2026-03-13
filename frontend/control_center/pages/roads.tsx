@@ -1,6 +1,7 @@
 import Layout from '@/components/Layout'
 import { Map, TrendingUp, AlertTriangle, Car, Clock, RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 
 interface Road {
   name: string
@@ -44,6 +45,14 @@ export default function RoadsPage() {
 
   const [roads, setRoads] = useState<Road[]>(mockRoads)
   const [loading, setLoading] = useState(true)
+
+  const handleViewDetails = (roadName: string) => {
+    toast.success(`Loading details for ${roadName}...`)
+  }
+
+  const handleSpeedCams = (roadName: string) => {
+    toast.success(`Viewing speed cameras on ${roadName}...`)
+  }
 
   useEffect(() => {
     const fetchRoads = async () => {
@@ -151,10 +160,16 @@ export default function RoadsPage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-700 flex gap-2">
-                <button className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm">
+                <button 
+                  onClick={() => handleViewDetails(road.name)}
+                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                >
                   View Details
                 </button>
-                <button className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm">
+                <button 
+                  onClick={() => handleSpeedCams(road.name)}
+                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                >
                   Speed Cams
                 </button>
               </div>

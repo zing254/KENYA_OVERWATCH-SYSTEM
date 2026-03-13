@@ -16,18 +16,35 @@ logger = logging.getLogger(__name__)
 # Database configuration
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./ntsa_overwatch.db")
 
-# Create engine
+# Create engine with optimized connection pooling
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         DATABASE_URL,
         connect_args={"check_same_thread": False},
-        echo=os.environ.get("SQL_ECHO", "false").lower() == "true"
+        echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
+        pool_pre_ping=True,  # Check connections before using
+        pool_recycle=3600,   # Recycle connections after 1 hour
     )
 else:
-    engine = create_engine(DATABASE_URL)
+    # Production PostgreSQL with optimized pool settings
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,           # Number of connections to keep open
+        max_overflow=30,        # Additional connections beyond pool_size
+        pool_timeout=30,        # Timeout for getting a connection from pool
+        pool_recycle=1800,     # Recycle connections every 30 minutes
+        pool_pre_ping=True,    # Check connections before using
+        echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
+        future=True            # Use SQLAlchemy 2.0 style
+    )
 
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create session factory with expire_on_commit=False for better performance
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False  # Improves performance by not expiring objects
+)
 
 # Create base class
 Base = declarative_base()

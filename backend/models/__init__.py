@@ -1,15 +1,65 @@
 """
-Pydantic Models for Request Validation
-Kenya NTSA Road Safety API
+Kenya Overwatch - Unified Models Package
+Re-exports from all model modules to provide single import source
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
+# Domain models and enums from road_safety_engine
+from ..road_safety_engine import (
+    Coordinates,
+    Vehicle as DomainVehicle,
+    Driver as DomainDriver,
+    RoadAccident,
+    TrafficViolation,
+    SpeedDetection,
+    AccidentType,
+    CauseType,
+    SeverityLevel as DomainSeverityLevel,
+    IncidentStatus as DomainIncidentStatus,
+    VehicleType as DomainVehicleType,
+    RoadSegment as DomainRoadSegment,
+    KENYA_ROADS,
+    ACCIDENT_HOTSPOTS,
+)
 
-# ==================== ENUMS ====================
+# ORM models from database_models
+from ..database_models import (
+    User,
+    UserRole,
+    Team,
+    Alert,
+    Camera as DBCamera,
+    RoadSegment as DBRoadSegment,
+    Vehicle as DBVehicle,
+    Driver as DBDriver,
+    Accident as DBAccident,
+    Violation as DBViolation,
+    SeverityLevel as DBSeverityLevel,
+    IncidentStatus as DBIncidentStatus,
+    ViolationStatus,
+)
+
+# Shared enums
+from ..enums import (
+    SeverityLevel,
+    IncidentStatus,
+    VehicleType,
+    UserRole as EnumUserRole,
+    UserStatus,
+    TeamType,
+    AlertSeverity,
+    AlertType,
+    CameraType,
+    ReportType,
+    AppealStatus,
+    IncidentType,
+)
+
+# Pydantic Models for Request Validation
 class AccidentTypeEnum(str, Enum):
     HEAD_ON = "head_on"
     REAR_END = "rear_end"
@@ -60,13 +110,11 @@ class VehicleTypeEnum(str, Enum):
     OTHER = "other"
 
 
-# ==================== COORDINATES ====================
 class CoordinatesInput(BaseModel):
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lng: float = Field(..., ge=-180, le=180, description="Longitude")
 
 
-# ==================== ACCIDENT MODELS ====================
 class AccidentCreate(BaseModel):
     accident_type: AccidentTypeEnum = Field(..., description="Type of accident")
     cause: CauseTypeEnum = Field(..., description="Cause of accident")
@@ -80,14 +128,14 @@ class AccidentCreate(BaseModel):
     weather: str = Field(default="clear", description="Weather conditions")
     road_conditions: str = Field(default="good", description="Road conditions")
     
-    @validator('location', 'road_name')
+    @field_validator('location', 'road_name')
+    @classmethod
     def validate_not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
         return v.strip()
 
 
-# ==================== VIOLATION MODELS ====================
 class ViolationCreate(BaseModel):
     violation_type: CauseTypeEnum = Field(..., description="Type of violation")
     plate_number: str = Field(..., min_length=5, max_length=20, description="Vehicle plate number")
@@ -101,11 +149,11 @@ class ViolationCreate(BaseModel):
     speed_limit: Optional[float] = Field(None, ge=0, le=200, description="Speed limit")
     evidence_image: str = Field(default="", description="Evidence image URL")
     
-    @validator('plate_number')
+    @field_validator('plate_number')
+    @classmethod
     def validate_plate(cls, v):
         if not v or not v.strip():
             raise ValueError('Plate number is required')
-        # Kenyan plate format
         v = v.strip().upper()
         if len(v) < 5:
             raise ValueError('Invalid plate number format')
@@ -117,14 +165,14 @@ class ViolationReview(BaseModel):
     officer_id: str = Field(..., description="Officer ID")
     notes: str = Field(default="", max_length=500, description="Review notes")
     
-    @validator('decision')
+    @field_validator('decision')
+    @classmethod
     def validate_decision(cls, v):
         if v.lower() not in ['approve', 'reject']:
             raise ValueError('Decision must be approve or reject')
         return v.lower()
 
 
-# ==================== ALERT MODELS ====================
 class AlertCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=100, description="Alert title")
     message: str = Field(..., min_length=10, max_length=500, description="Alert message")
@@ -134,13 +182,15 @@ class AlertCreate(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude")
     
-    @validator('severity')
+    @field_validator('severity')
+    @classmethod
     def validate_severity(cls, v):
         if v.lower() not in ['low', 'medium', 'high', 'critical']:
             raise ValueError('Severity must be: low, medium, high, or critical')
         return v.lower()
     
-    @validator('alert_type')
+    @field_validator('alert_type')
+    @classmethod
     def validate_type(cls, v):
         valid_types = ['road', 'weather', 'system', 'emergency', 'traffic', 'crime']
         if v.lower() not in valid_types:
@@ -148,7 +198,6 @@ class AlertCreate(BaseModel):
         return v.lower()
 
 
-# ==================== CITIZEN REPORT MODELS ====================
 class CitizenReportCreate(BaseModel):
     report_type: str = Field(..., description="Report type: accident, crime, emergency, etc.")
     description: str = Field(..., min_length=20, max_length=2000, description="Description")
@@ -161,25 +210,24 @@ class CitizenReportCreate(BaseModel):
     anonymous: bool = Field(default=False, description="Submit anonymously")
     attachments: List[str] = Field(default_factory=list, description="Attachment URLs")
     
-    @validator('report_type')
+    @field_validator('report_type')
+    @classmethod
     def validate_type(cls, v):
         valid_types = ['accident', 'crime', 'emergency', 'traffic', 'suspicious', 'other']
         if v.lower() not in valid_types:
             raise ValueError(f'Report type must be one of: {", ".join(valid_types)}')
         return v.lower()
     
-    @validator('phone_number')
+    @field_validator('phone_number')
+    @classmethod
     def validate_phone(cls, v):
         if v:
-            # Remove spaces and dashes
             v = v.replace(' ', '').replace('-', '')
-            # Basic validation for Kenyan numbers
             if not (v.startswith('+254') or v.startswith('254') or v.startswith('07') or v.startswith('01')):
                 raise ValueError('Invalid phone number format')
         return v
 
 
-# ==================== SPEED DETECTION MODELS ====================
 class SpeedDetectionInput(BaseModel):
     camera_id: str = Field(..., min_length=1, description="Camera ID")
     plate_number: str = Field(..., min_length=5, max_length=20, description="Vehicle plate")
@@ -192,13 +240,11 @@ class SpeedDetectionInput(BaseModel):
     image_rear: str = Field(default="", description="Rear image URL")
 
 
-# ==================== TEAM DISPATCH MODELS ====================
 class TeamDispatch(BaseModel):
     incident_id: str = Field(..., description="Incident ID to respond to")
     eta: str = Field(default="10 min", description="Estimated time of arrival")
 
 
-# ==================== FILTER MODELS ====================
 class PaginationParams(BaseModel):
     limit: int = Field(default=100, ge=1, le=500, description="Limit results")
     offset: int = Field(default=0, ge=0, description="Offset for pagination")
@@ -217,3 +263,69 @@ class ViolationFilter(BaseModel):
     violation_type: Optional[str] = None
     limit: int = Field(default=100, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
+
+
+__all__ = [
+    # Domain models
+    'Coordinates',
+    'DomainVehicle',
+    'DomainDriver',
+    'RoadAccident',
+    'TrafficViolation',
+    'SpeedDetection',
+    'AccidentType',
+    'CauseType',
+    'DomainSeverityLevel',
+    'DomainIncidentStatus',
+    'DomainVehicleType',
+    'DomainRoadSegment',
+    
+    # ORM models
+    'User',
+    'UserRole',
+    'Team',
+    'Alert',
+    'DBCamera',
+    'DBRoadSegment',
+    'DBVehicle',
+    'DBDriver',
+    'DBAccident',
+    'DBViolation',
+    'DBSeverityLevel',
+    'DBIncidentStatus',
+    'ViolationStatus',
+    
+    # Shared enums
+    'SeverityLevel',
+    'IncidentStatus',
+    'VehicleType',
+    'EnumUserRole',
+    'UserStatus',
+    'TeamType',
+    'AlertSeverity',
+    'AlertType',
+    'CameraType',
+    'ReportType',
+    'AppealStatus',
+    
+    # Constants
+    'KENYA_ROADS',
+    'ACCIDENT_HOTSPOTS',
+    
+    # Pydantic models
+    'AccidentTypeEnum',
+    'CauseTypeEnum',
+    'SeverityLevelEnum',
+    'VehicleTypeEnum',
+    'CoordinatesInput',
+    'AccidentCreate',
+    'ViolationCreate',
+    'ViolationReview',
+    'AlertCreate',
+    'CitizenReportCreate',
+    'SpeedDetectionInput',
+    'TeamDispatch',
+    'PaginationParams',
+    'AccidentFilter',
+    'ViolationFilter',
+]

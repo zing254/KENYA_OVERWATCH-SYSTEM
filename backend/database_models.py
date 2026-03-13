@@ -4,77 +4,21 @@ SQLAlchemy models for PostgreSQL integration
 """
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum, Text, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime, timezone
-import enum
+
+# Import shared enums to eliminate duplicates
+from .enums import (
+    UserRole,
+    UserStatus,
+    VehicleType,
+    SeverityLevel,
+    IncidentStatus,
+    ViolationStatus,
+    AccidentType,
+)
 
 Base = declarative_base()
-
-
-class UserRole(enum.Enum):
-    ADMIN = "admin"
-    OFFICER = "officer"
-    DISPATCHER = "dispatcher"
-    VIEWER = "viewer"
-
-
-class UserStatus(enum.Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
-
-
-class VehicleType(enum.Enum):
-    MOTORCYCLE = "motorcycle"
-    SALOON = "saloon"
-    STATION_WAGON = "station_wagon"
-    PICKUP = "pickup"
-    LORRY = "lorry"
-    BUS = "bus"
-    MATATU = "matatu"
-    TAXI = "taxi"
-    OTHER = "other"
-
-
-class SeverityLevel(enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class IncidentStatus(enum.Enum):
-    REPORTED = "reported"
-    DISPATCHED = "dispatched"
-    ON_SCENE = "on_scene"
-    TREATMENT = "treatment"
-    CLEARED = "cleared"
-    INVESTIGATION = "investigation"
-    CLOSED = "closed"
-
-
-class ViolationStatus(enum.Enum):
-    DETECTED = "detected"
-    CAPTURED = "captured"
-    REVIEWED = "reviewed"
-    ISSUED = "issued"
-    PAID = "paid"
-    DISPUTED = "disputed"
-    CANCELLED = "cancelled"
-
-
-class AccidentType(enum.Enum):
-    HEAD_ON = "head_on"
-    REAR_END = "rear_end"
-    SIDE_IMPACT = "side_impact"
-    ROLLOVER = "rollover"
-    HIT_PEDESTRIAN = "hit_pedestrian"
-    HIT_ANIMAL = "hit_animal"
-    OBJECT_STRIKE = "object_strike"
-    SINGLE_VEHICLE = "single_vehicle"
-    MULTI_VEHICLE = "multi_vehicle"
-    PARKED_VEHICLE = "parked_vehicle"
 
 
 # SQLAlchemy Models

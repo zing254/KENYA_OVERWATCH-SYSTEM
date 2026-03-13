@@ -8,10 +8,11 @@ import {
   Shield, Home, Video, AlertTriangle, Users, Bell, BarChart3, 
   Settings, LogOut, Menu, X, Map, FileText, Car, Activity,
   ChevronDown, Search, User, Send, MapPin, TrendingUp, Radio,
-  MessageCircle
+  MessageCircle, Terminal
 } from 'lucide-react'
 import ChatPanel from './ChatPanel'
 import NotificationPanel from './NotificationPanel'
+import useAuthStore from '@/store/auth'
 
 interface LayoutProps {
   children: ReactNode
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/dispatch', label: 'Dispatch', icon: Radio },
   { href: '/citizen-reports', label: 'Citizen Reports', icon: MessageCircle },
   { href: '/chat', label: 'Team Chat', icon: MessageCircle },
+  { href: '/logs', label: 'System Logs', icon: Terminal },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/county-analysis', label: 'County Analysis', icon: MapPin },
@@ -36,6 +38,12 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const { logout } = useAuthStore()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/login')
+  }
 
   return (
     <>
@@ -102,7 +110,7 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
               </button>
               
               {/* Search */}
-              <div className="relative">
+              <div className="relative hidden lg:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -110,6 +118,10 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
                   className="bg-black/30 border border-ntsa-primaryLight/30 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-ntsa-primaryLight w-80"
                 />
               </div>
+              {/* Mobile search icon */}
+              <button className="lg:hidden p-2 hover:bg-ntsa-primary/50 rounded-lg text-gray-400">
+                <Search className="w-5 h-5" />
+              </button>
             </div>
 
             <div className="flex items-center gap-4">
@@ -149,7 +161,7 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
                       Settings
                     </button>
                     <hr className="border-gray-700 my-1" />
-                    <button className="w-full flex items-center gap-2 px-4 py-2 text-red-400 hover:bg-gray-700">
+                    <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-red-400 hover:bg-gray-700">
                       <LogOut className="w-4 h-4" />
                       Logout
                     </button>

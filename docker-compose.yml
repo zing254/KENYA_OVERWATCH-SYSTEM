@@ -129,16 +129,17 @@ services:
     networks:
       - kenya-overwatch-network
 
-  # Frontend - Ulinzi 112
-  ulinzi-112:
+  # Frontend - Taifaroad (Citizen App)
+  taifaroad:
     build:
-      context: ./frontend/ulinnzi_112
+      context: ./frontend/taifaroad
       dockerfile: Dockerfile
-    container_name: overwatch-ulinzi-112
+    container_name: overwatch-taifaroad
     ports:
       - "3002:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://backend:8001
+      NEXT_PUBLIC_WS_URL: ws://backend:8001
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
@@ -169,7 +170,7 @@ services:
         condition: service_healthy
       taifa-guard:
         condition: service_healthy
-      ulinzi-112:
+      taifaroad:
         condition: service_healthy
     restart: unless-stopped
     networks:

@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kenya-overwatch
+
+resources:
+  - services.yaml
+  - deployments.yaml
+
+commonLabels:
+  app.kubernetes.io/name: kenya-overwatch
+  app.kubernetes.io/part-of: ntsa-kenya
+
+images:
+  - name: kenya-overwatch-backend
+    newTag: latest
+  - name: kenya-overwatch-control-center
+    newTag: latest
+  - name: kenya-overwatch-taifa-guard
+    newTag: latest
+  - name: kenya-overwatch-taifaroad
+    newTag: latest

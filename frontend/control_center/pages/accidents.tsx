@@ -1,6 +1,7 @@
 import Layout from '@/components/Layout'
 import { useState, useEffect } from 'react'
-import { Search, Filter, MapPin, Users, AlertTriangle, Clock, Car, Phone, FileText, Send } from 'lucide-react'
+import { Search, Filter, MapPin, Users, AlertTriangle, Clock, Car, Phone, FileText, Send, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Accident {
   id: string
@@ -32,6 +33,22 @@ export default function AccidentsPage() {
   const [severityFilter, setSeverityFilter] = useState('all')
   const [accidents, setAccidents] = useState<Accident[]>(mockAccidents)
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  const handleDispatch = async (accidentId: string) => {
+    setActionLoading(accidentId)
+    await new Promise(r => setTimeout(r, 1000))
+    toast.success('Dispatch team assigned successfully')
+    setActionLoading(null)
+  }
+
+  const handleContact = (accidentId: string) => {
+    toast.success('Contacting emergency services...')
+  }
+
+  const handleReport = (accidentId: string) => {
+    toast.success('Generating incident report...')
+  }
 
   useEffect(() => {
     const fetchAccidents = async () => {
@@ -198,15 +215,25 @@ export default function AccidentsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
-                  <Send className="w-4 h-4" />
+                <button 
+                  onClick={() => handleDispatch(accident.id)}
+                  disabled={actionLoading === accident.id}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm transition-colors"
+                >
+                  {actionLoading === accident.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Dispatch
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+                <button 
+                  onClick={() => handleContact(accident.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+                >
                   <Phone className="w-4 h-4" />
                   Contact
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+                <button 
+                  onClick={() => handleReport(accident.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+                >
                   <FileText className="w-4 h-4" />
                   Report
                 </button>

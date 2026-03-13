@@ -113,6 +113,24 @@ export default function ResponderApp() {
   const [loginError, setLoginError] = useState('')
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [user, setUser] = useState<{ name: string; badge: string; station: string } | null>(null)
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [activeTab, setActiveTab] = useState<string>('dashboard')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string; type: string}[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [myTeam, setMyTeam] = useState<Team | null>(null)
+  const [dispatches, setDispatches] = useState<Dispatch[]>([])
+  const [showSidebar, setShowSidebar] = useState(false)
+  const [myLocation, setMyLocation] = useState<{lat: number; lng: number} | null>(null)
+  const [isTracking, setIsTracking] = useState(false)
+  const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null)
+  const [mapCenter, setMapCenter] = useState<{lat: number; lng: number}>({ lat: -1.2921, lng: 36.8219 })
+  const [mapZoom, setMapZoom] = useState(13)
   
   useEffect(() => {
     const savedUser = localStorage.getItem('taifa_guard_user')
@@ -122,6 +140,153 @@ export default function ResponderApp() {
     }
     setIsAuthLoading(false)
   }, [])
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchData()
+      const interval = setInterval(fetchData, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    let ws: WebSocket | null = null
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/ws/responder_001`
+        ws = new WebSocket(wsUrl)
+        
+        ws.onopen = () => {
+          console.log('WebSocket connected')
+          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['incidents', 'alerts', 'dispatches'] }))
+        }
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            console.log('WebSocket message:', data)
+            
+            if (data.type === 'incident_update') {
+              setIncidents(prev => [data.incident, ...prev.filter(i => i.id !== data.incident.id)])
+            } else if (data.type === 'new_incident') {
+              setIncidents(prev => [data.incident, ...prev])
+              playSound('incident', 0.7)
+            } else if (data.type === 'new_alert') {
+              setNotifications(prev => [data.alert, ...prev])
+              playSound('alert', 0.7)
+            } else if (data.type === 'dispatch_update') {
+              setDispatches(prev => [...prev.filter(d => d.id !== data.dispatch.id), data.dispatch])
+            } else if (data.type === 'emergency_alert') {
+              playSound('emergency', 1.0)
+            }
+          } catch (e) {
+            console.error('Failed to parse WebSocket message:', e)
+          }
+        }
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error)
+        }
+        
+        ws.onclose = () => {
+          console.log('WebSocket disconnected, reconnecting...')
+          setTimeout(connectWebSocket, 3000)
+        }
+      } catch (error) {
+        console.error('Failed to connect WebSocket:', error)
+      }
+    }
+    
+    connectWebSocket()
+    
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    let wsChat: WebSocket | null = null
+    
+    const connectChat = () => {
+      try {
+        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/api/v1/chat/ws/chat/responder_001`
+        wsChat = new WebSocket(wsUrl)
+
+        wsChat.onopen = () => {
+          console.log('Chat WebSocket connected')
+          wsChat?.send(JSON.stringify({
+            name: 'Responder Unit 001',
+            role: 'officer',
+            channel: 'general'
+          }))
+          wsChat?.send(JSON.stringify({ type: 'join_channel', channel: 'general' }))
+        }
+
+        wsChat.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'chat_message') {
+              const msg = data.message
+              setChatMessages(prev => [...prev, {
+                id: msg.message_id,
+                sender: msg.sender_name,
+                message: msg.message,
+                timestamp: msg.timestamp,
+                type: msg.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
+              }])
+            } else if (data.type === 'channel_history') {
+              const msgs = (data.messages || []).map((m: any) => ({
+                id: m.message_id,
+                sender: m.sender_name,
+                message: m.message,
+                timestamp: m.timestamp,
+                type: m.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
+              }))
+              setChatMessages(msgs)
+            }
+          } catch (error) {
+            console.error('Chat parse error:', error)
+          }
+        }
+
+        wsChat.onerror = (error) => {
+          console.error('Chat WebSocket error:', error)
+        }
+
+        wsChat.onclose = () => {
+          console.log('Chat WebSocket disconnected, reconnecting...')
+          setTimeout(connectChat, 5000)
+        }
+      } catch (error) {
+        console.error('Failed to connect to chat:', error)
+      }
+    }
+
+    connectChat()
+
+    return () => {
+      if (wsChat) wsChat.close()
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMyLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (error) => console.error('Geolocation error:', error)
+      )
+    }
+  }, [isLoggedIn])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -247,25 +412,6 @@ export default function ResponderApp() {
     )
   }
 
-  const [incidents, setIncidents] = useState<Incident[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('dashboard')
-  const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [chatMessages, setChatMessages] = useState<{id: string; sender: string; message: string; timestamp: string; type: string}[]>([])
-  const [newMessage, setNewMessage] = useState('')
-  const [myTeam, setMyTeam] = useState<Team | null>(null)
-  const [dispatches, setDispatches] = useState<Dispatch[]>([])
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [myLocation, setMyLocation] = useState<{lat: number; lng: number} | null>(null)
-  const [isTracking, setIsTracking] = useState(false)
-  const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null)
-  const [mapCenter, setMapCenter] = useState<{lat: number; lng: number}>({ lat: -1.2921, lng: 36.8219 })
-  const [mapZoom, setMapZoom] = useState(13)
-
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -291,149 +437,6 @@ export default function ResponderApp() {
     }
     setLoading(false)
   }
-
-  useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    let ws: WebSocket | null = null
-    const connectWebSocket = () => {
-      try {
-        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/ws/responder_001`
-        ws = new WebSocket(wsUrl)
-        
-        ws.onopen = () => {
-          console.log('WebSocket connected')
-          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['incidents', 'alerts', 'dispatches'] }))
-        }
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            console.log('WebSocket message:', data)
-            
-            if (data.type === 'incident_update') {
-              setIncidents(prev => [data.incident, ...prev.filter(i => i.id !== data.incident.id)])
-            } else if (data.type === 'new_incident') {
-              setIncidents(prev => [data.incident, ...prev])
-              playSound('incident', 0.7)
-            } else if (data.type === 'new_alert') {
-              setNotifications(prev => [data.alert, ...prev])
-              playSound('alert', 0.7)
-            } else if (data.type === 'dispatch_update') {
-              setDispatches(prev => [...prev.filter(d => d.id !== data.dispatch.id), data.dispatch])
-            } else if (data.type === 'emergency_alert') {
-              playSound('emergency', 1.0)
-            }
-          } catch (e) {
-            console.error('Failed to parse WebSocket message:', e)
-          }
-        }
-        
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
-        }
-        
-        ws.onclose = () => {
-          console.log('WebSocket disconnected, reconnecting...')
-          setTimeout(connectWebSocket, 3000)
-        }
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error)
-      }
-    }
-    
-    connectWebSocket()
-    
-    return () => {
-      if (ws) {
-        ws.close()
-      }
-    }
-  }, [])
-
-  // Chat WebSocket - Shared with Control Center
-  useEffect(() => {
-    let wsChat: WebSocket | null = null
-    
-    const connectChat = () => {
-      try {
-        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/api/v1/chat/ws/chat/responder_001`
-        wsChat = new WebSocket(wsUrl)
-
-        wsChat.onopen = () => {
-          console.log('Chat WebSocket connected')
-          wsChat?.send(JSON.stringify({
-            name: 'Responder Unit 001',
-            role: 'officer',
-            channel: 'general'
-          }))
-          wsChat?.send(JSON.stringify({ type: 'join_channel', channel: 'general' }))
-        }
-
-        wsChat.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.type === 'chat_message') {
-              const msg = data.message
-              setChatMessages(prev => [...prev, {
-                id: msg.message_id,
-                sender: msg.sender_name,
-                message: msg.message,
-                timestamp: msg.timestamp,
-                type: msg.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
-              }])
-            } else if (data.type === 'channel_history') {
-              const msgs = (data.messages || []).map((m: any) => ({
-                id: m.message_id,
-                sender: m.sender_name,
-                message: m.message,
-                timestamp: m.timestamp,
-                type: m.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
-              }))
-              setChatMessages(msgs)
-            }
-          } catch (error) {
-            console.error('Chat parse error:', error)
-          }
-        }
-
-        wsChat.onerror = (error) => {
-          console.error('Chat WebSocket error:', error)
-        }
-
-        wsChat.onclose = () => {
-          console.log('Chat WebSocket disconnected, reconnecting...')
-          setTimeout(connectChat, 5000)
-        }
-      } catch (error) {
-        console.error('Failed to connect to chat:', error)
-      }
-    }
-
-    connectChat()
-
-    return () => {
-      if (wsChat) wsChat.close()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setMyLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          })
-        },
-        (error) => console.error('Geolocation error:', error)
-      )
-    }
-  }, [])
 
   const updateIncidentStatus = async (incidentId: string, status: string) => {
     setUpdatingStatus(true)

@@ -1,6 +1,7 @@
 import Layout from '@/components/Layout'
 import { useState, useEffect } from 'react'
-import { Search, Filter, Download, Eye, Check, X, Car, MapPin, Clock, AlertTriangle, DollarSign } from 'lucide-react'
+import { Search, Filter, Download, Eye, Check, X, Car, MapPin, Clock, AlertTriangle, DollarSign, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Violation {
   id: string
@@ -33,6 +34,33 @@ export default function ViolationsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [violations, setViolations] = useState<Violation[]>(mockViolations)
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  const handleExport = async () => {
+    toast.loading('Exporting violations data...')
+    await new Promise(r => setTimeout(r, 1500))
+    toast.success('Exported 6 records to CSV')
+  }
+
+  const handleViewDetails = (violationId: string) => {
+    toast.success('Opening violation details...')
+  }
+
+  const handleIssueNotice = async (violationId: string) => {
+    setActionLoading(violationId)
+    await new Promise(r => setTimeout(r, 1000))
+    setViolations(prev => prev.map(v => v.id === violationId ? { ...v, status: 'issued' } : v))
+    toast.success('Notice issued successfully')
+    setActionLoading(null)
+  }
+
+  const handleMarkPaid = async (violationId: string) => {
+    setActionLoading(violationId)
+    await new Promise(r => setTimeout(r, 1000))
+    setViolations(prev => prev.map(v => v.id === violationId ? { ...v, status: 'paid' } : v))
+    toast.success('Payment recorded successfully')
+    setActionLoading(null)
+  }
 
   useEffect(() => {
     const fetchViolations = async () => {
@@ -141,7 +169,10 @@ export default function ViolationsPage() {
               <option value="paid">Paid</option>
               <option value="disputed">Disputed</option>
             </select>
-            <button className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+            <button 
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
@@ -202,17 +233,39 @@ export default function ViolationsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button className="p-1 hover:bg-gray-700 rounded" title="View Details">
+                      <button 
+                        onClick={() => handleViewDetails(violation.id)}
+                        className="p-1 hover:bg-gray-700 rounded transition-colors" 
+                        title="View Details"
+                      >
                         <Eye className="w-4 h-4 text-gray-400" />
                       </button>
                       {violation.status === 'detected' && (
-                        <button className="p-1 hover:bg-gray-700 rounded" title="Issue Notice">
-                          <Check className="w-4 h-4 text-green-400" />
+                        <button 
+                          onClick={() => handleIssueNotice(violation.id)}
+                          disabled={actionLoading === violation.id}
+                          className="p-1 hover:bg-gray-700 rounded transition-colors disabled:opacity-50" 
+                          title="Issue Notice"
+                        >
+                          {actionLoading === violation.id ? (
+                            <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4 text-green-400" />
+                          )}
                         </button>
                       )}
                       {violation.status === 'issued' && (
-                        <button className="p-1 hover:bg-gray-700 rounded" title="Mark as Paid">
-                          <DollarSign className="w-4 h-4 text-yellow-400" />
+                        <button 
+                          onClick={() => handleMarkPaid(violation.id)}
+                          disabled={actionLoading === violation.id}
+                          className="p-1 hover:bg-gray-700 rounded transition-colors disabled:opacity-50" 
+                          title="Mark as Paid"
+                        >
+                          {actionLoading === violation.id ? (
+                            <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />
+                          ) : (
+                            <DollarSign className="w-4 h-4 text-yellow-400" />
+                          )}
                         </button>
                       )}
                     </div>

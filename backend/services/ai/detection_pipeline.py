@@ -13,6 +13,14 @@ from datetime import datetime, timezone
 from enum import Enum
 import numpy as np
 
+# PyTorch 2.6+ compatibility fix
+import torch
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
 logger = logging.getLogger(__name__)
 
 # Try to import YOLOv8
@@ -367,7 +375,7 @@ class AIDetectionPipeline:
                        all_detections: List[Detection]) -> bool:
         """Detect potential accident based"""
         # Heuristic 1: Two or more stopped vehicles with pedestrians nearby
-        stopped_vehicles = len(behavior on heuristics.stopped_vehicles)
+        stopped_vehicles = getattr(behavior, 'stopped_vehicles', 0)
         pedestrians = sum(1 for d in all_detections 
                          if d.class_name == 'pedestrian')
         

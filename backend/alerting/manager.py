@@ -10,49 +10,11 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+from ..enums import AlertType, AlertSeverity, AlertStatus, NotificationChannel
+
 logger = logging.getLogger(__name__)
-
-
-class AlertType(Enum):
-    """Alert types"""
-    INCIDENT = "incident"
-    RISK = "risk"
-    SYSTEM = "system"
-    SECURITY = "security"
-    CAMERA = "camera"
-    EVIDENCE = "evidence"
-    DISPATCH = "dispatch"
-    ANPR = "anpr"
-
-
-class AlertSeverity(Enum):
-    """Alert severity levels"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-    EMERGENCY = "emergency"
-
-
-class AlertStatus(Enum):
-    """Alert status"""
-    NEW = "new"
-    ACKNOWLEDGED = "acknowledged"
-    DISPATCHED = "dispatched"
-    RESOLVED = "resolved"
-    CLOSED = "closed"
-
-
-class NotificationChannel(Enum):
-    """Notification channels"""
-    PUSH = "push"
-    SMS = "sms"
-    EMAIL = "email"
-    WEBHOOK = "webhook"
-    BROADCAST = "broadcast"
 
 
 @dataclass

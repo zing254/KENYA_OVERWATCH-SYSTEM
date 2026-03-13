@@ -29,14 +29,17 @@ export default function Login() {
 
       if (response.ok) {
         const data = await response.json()
+        const userData = data.user || {}
         login(
           {
-            id: data.user_id || data.id || '1',
-            name: data.name || username,
-            email: data.email || `${username}@ntsa.go.ke`,
-            role: data.role || (username.includes('admin') ? 'admin' : username.includes('dispatch') ? 'dispatcher' : 'officer'),
-            badge_number: data.badge_number,
-            station: data.station,
+            id: userData.id || data.user_id || data.id || '1',
+            name: userData.first_name && userData.last_name 
+              ? `${userData.first_name} ${userData.last_name}` 
+              : data.name || username,
+            email: userData.email || data.email || `${username}@ntsa.go.ke`,
+            role: userData.role || data.role || (username.includes('admin') ? 'admin' : username.includes('dispatch') ? 'dispatcher' : 'officer'),
+            badge_number: userData.badge_number || data.badge_number,
+            station: userData.station || data.station,
           },
           data.access_token || 'demo-token'
         )

@@ -59,6 +59,43 @@ export default function TeamsPage() {
 
   useEffect(() => {
     fetchData()
+    const interval = setInterval(fetchData, 20000)
+    
+    // WebSocket for real-time team status updates
+    let ws: WebSocket | null = null
+    const connectWS = () => {
+      try {
+        const wsUrl = API_URL.replace('http', 'ws') + '/ws/road_safety'
+        ws = new WebSocket(wsUrl)
+        
+        ws.onopen = () => {
+          console.log('Teams WebSocket connected')
+          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['teams', 'dispatch'] }))
+        }
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'team_update') {
+              setTeams(prev => prev.map(t => 
+                t.id === data.team_id ? { ...t, status: data.status, current_incident: data.incident_id } : t
+              ))
+            } else if (data.type === 'new_dispatch') {
+              setDispatches(prev => [...prev, data.dispatch])
+            }
+          } catch (e) { console.error('WS parse error:', e) }
+        }
+        
+        ws.onclose = () => setTimeout(connectWS, 5000)
+      } catch (e) { console.error('WS connect error:', e) }
+    }
+    
+    connectWS()
+    
+    return () => {
+      clearInterval(interval)
+      ws?.close()
+    }
   }, [])
 
   const fetchData = async () => {

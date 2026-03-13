@@ -1,6 +1,7 @@
 import Layout from '@/components/Layout'
 import { useState } from 'react'
 import { FileText, Search, Upload, Clock, CheckCircle, XCircle, AlertCircle, Shield } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Appeal {
   id: string
@@ -21,6 +22,28 @@ export default function CitizenPortal() {
   })
   const [submitted, setSubmitted] = useState(false)
 
+  const handleSearch = () => {
+    if (!searchCase.trim()) {
+      toast.error('Please enter a case number')
+      return
+    }
+    toast.success(`Searching for case ${searchCase}...`)
+  }
+
+  const handleSubmitAppeal = () => {
+    if (!appealForm.caseNumber || !appealForm.citizenId || !appealForm.reason) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+    toast.success('Appeal submitted successfully!')
+    setSubmitted(true)
+    setTimeout(() => {
+      setActiveTab('status')
+      setSubmitted(false)
+      setAppealForm({ caseNumber: '', citizenId: '', reason: '', evidence: '' })
+    }, 2000)
+  }
+
   const mockAppeals: Appeal[] = [
     {
       id: 'app_001',
@@ -37,11 +60,6 @@ export default function CitizenPortal() {
       description: 'Wrongful parking penalty'
     }
   ]
-
-  const handleSubmitAppeal = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitted(true)
-  }
 
   return (
     <Layout title="Kenya Overwatch - Citizen Portal">
@@ -101,7 +119,10 @@ export default function CitizenPortal() {
                   onChange={(e) => setSearchCase(e.target.value)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <button className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+                <button 
+                  onClick={handleSearch}
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                >
                   Search
                 </button>
               </div>

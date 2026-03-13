@@ -1,6 +1,7 @@
 import Layout from '@/components/Layout'
 import { useState } from 'react'
 import { Search, Car, User, FileText, AlertTriangle, Shield, Clock, Check, X } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface Vehicle {
   plate_number: string
@@ -153,7 +154,10 @@ export default function VehiclesPage() {
                 </div>
 
                 <div className="pt-4 border-t border-gray-700">
-                  <button className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
+                  <button 
+                    onClick={() => toast.success(`Viewing violations for ${selectedVehicle.plate_number}`)}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+                  >
                     View Violations
                   </button>
                 </div>

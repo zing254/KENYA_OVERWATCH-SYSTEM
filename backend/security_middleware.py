@@ -412,7 +412,7 @@ def redact_sensitive_data(data: dict) -> dict:
     
     redacted = data.copy()
     
-    def redact_value(key: str, val: any) -> any:
+    def redact_value(key: str, val: Any) -> Any:
         key_lower = key.lower()
         
         # Check if field is sensitive

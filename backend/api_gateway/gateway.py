@@ -5,6 +5,7 @@ import time
 import re
 from collections import defaultdict
 import httpx
+import asyncio
 
 from .config import GatewayConfig
 
@@ -49,6 +50,10 @@ class APIGateway:
             "taifa_guard": "http://localhost:3001",
             "taifaroad": "http://localhost:3002"
         }
+        
+        # Connection pool for upstream services
+        self._http_client: Optional[httpx.AsyncClient] = None
+        self._client_lock = asyncio.Lock()
         
         self._register_default_routes()
 
@@ -152,19 +157,20 @@ class APIGateway:
         full_url = f"{upstream_url}{path}"
         
         try:
-            async with httpx.AsyncClient(timeout=route.timeout) as client:
-                response = await client.request(
-                    method=method,
-                    url=full_url,
-                    headers=headers,
-                    content=body
-                )
-                
-                return {
-                    "status": response.status_code,
-                    "body": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
-                    "headers": dict(response.headers)
-                }
+            client = await self.get_http_client()
+            response = await client.request(
+                method=method,
+                url=full_url,
+                headers=headers,
+                content=body,
+                timeout=route.timeout
+            )
+            
+            return {
+                "status": response.status_code,
+                "body": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
+                "headers": dict(response.headers)
+            }
         except httpx.TimeoutException:
             return {
                 "status": 504,
@@ -194,3 +200,27 @@ class APIGateway:
                 for r in self.routes.values()
             ]
         }
+    
+    async def get_http_client(self) -> httpx.AsyncClient:
+        """Get or create shared HTTP client with connection pooling"""
+        async with self._client_lock:
+            if self._http_client is None or self._http_client.is_closed:
+                # Configure connection pool limits
+                limits = httpx.Limits(
+                    max_keepalive_connections=20,
+                    max_connections=100,
+                    keepalive_expiry=30.0
+                )
+                self._http_client = httpx.AsyncClient(
+                    timeout=30.0,
+                    limits=limits,
+                    http2=True  # Enable HTTP/2 for better performance
+                )
+            return self._http_client
+    
+    async def close(self):
+        """Close the HTTP client (call on shutdown)"""
+        async with self._client_lock:
+            if self._http_client and not self._http_client.is_closed:
+                await self._http_client.aclose()
+                self._http_client = None

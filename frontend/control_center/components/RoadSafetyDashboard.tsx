@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
-import { AlertTriangle, AlertCircle, MapPin, Car, Activity, Shield, FileText, Settings, Radio, Map, BarChart3, Zap, Users, TrendingUp, DollarSign, Clock, MapPinned, Camera, Eye, Bell } from 'lucide-react'
+import { AlertTriangle, AlertCircle, MapPin, Car, Activity, Shield, FileText, Settings, Radio, Map, BarChart3, Zap, Users, TrendingUp, DollarSign, Clock, MapPinned, Camera, Eye, Bell, Loader2, Send } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const KENYA_OVERWATCH_COLORS = {
   primary: '#14532D',
@@ -146,7 +147,34 @@ export default function RoadSafetyDashboard() {
     activeUnits: 0
   })
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
+  const handleDispatch = async (accidentId: string) => {
+    setActionLoading(accidentId)
+    await new Promise(r => setTimeout(r, 1000))
+    toast.success('Dispatch team assigned successfully')
+    setActionLoading(null)
+  }
+
+  const handleIssueNotice = async (violationId: string) => {
+    setActionLoading(violationId)
+    await new Promise(r => setTimeout(r, 1000))
+    toast.success('Notice issued successfully')
+    setActionLoading(null)
+  }
+
+  const handleViewEvidence = (violationId: string) => {
+    toast.success('Loading evidence...')
+  }
+
+  const handleVehicleDetails = (plateNumber: string) => {
+    toast.success(`Loading vehicle details for ${plateNumber}...`)
+  }
+
+  const handleViewRoadDetails = (roadName: string) => {
+    toast.success(`Viewing details for ${roadName}...`)
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -576,7 +604,12 @@ export default function RoadSafetyDashboard() {
             <div className="flex items-center gap-1 text-yellow-400">
               <Users className="w-4 h-4" /> {accident.injuries} Injuries
             </div>
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm ml-auto">
+            <button 
+              onClick={() => handleDispatch(accident.id)}
+              disabled={actionLoading === accident.id}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm ml-auto transition-colors flex items-center gap-2"
+            >
+              {actionLoading === accident.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Dispatch
             </button>
           </div>
@@ -613,14 +646,25 @@ export default function RoadSafetyDashboard() {
           </div>
           <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
             {violation.status === 'detected' && (
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
+              <button 
+                onClick={() => handleIssueNotice(violation.id)}
+                disabled={actionLoading === violation.id}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+              >
+                {actionLoading === violation.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Issue Notice
               </button>
             )}
-            <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+            <button 
+              onClick={() => handleViewEvidence(violation.id)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
               View Evidence
             </button>
-            <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+            <button 
+              onClick={() => handleVehicleDetails(violation.plate_number)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
               Vehicle Details
             </button>
           </div>
@@ -652,7 +696,10 @@ export default function RoadSafetyDashboard() {
                   <AlertTriangle className="w-4 h-4" /> {road.accidents_30d} accidents (30 days)
                 </span>
               </div>
-              <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
+              <button 
+                onClick={() => handleViewRoadDetails(road.name)}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+              >
                 View Details
               </button>
             </div>

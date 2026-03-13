@@ -58,7 +58,9 @@ class NotificationManager:
             except:
                 pass
         
-        if user_id and user_id in self.notifications:
+        if user_id:
+            if user_id not in self.notifications:
+                self.notifications[user_id] = []
             self.notifications[user_id].insert(0, notification)
             if len(self.notifications[user_id]) > 100:
                 self.notifications[user_id] = self.notifications[user_id][:100]
@@ -73,10 +75,12 @@ class NotificationManager:
             except:
                 pass
         
-        for user_id in self.notifications:
+        for user_id in list(self.notifications.keys()):
             self.notifications[user_id].insert(0, notification)
+            if len(self.notifications[user_id]) > 100:
+                self.notifications[user_id] = self.notifications[user_id][:100]
 
-    async def play_sound(self, sound: SoundAlert, user_id: str = None):
+    async def play_sound(self, sound: SoundAlert, user_id: Optional[str] = None):
         target_connections = [self.active_connections[user_id]] if user_id and user_id in self.active_connections else list(self.active_connections.values())
         
         for websocket in target_connections:

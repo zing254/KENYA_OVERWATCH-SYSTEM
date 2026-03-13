@@ -7,34 +7,11 @@ import logging
 import uuid
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timezone
-from enum import Enum
 from dataclasses import dataclass, field, asdict
 
+from ...enums import ResponderType, ResponderStatus, DispatchStatus
+
 logger = logging.getLogger(__name__)
-
-
-class ResponderType(str, Enum):
-    POLICE = "police"
-    AMBULANCE = "ambulance"
-    FIRE = "fire"
-    TOW_TRUCK = "tow_truck"
-    MAINTENANCE = "maintenance"
-
-
-class ResponderStatus(str, Enum):
-    AVAILABLE = "available"
-    BUSY = "busy"
-    ENROUTE = "enroute"
-    OFFLINE = "offline"
-
-
-class DispatchStatus(str, Enum):
-    DISPATCHED = "dispatched"
-    ACKNOWLEDGED = "acknowledged"
-    ENROUTE = "enroute"
-    ONSCENE = "onscene"
-    RESOLVED = "resolved"
-    REJECTED = "rejected"
 
 
 @dataclass

@@ -7,30 +7,30 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
 from pydantic import BaseModel
 
-from services.incident_service import (
+from .incident_service import (
     incident_service,
     IncidentType,
     SeverityLevel,
     IncidentStatus,
     Coordinates as IncidentCoordinates
 )
-from services.dispatch.dispatch_coordinator import (
+from .dispatch.dispatch_coordinator import (
     dispatch_coordinator,
     ResponderType,
     ResponderStatus,
     DispatchStatus
 )
-from services.analytics.predictive_engine import predictive_analytics
-from services.location.location_service import location_service
-from services.ingestion.rtsp_client import (
+from .analytics.predictive_engine import predictive_analytics
+from .location.location_service import location_service
+from .ingestion.rtsp_client import (
     camera_ingestion_service,
     CameraConfig
 )
-from services.notification_service import notification_service
-from services.routing_service import routing_service
-from services.iot_sensors import mqtt_sensor_service
-from services.webrtc_gateway import webrtc_gateway
-from services.ai.behavior_analysis import BehaviorAnalyzer, get_or_create_calibration
+from .notification_service import notification_service
+from .routing_service import routing_service
+from .iot_sensors import mqtt_sensor_service
+from .webrtc_gateway import webrtc_gateway
+from .ai.behavior_analysis import BehaviorAnalyzer, get_or_create_calibration
 
 
 router = APIRouter(prefix="/api/v1/services", tags=["services"])

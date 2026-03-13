@@ -1,0 +1,189 @@
+{
+  "roles": [
+    {
+      "role_id": "admin",
+      "name": "Administrator",
+      "description": "Full system access",
+      "permissions": [
+        {
+          "resource": "incident",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "camera",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "report",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "user",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "dispatch",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "analytics",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        },
+        {
+          "resource": "admin",
+          "actions": [
+            "update",
+            "create",
+            "read",
+            "delete"
+          ]
+        }
+      ],
+      "is_system_role": true,
+      "created_at": "2026-03-03T22:48:58.999916"
+    },
+    {
+      "role_id": "dispatcher",
+      "name": "Dispatcher",
+      "description": "Dispatch and incident management",
+      "permissions": [
+        {
+          "resource": "incident",
+          "actions": [
+            "update",
+            "create",
+            "read"
+          ]
+        },
+        {
+          "resource": "camera",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "report",
+          "actions": [
+            "create",
+            "read"
+          ]
+        },
+        {
+          "resource": "dispatch",
+          "actions": [
+            "update",
+            "create",
+            "read"
+          ]
+        },
+        {
+          "resource": "analytics",
+          "actions": [
+            "read"
+          ]
+        }
+      ],
+      "is_system_role": true,
+      "created_at": "2026-03-03T22:48:58.999934"
+    },
+    {
+      "role_id": "officer",
+      "name": "Officer",
+      "description": "Field officer access",
+      "permissions": [
+        {
+          "resource": "incident",
+          "actions": [
+            "update",
+            "read"
+          ]
+        },
+        {
+          "resource": "camera",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "report",
+          "actions": [
+            "create",
+            "read"
+          ]
+        },
+        {
+          "resource": "dispatch",
+          "actions": [
+            "update",
+            "read"
+          ]
+        }
+      ],
+      "is_system_role": true,
+      "created_at": "2026-03-03T22:48:58.999945"
+    },
+    {
+      "role_id": "viewer",
+      "name": "Viewer",
+      "description": "Read-only access",
+      "permissions": [
+        {
+          "resource": "incident",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "camera",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "report",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "analytics",
+          "actions": [
+            "read"
+          ]
+        }
+      ],
+      "is_system_role": true,
+      "created_at": "2026-03-03T22:48:58.999953"
+    }
+  ]
+}

@@ -5,7 +5,7 @@ Secure JWT-based authentication with bcrypt password hashing
 
 from fastapi import APIRouter, HTTPException, Depends, Request, status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
@@ -15,7 +15,13 @@ import secrets
 import logging
 import os
 
+from .enums import UserRole as SharedUserRole, UserStatus as SharedUserStatus
+
 logger = logging.getLogger(__name__)
+
+# Re-export shared enums for backward compatibility
+UserRole = SharedUserRole
+UserStatus = SharedUserStatus
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -65,21 +71,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=Fals
 
 
 # ==================== ENUMS ====================
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    OFFICER = "officer"
-    DISPATCHER = "dispatcher"
-    VIEWER = "viewer"
-
-
-class UserStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
-    PENDING = "pending"
-    LOCKED = "locked"
-
-
 class TokenType(str, Enum):
     ACCESS = "access"
     REFRESH = "refresh"
@@ -100,7 +91,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
@@ -157,7 +149,8 @@ class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('new_password')
+    @field_validator('new_password')
+    @classmethod
     def validate_password(cls, v):
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
