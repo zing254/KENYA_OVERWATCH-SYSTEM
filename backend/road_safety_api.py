@@ -2434,6 +2434,36 @@ async def websocket_road_safety(websocket: WebSocket):
 
 
 # ==================== MONITORING & METRICS ====================
+@app.get("/api/system/overview")
+async def get_system_overview():
+    """Get comprehensive system overview"""
+    try:
+        from .cache import cache
+    except ModuleNotFoundError:
+        from backend.cache import cache
+    
+    cache_stats = cache.get_stats()
+    
+    return {
+        "timestamp": utcnow().isoformat(),
+        "status": "healthy",
+        "version": "2.0.0",
+        "services": {
+            "api": "operational",
+            "database": "connected",
+            "cache": "operational" if cache_stats.get("backend") == "redis" else "in-memory",
+            "websocket": "operational",
+        },
+        "resources": {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent,
+            "disk_percent": psutil.disk_usage('/').percent,
+        },
+        "cache": cache_stats,
+        "settings": system_settings.get(),
+    }
+
+
 @app.get("/api/metrics")
 async def get_metrics():
     """Get system metrics"""
