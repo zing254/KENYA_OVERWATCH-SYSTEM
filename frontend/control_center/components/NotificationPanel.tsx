@@ -1,28 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { Bell, X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Bell, X, Check, AlertTriangle, Info, AlertCircle, Volume2, VolumeX, Settings, Play, Pause } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
-const playSound = (soundType: string, volume: number = 1.0) => {
-  if (typeof window === 'undefined') return
+interface SoundConfig {
+  enabled: boolean
+  volume: number
+  testMode: boolean
+}
 
-  const sounds: Record<string, string> = {
-    emergency: '/sounds/emergency.mp3',
-    alert: '/sounds/alert.mp3',
-    warning: '/sounds/warning.mp3',
-    notification: '/sounds/notification.mp3',
-    incident: '/sounds/incident.mp3',
-    dispatch: '/sounds/dispatch.mp3',
-    road_sign: '/sounds/road_sign.mp3',
-    speed_camera: '/sounds/speed_camera.mp3',
-  }
+const defaultSounds: Record<string, string> = {
+  emergency: '/sounds/emergency.mp3',
+  alert: '/sounds/alert.mp3',
+  warning: '/sounds/warning.mp3',
+  notification: '/sounds/notification.mp3',
+  incident: '/sounds/incident.mp3',
+  dispatch: '/sounds/dispatch.mp3',
+  road_sign: '/sounds/road_sign.mp3',
+  speed_camera: '/sounds/speed_camera.mp3',
+}
 
-  const soundPath = sounds[soundType]
+const playSound = (soundType: string, volume: number = 1.0, enabled: boolean = true) => {
+  if (!enabled || typeof window === 'undefined') return
+
+  const soundPath = defaultSounds[soundType]
   if (soundPath) {
     const audio = new Audio(soundPath)
-    audio.volume = volume
+    audio.volume = Math.max(0, Math.min(1, volume))
     audio.play().catch(e => console.error('Error playing sound:', e))
   }
+}
+
+const testSound = (soundType: string, volume: number, enabled: boolean) => {
+  playSound(soundType, volume, enabled)
 }
 
 interface Notification {
@@ -45,6 +55,11 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [volume, setVolume] = useState(0.7)
+  const [showSettings, setShowSettings] = useState(false)
+  const [testingSound, setTestingSound] = useState<string | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -92,16 +107,17 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
         'speed_camera': 'speed_camera'
       }
       const soundType = soundMap[notif.notification_type] || soundMap[notif.severity] || 'notification'
-      playSound(soundType, 0.7)
+      playSound(soundType, volume, soundEnabled)
     } else if (data.type === 'sound_alert') {
       const sound = data.data
-      playSound(sound.sound_type, sound.volume)
+      playSound(sound.sound_type, sound.volume, soundEnabled)
     }
-  }, [])
+  }, [volume, soundEnabled])
 
   useEffect(() => {
     const wsUrl = API_URL.replace('http', 'ws') + `/api/v1/notifications/ws/notifications/admin`
     const ws = new WebSocket(wsUrl)
+    wsRef.current = ws
 
     ws.onopen = () => {
       console.log('Notifications WebSocket connected')
@@ -128,6 +144,12 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
       ws.close()
     }
   }, [handleWebSocketMessage])
+
+  const testSoundForType = (soundType: string) => {
+    setTestingSound(soundType)
+    playSound(soundType, volume, true)
+    setTimeout(() => setTestingSound(null), 1000)
+  }
 
   const markAsRead = async (id: string) => {
     try {
@@ -176,17 +198,81 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ refreshInterval =
   return (
     <div className="relative">
       {/* Bell Icon with Badge */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-400 hover:text-white transition-colors"
-      >
-        <Bell className="w-6 h-6" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
-      </button>
+      <div className="flex items-center gap-1">
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="relative p-2 text-gray-400 hover:text-white transition-colors"
+        >
+          <Bell className="w-6 h-6" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+        
+        {/* Sound Toggle Button */}
+        <button 
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          className={`p-2 transition-colors ${soundEnabled ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-gray-400'}`}
+          title={soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+        >
+          {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+        </button>
+        
+        {/* Settings Button */}
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className={`p-2 transition-colors ${showSettings ? 'text-blue-400 hover:text-blue-300' : 'text-gray-400 hover:text-white'}`}
+          title="Sound settings"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Sound Settings Panel */}
+      {showSettings && (
+        <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl z-50 border border-gray-700 p-4">
+          <h4 className="text-white font-semibold mb-3">Sound Settings</h4>
+          
+          {/* Volume Slider */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-gray-400 text-sm">Volume</span>
+              <span className="text-gray-400 text-xs">{Math.round(volume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume * 100}
+              onChange={(e) => setVolume(parseInt(e.target.value) / 100)}
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+          
+          {/* Test Sounds */}
+          <div className="space-y-2">
+            <span className="text-gray-400 text-sm">Test Sounds</span>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(defaultSounds).map(([key, _]) => (
+                <button
+                  key={key}
+                  onClick={() => testSoundForType(key)}
+                  disabled={testingSound === key}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    testingSound === key 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {testingSound === key ? 'Playing...' : key.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notification Panel */}
       {isOpen && (
