@@ -1,0 +1,733 @@
+"""
+Kenya Counties Data Module
+Contains metadata for all 47 Kenyan counties for road safety monitoring
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Tuple, Any
+from enum import Enum
+
+
+class CountyRegion(Enum):
+    CENTRAL = "Central"
+    COASTAL = "Coastal"
+    EASTERN = "Eastern"
+    NORTH_EASTERN = "North Eastern"
+    NYANZA = "Nyanza"
+    RIFT_VALLEY = "Rift Valley"
+    WESTERN = "Western"
+
+
+@dataclass
+class County:
+    code: str
+    name: str
+    region: CountyRegion
+    capital: str
+    population: int
+    area_sq_km: int
+    latitude: float
+    longitude: float
+    major_roads: List[str] = field(default_factory=list)
+    road_density_km: float = 0.0
+    urban_centers: List[str] = field(default_factory=list)
+    risk_factors: List[str] = field(default_factory=list)
+
+
+KENYA_COUNTIES: List[County] = [
+    County(
+        code="001",
+        name="Mombasa",
+        region=CountyRegion.COASTAL,
+        capital="Mombasa",
+        population=1200000,
+        area_sq_km=219,
+        latitude=-4.0435,
+        longitude=39.6682,
+        major_roads=["Mombasa-Nairobi Highway", "Malindi Road", "Likoni Ferry Road"],
+        road_density_km=850,
+        urban_centers=["Mombasa", "Kisauni", "Nyali", "Likoni"],
+        risk_factors=["High traffic congestion", "Flooding in low areas", "Port traffic"]
+    ),
+    County(
+        code="002",
+        name="Kwale",
+        region=CountyRegion.COASTAL,
+        capital="Kwale",
+        population=867000,
+        area_sq_km=8270,
+        latitude=-4.4167,
+        longitude=39.5833,
+        major_roads=["Mombasa-Tanga Road", "Diani Beach Road"],
+        road_density_km=120,
+        urban_centers=["Kwale", "Diani", "Msambweni", "Kinango"],
+        risk_factors=["Rural roads", "Seasonal flooding", "Limited road maintenance"]
+    ),
+    County(
+        code="003",
+        name="Kilifi",
+        region=CountyRegion.COASTAL,
+        capital="Kilifi",
+        population=1460000,
+        area_sq_km=12245,
+        latitude=-3.6305,
+        longitude=39.8499,
+        major_roads=["Mombasa-Malindi Highway", "Kilifi-Wetu Road"],
+        road_density_km=180,
+        urban_centers=["Kilifi", "Malindi", "Watamu", "Kaloleni"],
+        risk_factors=["Tourist traffic", "Flood-prone areas", "Coastal erosion"]
+    ),
+    County(
+        code="004",
+        name="Tana River",
+        region=CountyRegion.COASTAL,
+        capital="Hola",
+        population=315000,
+        area_sq_km=38000,
+        latitude=-1.5000,
+        longitude=40.0000,
+        major_roads=["Garissa-Hola Road", "Tana River Bridge approach"],
+        road_density_km=45,
+        urban_centers=["Hola", "Garsen", "Madogo"],
+        risk_factors=["Flooding along Tana River", "Bridge vulnerability", "Limited emergency access"]
+    ),
+    County(
+        code="005",
+        name="Lamu",
+        region=CountyRegion.COASTAL,
+        capital="Lamu",
+        population=143000,
+        area_sq_km=6497,
+        latitude=-2.2686,
+        longitude=40.9020,
+        major_roads=["Lamu-Malka Mari Road", "Faza-Lamu Road"],
+        road_density_km=60,
+        urban_centers=["Lamu", "Faza", "Kizingo"],
+        risk_factors=["Island connectivity", "Flooding", "Limited road infrastructure"]
+    ),
+    County(
+        code="006",
+        name="Taita-Taveta",
+        region=CountyRegion.COASTAL,
+        capital="Voi",
+        population=340000,
+        area_sq_km=17083,
+        latitude=-3.3960,
+        longitude=38.4440,
+        major_roads=["Nairobi-Mombasa Highway", "Voi-Taveta Road"],
+        road_density_km=95,
+        urban_centers=["Voi", "Mwatate", "Taveta", "Wundanyi"],
+        risk_factors=["Hilly terrain", "Landslide prone", "Wildlife crossing"]
+    ),
+    County(
+        code="007",
+        name="Garissa",
+        region=CountyRegion.NORTH_EASTERN,
+        capital="Garissa",
+        population=870000,
+        area_sq_km=45000,
+        latitude=-0.4536,
+        longitude=39.6401,
+        major_roads=["Garissa-Nairobi Road", "Garissa-Moyale Highway"],
+        road_density_km=85,
+        urban_centers=["Garissa", "Dadaab", "Fafi"],
+        risk_factors=["Desert conditions", "Flooding during rains", "Livestock on roads"]
+    ),
+    County(
+        code="008",
+        name="Wajir",
+        region=CountyRegion.NORTH_EASTERN,
+        capital="Wajir",
+        population=661000,
+        area_sq_km=56000,
+        latitude=1.7500,
+        longitude=40.0500,
+        major_roads=["Wajir-Moyale Road", "Wajir-Garissa Road"],
+        road_density_km=50,
+        urban_centers=["Wajir", "Eldas", "Wajir South"],
+        risk_factors=["Drought conditions", "Limited road network", "Remote area"]
+    ),
+    County(
+        code="009",
+        name="Mandera",
+        region=CountyRegion.NORTH_EASTERN,
+        capital="Mandera",
+        population=867000,
+        area_sq_km=25000,
+        latitude=3.9333,
+        longitude=41.8667,
+        major_roads=["Mandera-Wajir Road", "Ethiopia border road"],
+        road_density_km=40,
+        urban_centers=["Mandera", "Mandera East", "Mandera West"],
+        risk_factors=["Border security concerns", "Limited infrastructure", "Remote location"]
+    ),
+    County(
+        code="010",
+        name="Marsabit",
+        region=CountyRegion.NORTH_EASTERN,
+        capital="Marsabit",
+        population=442000,
+        area_sq_km=70000,
+        latitude=2.3333,
+        longitude=37.9833,
+        major_roads=["Marsabit-Isiolo Road", "Marsabit-Turbi Road"],
+        road_density_km=35,
+        urban_centers=["Marsabit", "Moyale", "Loiyangalani"],
+        risk_factors=["Desert terrain", "Livestock crossings", "Limited emergency services"]
+    ),
+    County(
+        code="011",
+        name="Isiolo",
+        region=CountyRegion.EASTERN,
+        capital="Isiolo",
+        population=268000,
+        area_sq_km=25300,
+        latitude=0.3546,
+        longitude=37.5822,
+        major_roads=["Isiolo-Marsabit Road", "Isiolo-Meru Road"],
+        road_density_km=75,
+        urban_centers=["Isiolo", "Merti", "Garba Tula"],
+        risk_factors=["Pastoralist movements", "Wildlife corridors", "Drought prone"]
+    ),
+    County(
+        code="012",
+        name="Meru",
+        region=CountyRegion.EASTERN,
+        capital="Meru",
+        population=1455000,
+        area_sq_km=7000,
+        latitude=0.0500,
+        longitude=37.6500,
+        major_roads=["Meru-Nairobi Road", "Meru-Mikindji Road"],
+        road_density_km=420,
+        urban_centers=["Meru", "Maua", "Timau", "Kianjai"],
+        risk_factors=["Mountain roads", "Rainy season hazards", "High vehicle volume"]
+    ),
+    County(
+        code="013",
+        name="Tharaka-Nithi",
+        region=CountyRegion.EASTERN,
+        capital="Chuka",
+        population=393000,
+        area_sq_km=2600,
+        latitude=-0.2833,
+        longitude=37.8333,
+        major_roads=["Chuka-Meru Road", "Chuka-Embu Road"],
+        road_density_km=180,
+        urban_centers=["Chuka", "Marimanti", "Nkubu"],
+        risk_factors=["Hilly terrain", "Landslide prone", "Narrow roads"]
+    ),
+    County(
+        code="014",
+        name="Embu",
+        region=CountyRegion.EASTERN,
+        capital="Embu",
+        population=608000,
+        area_sq_km=2800,
+        latitude=-0.5389,
+        longitude=37.4583,
+        major_roads=["Embu-Meru Road", "Embu-Nairobi Road"],
+        road_density_km=350,
+        urban_centers=["Embu", "Runyenjes", "Kibirigwi"],
+        risk_factors=["Mountain roads", "Agricultural traffic", "Rainy season"]
+    ),
+    County(
+        code="015",
+        name="Kitui",
+        region=CountyRegion.EASTERN,
+        capital="Kitui",
+        population=1138000,
+        area_sq_km=30000,
+        latitude=-1.3667,
+        longitude=38.0167,
+        major_roads=["Kitui-Nairobi Road", "Kitui-Mwingi Road"],
+        road_density_km=120,
+        urban_centers=["Kitui", "Mwingi", "Kisasi", "Mutomo"],
+        risk_factors=["Semi-arid terrain", "Dust storms", "Limited road maintenance"]
+    ),
+    County(
+        code="016",
+        name="Machakos",
+        region=CountyRegion.EASTERN,
+        capital="Machakos",
+        population=1420000,
+        area_sq_km=14000,
+        latitude=-1.5177,
+        longitude=37.2634,
+        major_roads=["Nairobi-Mombasa Highway", "Machakos-Nairobi Road"],
+        road_density_km=380,
+        urban_centers=["Machakos", "Mlolongo", "Athi River", "Kangundo"],
+        risk_factors=["High speed accidents", "Growing urbanization", "Cargo truck traffic"]
+    ),
+    County(
+        code="017",
+        name="Makueni",
+        region=CountyRegion.EASTERN,
+        capital="Wote",
+        population=987000,
+        area_sq_km=16000,
+        latitude=-2.1833,
+        longitude=37.6333,
+        major_roads=["Nairobi-Mombasa Highway", "Makueni-Wote Road"],
+        road_density_km=200,
+        urban_centers=["Wote", "Kibwezi", "Makindu", "Kilungu"],
+        risk_factors=["Dusty roads", "Flooding in valleys", "Long distance travel"]
+    ),
+    County(
+        code="018",
+        name="Nyandarua",
+        region=CountyRegion.CENTRAL,
+        capital="Ol Kalou",
+        population=638000,
+        area_sq_km=3100,
+        latitude=-0.7833,
+        longitude=36.3667,
+        major_roads=["Nakuru-Ol Kalou Road", "Ol Kalou-Kinangop Road"],
+        road_density_km=220,
+        urban_centers=["Ol Kalou", "Kinangop", "Ndarwa", "Mairo Inya"],
+        risk_factors=["High altitude", "Fog conditions", "Steep terrain"]
+    ),
+    County(
+        code="019",
+        name="Nyeri",
+        region=CountyRegion.CENTRAL,
+        capital="Nyeri",
+        population=870000,
+        area_sq_km=2800,
+        latitude=-0.4197,
+        longitude=36.9553,
+        major_roads=["Nairobi-Nyeri Highway", "Nyeri-Marsabit Road"],
+        road_density_km=520,
+        urban_centers=["Nyeri", "Othaya", "Mukurweini", "Kiganjo"],
+        risk_factors=["Mountain roads", "Fog and mist", "Curved mountain passes"]
+    ),
+    County(
+        code="020",
+        name="Kirinyaga",
+        region=CountyRegion.CENTRAL,
+        capital="Kutus",
+        population=610000,
+        area_sq_km=1200,
+        latitude=-0.6833,
+        longitude=37.2833,
+        major_roads=["Nairobi-Nyeri Highway", "Kutus-Kerugoya Road"],
+        road_density_km=680,
+        urban_centers=["Kutus", "Kerugoya", "Wanguru", "Kimbimbi"],
+        risk_factors=["Agricultural traffic", "Narrow rural roads", "Pedestrian crossings"]
+    ),
+    County(
+        code="021",
+        name="Murang'a",
+        region=CountyRegion.CENTRAL,
+        capital="Murang'a",
+        population=1055000,
+        area_sq_km=2300,
+        latitude=-0.7167,
+        longitude=37.1500,
+        major_roads=["Nairobi-Nakuru Highway", "Murang'a-Kiambu Road"],
+        road_density_km=450,
+        urban_centers=["Murang'a", "Kangema", "Mathioya", "Kiharu"],
+        risk_factors=["Hilly terrain", "Narrow roads", "Agricultural vehicles"]
+    ),
+    County(
+        code="022",
+        name="Kiambu",
+        region=CountyRegion.CENTRAL,
+        capital="Kiambu",
+        population=2038000,
+        area_sq_km=2500,
+        latitude=-1.1714,
+        longitude=36.8356,
+        major_roads=["Nairobi-Thika Highway", "Kiambu-Ruiru Road"],
+        road_density_km=920,
+        urban_centers=["Kiambu", "Ruiru", "Thika", "Limuru", "Githunguri"],
+        risk_factors=["Urban congestion", "High pedestrian activity", "Rapid urbanization"]
+    ),
+    County(
+        code="023",
+        name="Turkana",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Lodwar",
+        population=926000,
+        area_sq_km=71000,
+        latitude=3.1167,
+        longitude=35.6000,
+        major_roads=["Lodwar-Kitale Road", "Lodwar-Kakuma Road"],
+        road_density_km=30,
+        urban_centers=["Lodwar", "Kakuma", "Lokichar", "Loiya"],
+        risk_factors=["Remote area", "Flooding during rains", "Limited emergency access"]
+    ),
+    County(
+        code="024",
+        name="West Pokot",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kapenguria",
+        population=621000,
+        area_sq_km=9000,
+        latitude=1.2333,
+        longitude=35.1167,
+        major_roads=["Kapenguria-Kitale Road", "West Pokot-Marsabit Road"],
+        road_density_km=110,
+        urban_centers=["Kapenguria", "Kacheliba", "Sigor", "Chepareria"],
+        risk_factors=["Mountain terrain", "Landslides", "Cattle crossing"]
+    ),
+    County(
+        code="025",
+        name="Samburu",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Maralal",
+        population=310000,
+        area_sq_km=20000,
+        latitude=1.1000,
+        longitude=36.7833,
+        major_roads=["Maralal-Isiolo Road", "Samburu-Marsabit Road"],
+        road_density_km=45,
+        urban_centers=["Maralal", "Wamba", "Archer's Post"],
+        risk_factors=["Wildlife crossings", "Remote roads", "Pastoralist movements"]
+    ),
+    County(
+        code="026",
+        name="Trans-Nzoia",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kitale",
+        population=1081000,
+        area_sq_km=2500,
+        latitude=1.0157,
+        longitude=35.0062,
+        major_roads=["Kitale-Eldoret Road", "Kitale-Webuye Road"],
+        road_density_km=580,
+        urban_centers=["Kitale", "Kachemi", "Saboti", "Namasoli"],
+        risk_factors=["High cargo traffic", "Agricultural vehicles", "Rainy season hazards"]
+    ),
+    County(
+        code="027",
+        name="Uasin Gishu",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Eldoret",
+        population=1235000,
+        area_sq_km=3500,
+        latitude=0.5144,
+        longitude=35.2698,
+        major_roads=["Nairobi-Eldoret Highway", "Eldoret-Kakamega Road"],
+        road_density_km=650,
+        urban_centers=["Eldoret", "Kapsabet", "Wareng", "Moiben"],
+        risk_factors=["High speed accidents", "Long distance trucks", "Growing urban traffic"]
+    ),
+    County(
+        code="028",
+        name="Elgeyo-Marakwet",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Iten",
+        population=454000,
+        area_sq_km=3000,
+        latitude=0.7833,
+        longitude=35.5000,
+        major_roads=["Iten-Eldoret Road", "Marakwet Hills Road"],
+        road_density_km=180,
+        urban_centers=["Iten", "Kapsowar", "Keiyo", "Kimwarer"],
+        risk_factors=["Mountain terrain", "Steep roads", "Limited visibility"]
+    ),
+    County(
+        code="029",
+        name="Nandi",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kapsabet",
+        population=885000,
+        area_sq_km=2800,
+        latitude=0.1833,
+        longitude=35.1000,
+        major_roads=["Kapsabet-Eldoret Road", "Nandi Hills-Kisumu Road"],
+        road_density_km=320,
+        urban_centers=["Kapsabet", "Nandi Hills", "Kilibwoni", "Mosoriot"],
+        risk_factors=["Tea estate traffic", "Narrow roads", "Rainy conditions"]
+    ),
+    County(
+        code="030",
+        name="Baringo",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kabarnet",
+        population=456000,
+        area_sq_km=11000,
+        latitude=0.6833,
+        longitude=35.7333,
+        major_roads=["Kabarnet-Eldoret Road", "Baringo-Mogotio Road"],
+        road_density_km=90,
+        urban_centers=["Kabarnet", "Mogotio", "Eldama Ravine", "Tiaty"],
+        risk_factors=["Rough terrain", "Limited road network", "Flooding in low areas"]
+    ),
+    County(
+        code="031",
+        name="Laikipia",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Rumuruti",
+        population=518000,
+        area_sq_km=9700,
+        latitude=0.0833,
+        longitude=36.5500,
+        major_roads=["Nanyuki-Isiolo Road", "Rumuruti-Nakuru Road"],
+        road_density_km=160,
+        urban_centers=["Rumuruti", "Nanyuki", "Mukogodo", "Ol Moran"],
+        risk_factors=["Wildlife crossings", "Ranch roads", "Tourist traffic"]
+    ),
+    County(
+        code="032",
+        name="Nakuru",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Nakuru",
+        population=2135000,
+        area_sq_km=7500,
+        latitude=-0.3034,
+        longitude=36.0800,
+        major_roads=["Nairobi-Nakuru Highway", "Nakuru-Eldoret Highway"],
+        road_density_km=720,
+        urban_centers=["Nakuru", "Naivasha", "Molo", "Gilgil", "Nyahururu"],
+        risk_factors=["High traffic volume", "Growing urbanization", "Industrial traffic"]
+    ),
+    County(
+        code="033",
+        name="Narok",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Narok",
+        population=1154000,
+        area_sq_km=18000,
+        latitude=-1.0789,
+        longitude=35.8604,
+        major_roads=["Nairobi-Narok Highway", "Narok-Mara Road"],
+        road_density_km=200,
+        urban_centers=["Narok", "Mara", "Kilgoris", "Ololulunga"],
+        risk_factors=["Wildlife crossings", "Tourist vehicles", "Long distance travel"]
+    ),
+    County(
+        code="034",
+        name="Kajiado",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kajiado",
+        population=887000,
+        area_sq_km=21000,
+        latitude=-1.8519,
+        longitude=36.7820,
+        major_roads=["Nairobi-Mombasa Highway", "Kajiado-Namanga Road"],
+        road_density_km=140,
+        urban_centers=["Kajiado", "Kitengela", "Magadi", "Isinya"],
+        risk_factors=["Livestock crossings", "Wildlife corridors", "Rapid development"]
+    ),
+    County(
+        code="035",
+        name="Kericho",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Kericho",
+        population=968000,
+        area_sq_km=2400,
+        latitude=-0.3689,
+        longitude=35.2863,
+        major_roads=["Nairobi-Eldoret Highway", "Kericho-Kisumu Road"],
+        road_density_km=620,
+        urban_centers=["Kericho", "Litein", "Kapkatet", "Sondu"],
+        risk_factors=["Tea estate traffic", "Fog conditions", "Steep terrain"]
+    ),
+    County(
+        code="036",
+        name="Bomet",
+        region=CountyRegion.RIFT_VALLEY,
+        capital="Bomet",
+        population=875000,
+        area_sq_km=2600,
+        latitude=-0.7833,
+        longitude=35.3333,
+        major_roads=["Bomet-Narok Road", "Bomet-Kericho Road"],
+        road_density_km=380,
+        urban_centers=["Bomet", "Sotik", "Longisa", "Chebunyo"],
+        risk_factors=["Agricultural traffic", "Hilly terrain", "Narrow roads"]
+    ),
+    County(
+        code="037",
+        name="Kakamega",
+        region=CountyRegion.WESTERN,
+        capital="Kakamega",
+        population=1858000,
+        area_sq_km=3000,
+        latitude=0.2827,
+        longitude=34.7519,
+        major_roads=["Kakamega-Kisumu Road", "Kakamega-Webuye Road"],
+        road_density_km=720,
+        urban_centers=["Kakamega", "Mumias", "Lurambi", "Malava"],
+        risk_factors=["High population density", "Agricultural traffic", "Growing urbanization"]
+    ),
+    County(
+        code="038",
+        name="Vihiga",
+        region=CountyRegion.WESTERN,
+        capital="Vihiga",
+        population=590000,
+        area_sq_km=560,
+        latitude=0.0500,
+        longitude=34.7000,
+        major_roads=["Vihiga-Kakamega Road", "Vihiga-Kisumu Road"],
+        road_density_km=850,
+        urban_centers=["Vihiga", "Mbale", "Luanda", "Emuhaya"],
+        risk_factors=["Dense population", "Narrow roads", "High pedestrian activity"]
+    ),
+    County(
+        code="039",
+        name="Bungoma",
+        region=CountyRegion.WESTERN,
+        capital="Bungoma",
+        population=1750000,
+        area_sq_km=2200,
+        latitude=0.5635,
+        longitude=34.5606,
+        major_roads=["Bungoma-Webuye Road", "Bungoma-Mumias Road"],
+        road_density_km=680,
+        urban_centers=["Bungoma", "Webuye", "Kimilili", "Mukhumuli"],
+        risk_factors=["Border traffic", "Cargo trucks", "High accident rate"]
+    ),
+    County(
+        code="040",
+        name="Busia",
+        region=CountyRegion.WESTERN,
+        capital="Busia",
+        population=893000,
+        area_sq_km=1600,
+        latitude=0.4605,
+        longitude=34.2094,
+        major_roads=["Busia-Kisumu Road", "Busia-Malaba Road"],
+        road_density_km=520,
+        urban_centers=["Busia", "Malaba", "Nambale", "Butula"],
+        risk_factors=["Border crossing", "Cargo traffic", "Pedestrian crossings"]
+    ),
+    County(
+        code="041",
+        name="Siaya",
+        region=CountyRegion.NYANZA,
+        capital="Siaya",
+        population=985000,
+        area_sq_km=2500,
+        latitude=0.0619,
+        longitude=34.2881,
+        major_roads=["Siaya-Ukwala Road", "Siaya-Bondo Road"],
+        road_density_km=380,
+        urban_centers=["Siaya", "Bondo", "Ukwala", "Rarieda"],
+        risk_factors=["Rural roads", "Flood prone areas", "Limited road maintenance"]
+    ),
+    County(
+        code="042",
+        name="Kisumu",
+        region=CountyRegion.NYANZA,
+        capital="Kisumu",
+        population=1155000,
+        area_sq_km=2000,
+        latitude=-0.1022,
+        longitude=34.7617,
+        major_roads=["Kisumu-Nairobi Road", "Kisumu-Busia Road"],
+        road_density_km=820,
+        urban_centers=["Kisumu", "Kisian", "Maseno", "Ahero"],
+        risk_factors=["Urban traffic", "Lake shore roads", "Growing city"]
+    ),
+    County(
+        code="043",
+        name="Homa Bay",
+        region=CountyRegion.NYANZA,
+        capital="Homa Bay",
+        population=1082000,
+        area_sq_km=3600,
+        latitude=-0.5273,
+        longitude=34.4571,
+        major_roads=["Homa Bay-Rongo Road", "Homa Bay-Mbita Road"],
+        road_density_km=280,
+        urban_centers=["Homa Bay", "Mbita", "Rongo", "Kendi"],
+        risk_factors=["Lake shore flooding", "Fishing traffic", "Limited road infrastructure"]
+    ),
+    County(
+        code="044",
+        name="Migori",
+        region=CountyRegion.NYANZA,
+        capital="Migori",
+        population=1115000,
+        area_sq_km=2600,
+        latitude=-1.0634,
+        longitude=34.4731,
+        major_roads=["Migori-Nairobi Road", "Migori-Isebania Road"],
+        road_density_km=320,
+        urban_centers=["Migori", "Rongo", "Awendo", "Nyatike"],
+        risk_factors=["Border traffic", "Mining area traffic", "Rural roads"]
+    ),
+    County(
+        code="045",
+        name="Kisii",
+        region=CountyRegion.NYANZA,
+        capital="Kisii",
+        population=1383000,
+        area_sq_km=2200,
+        latitude=-0.6817,
+        longitude=34.7660,
+        major_roads=["Kisii-Keroka Road", "Kisii-Nyamira Road"],
+        road_density_km=720,
+        urban_centers=["Kisii", "Keroka", "Nyamira", "Ogembo"],
+        risk_factors=["Hilly terrain", "Dense population", "Growing traffic"]
+    ),
+    County(
+        code="046",
+        name="Nyamira",
+        region=CountyRegion.NYANZA,
+        capital="Nyamira",
+        population=605000,
+        area_sq_km=900,
+        latitude=-0.5667,
+        longitude=34.9333,
+        major_roads=["Nyamira-Kisii Road", "Nyamira-Mogogosi Road"],
+        road_density_km=680,
+        urban_centers=["Nyamira", "Keroka", "Mogogosi", "Ekerenyo"],
+        risk_factors=["Tea estate traffic", "Hilly terrain", "Agricultural vehicles"]
+    ),
+    County(
+        code="047",
+        name="Nairobi",
+        region=CountyRegion.CENTRAL,
+        capital="Nairobi",
+        population=4735000,
+        area_sq_km=696,
+        latitude=-1.2921,
+        longitude=36.8219,
+        major_roads=["Nairobi-Mombasa Highway", "Thika Road", "Ngong Road", "Kenyatta Avenue"],
+        road_density_km=2800,
+        urban_centers=["Nairobi", "Kasarani", "Ruaraka", "Embakasi"],
+        risk_factors=["Highest traffic congestion", "High pedestrian accidents", "Growing urbanization", "Expressway incidents"]
+    ),
+]
+
+
+COUNTY_CODE_MAP: Dict[str, County] = {c.code: c for c in KENYA_COUNTIES}
+COUNTY_NAME_MAP: Dict[str, County] = {c.name: c for c in KENYA_COUNTIES}
+
+
+def get_county_by_name(name: str) -> Optional[County]:
+    return COUNTY_NAME_MAP.get(name)
+
+
+def get_county_by_code(code: str) -> Optional[County]:
+    return COUNTY_CODE_MAP.get(code)
+
+
+def get_all_county_names() -> List[str]:
+    return sorted([c.name for c in KENYA_COUNTIES])
+
+
+def get_counties_by_region(region: CountyRegion) -> List[County]:
+    return [c for c in KENYA_COUNTIES if c.region == region]
+
+
+COUNTY_REGION_MAP: Dict[CountyRegion, List[str]] = {
+    region: [c.name for c in get_counties_by_region(region)]
+    for region in CountyRegion
+}
+
+
+def get_regions() -> List[Dict[str, "Any"]]:
+    return [
+        {
+            "name": region.value,
+            "counties": COUNTY_REGION_MAP[region],
+            "county_count": len(COUNTY_REGION_MAP[region])
+        }
+        for region in CountyRegion
+    ]

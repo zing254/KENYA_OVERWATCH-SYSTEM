@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   Video, Play, Pause, Maximize2, Settings, AlertTriangle, 
-  Car, Person, Activity, Zap, Eye, Camera, Volume2, VolumeX,
+  Car, User, Activity, Zap, Eye, Camera, Volume2, VolumeX,
   RefreshCw, Download, Filter, Clock, MapPin
 } from 'lucide-react'
 
@@ -201,7 +201,7 @@ export default function AICameraFeed({
           >
             <div className="absolute -top-6 left-0 text-xs bg-black/70 text-white px-1 rounded">
               {detection.type === 'vehicle' && <Car className="w-3 h-3 inline mr-1" />}
-              {detection.type === 'person' && <Person className="w-3 h-3 inline mr-1" />}
+              {detection.type === 'person' && <User className="w-3 h-3 inline mr-1" />}
               {detection.type === 'speed' && <Zap className="w-3 h-3 inline mr-1" />}
               {Math.round(detection.confidence * 100)}%
             </div>
@@ -244,8 +244,8 @@ export default function AICameraFeed({
             <span>Vehicles: {stats.vehicles}</span>
           </div>
           <div className="flex items-center gap-2 text-gray-300">
-            <Person className="w-3 h-3 text-green-400" />
-            <span>Persons: {stats.persons}</span>
+            <User className="w-3 h-3 text-green-400" />
+            <span>Users: {stats.persons}</span>
           </div>
           <div className="flex items-center gap-2 text-gray-300">
             <AlertTriangle className="w-3 h-3 text-red-400" />

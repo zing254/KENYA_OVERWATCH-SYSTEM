@@ -217,7 +217,7 @@ export function SpeedViolationHeatmap({ title }: AnalyticsChartProps) {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
   
   const generateHeatmapData = () => {
-    const data = []
+    const data: { day: string; hour: number; value: number }[] = []
     days.forEach((day, dayIndex) => {
       hours.forEach(hour => {
         const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19)

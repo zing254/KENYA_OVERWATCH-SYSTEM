@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { AlertTriangle, AlertCircle, MapPin, Car, Activity, Shield, FileText, Settings, Radio, Map, BarChart3, Zap, Users, TrendingUp, DollarSign, Clock, MapPinned, Camera, Eye, Bell } from 'lucide-react'
 
@@ -57,15 +58,30 @@ interface Hotspot {
   incidents_2024: number
 }
 
+interface CitizenReport {
+  id: string
+  type: string
+  description: string
+  location: string
+  latitude?: number
+  longitude?: number
+  first_name: string
+  last_name: string
+  phone_number: string
+  anonymous: boolean
+  status: string
+  created_at: string
+}
+
 const mockAccidents: Accident[] = [
-  { id: 'acc_001', accident_type: 'rear_end', cause: 'speeding', location: 'Mombasa Road Junction', road_name: 'Mombasa Road (A109)', severity: 'high', status: 'dispatched', casualties: 0, injuries: 3, reported_at: new Date().toISOString() },
+  { id: 'acc_001', accident_type: 'rear_end', cause: 'speeding', location: 'Mombasa Road Junction', road_name: 'Mombasa Road (A109)', severity: 'high', status: 'dispatched', casualties: 0, injuries: 3, reported_at: new Date(Date.now() - 120000).toISOString() },
   { id: 'acc_002', accident_type: 'hit_pedestrian', cause: 'red_light_jumping', location: 'Kenyatta Avenue', road_name: 'Kenyatta Avenue', severity: 'critical', status: 'on_scene', casualties: 1, injuries: 1, reported_at: new Date(Date.now() - 300000).toISOString() },
   { id: 'acc_003', accident_type: 'head_on', cause: 'reckless_driving', location: 'Thika Superhighway', road_name: 'Thika Superhighway', severity: 'critical', status: 'treatment', casualties: 2, injuries: 4, reported_at: new Date(Date.now() - 600000).toISOString() },
   { id: 'acc_004', accident_type: 'side_impact', cause: 'overtaking', location: 'Nakuru-Eldoret Road', road_name: 'Nakuru-Eldoret Road', severity: 'medium', status: 'cleared', casualties: 0, injuries: 2, reported_at: new Date(Date.now() - 900000).toISOString() },
 ]
 
 const mockViolations: Violation[] = [
-  { id: 'viol_001', violation_type: 'speeding', plate_number: 'KAA001A', location: 'Mombasa Road', speed_detected: 120, speed_limit: 100, fine_amount: 13000, status: 'detected', detected_at: new Date().toISOString() },
+  { id: 'viol_001', violation_type: 'speeding', plate_number: 'KAA001A', location: 'Mombasa Road', speed_detected: 120, speed_limit: 100, fine_amount: 13000, status: 'detected', detected_at: new Date(Date.now() - 60000).toISOString() },
   { id: 'viol_002', violation_type: 'drunk_driving', plate_number: 'KBB002B', location: 'Nairobi Expressway', speed_detected: null, speed_limit: null, fine_amount: 75000, status: 'issued', detected_at: new Date(Date.now() - 180000).toISOString() },
   { id: 'viol_003', violation_type: 'red_light_jumping', plate_number: 'KCC003C', location: 'Kenyatta Ave', speed_detected: null, speed_limit: null, fine_amount: 5000, status: 'detected', detected_at: new Date(Date.now() - 300000).toISOString() },
   { id: 'viol_004', violation_type: 'using_phone', plate_number: 'KDD004D', location: 'Ngong Road', speed_detected: null, speed_limit: null, fine_amount: 3000, status: 'paid', detected_at: new Date(Date.now() - 600000).toISOString() },
@@ -113,8 +129,9 @@ const causeData = [
 ]
 
 export default function RoadSafetyDashboard() {
-  const [accidents, setAccidents] = useState<Accident[]>(mockAccidents)
-  const [violations, setViolations] = useState<Violation[]>(mockViolations)
+  const [accidents, setAccidents] = useState<Accident[]>([])
+  const [violations, setViolations] = useState<Violation[]>([])
+  const [citizenReports, setCitizenReports] = useState<CitizenReport[]>([])
   const [roads] = useState<RoadStats[]>(mockRoads)
   const [hotspots] = useState<Hotspot[]>(mockHotspots)
   const [activeTab, setActiveTab] = useState<string>('dashboard')
@@ -162,9 +179,12 @@ export default function RoadSafetyDashboard() {
           const summary = await summaryRes.json()
           if (summary.recent_accidents) setAccidents(summary.recent_accidents)
           if (summary.recent_violations) setViolations(summary.recent_violations)
+          if (summary.citizen_reports) setCitizenReports(summary.citizen_reports)
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
+        setAccidents(mockAccidents)
+        setViolations(mockViolations)
       } finally {
         setLoading(false)
       }
@@ -400,6 +420,45 @@ export default function RoadSafetyDashboard() {
         </div>
       </div>
 
+      {/* Live Map Quick View */}
+      <div className="bg-gray-800 rounded-xl p-5 border border-blue-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Live Incident Map
+          </h3>
+          <Link href="/map" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+            <MapPin className="w-4 h-4" /> Open Full Map
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {accidents.slice(0, 4).map(accident => (
+            <div key={accident.id} className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className={`w-4 h-4 ${getSeverityColor(accident.severity)}`} />
+                <span className="text-white font-medium text-sm truncate">{accident.location}</span>
+              </div>
+              <div className="text-xs text-gray-400">
+                <p>{accident.accident_type?.replace('_', ' ')}</p>
+                <p className={getStatusColor(accident.status)}>{accident.status}</p>
+              </div>
+            </div>
+          ))}
+          {citizenReports.filter(r => r.latitude && r.longitude).slice(0, 2).map(report => (
+            <div key={report.id} className="bg-purple-900/30 rounded-lg p-3 border border-purple-700/50">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-purple-400" />
+                <span className="text-white font-medium text-sm truncate">{report.location}</span>
+              </div>
+              <div className="text-xs text-gray-400">
+                <p>{report.type?.replace('_', ' ')}</p>
+                <p className="text-purple-400">Citizen Report</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Top Causes */}
       <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
         <h3 className="text-lg font-semibold text-white mb-4">Top Accident Causes</h3>
@@ -457,6 +516,35 @@ export default function RoadSafetyDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Citizen Reports */}
+        {citizenReports.length > 0 && (
+          <div className="bg-gray-800 rounded-xl p-5 border border-purple-700">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              Citizen Reports
+              <span className="text-xs bg-purple-600 px-2 py-1 rounded-full">{citizenReports.length}</span>
+            </h3>
+            <div className="space-y-3">
+              {citizenReports.slice(0, 4).map(report => (
+                <div key={report.id} className="flex items-center justify-between p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    <div>
+                      <p className="text-white font-medium">{report.type.replace('_', ' ')}</p>
+                      <p className="text-gray-400 text-sm">{report.location}</p>
+                      <p className="text-gray-500 text-xs">{report.description?.slice(0, 50)}...</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-medium ${report.status === 'pending' ? 'text-yellow-400' : 'text-green-400'}`}>{report.status}</p>
+                    <p className="text-gray-500 text-xs">{report.anonymous ? 'Anonymous' : `${report.first_name} ${report.last_name}`}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

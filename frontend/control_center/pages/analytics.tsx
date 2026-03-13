@@ -203,7 +203,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-gray-500">Camera Coverage</p>
                 <p className="text-2xl font-bold">{Math.round((stats.camerasOnline / stats.totalCameras) * 100)}%</p>
                 <p className="text-sm text-orange-600 flex items-center gap-1">
-                  <Eye className="w-3 h-3" /> {stats.totalCameras - stats.camerasOffline} gaps
+                  <Eye className="w-3 h-3" /> {stats.totalCameras - (stats.camerasOffline ?? 0)} gaps
                 </p>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">

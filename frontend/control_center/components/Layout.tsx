@@ -1,3 +1,5 @@
+'use client'
+
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -5,8 +7,11 @@ import { ReactNode, useState } from 'react'
 import { 
   Shield, Home, Video, AlertTriangle, Users, Bell, BarChart3, 
   Settings, LogOut, Menu, X, Map, FileText, Car, Activity,
-  ChevronDown, Search, User, Send, MapPin, TrendingUp, Radio
+  ChevronDown, Search, User, Send, MapPin, TrendingUp, Radio,
+  MessageCircle
 } from 'lucide-react'
+import ChatPanel from './ChatPanel'
+import NotificationPanel from './NotificationPanel'
 
 interface LayoutProps {
   children: ReactNode
@@ -15,15 +20,16 @@ interface LayoutProps {
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/accidents', label: 'Accidents', icon: AlertTriangle },
-  { href: '/violations', label: 'Violations', icon: Car },
-  { href: '/roads', label: 'Roads', icon: Map },
-  { href: '/hotspots', label: 'Hotspots', icon: MapPin },
   { href: '/cameras', label: 'Speed Cams', icon: Video },
+  { href: '/satellite', label: 'Satellite', icon: Map },
   { href: '/vehicles', label: 'Vehicles', icon: Car },
   { href: '/dispatch', label: 'Dispatch', icon: Radio },
+  { href: '/citizen-reports', label: 'Citizen Reports', icon: MessageCircle },
+  { href: '/chat', label: 'Team Chat', icon: MessageCircle },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
   { href: '/reports', label: 'Reports', icon: FileText },
+  { href: '/county-analysis', label: 'County Analysis', icon: MapPin },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }: LayoutProps) => {
@@ -81,18 +87,6 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
               )
             })}
           </nav>
-
-          {/* Bottom section */}
-          <div className="p-2 border-t border-gray-700">
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
-              title={!sidebarOpen ? 'Settings' : undefined}
-            >
-              <Settings className="w-5 h-5" />
-              {sidebarOpen && <span className="text-sm">Settings</span>}
-            </Link>
-          </div>
         </aside>
 
         {/* Main content */}
@@ -125,11 +119,11 @@ const Layout = ({ children, title = 'KENYA OVERWATCH SYSTEM - Command Center' }:
                 <span className="text-ntsa-primaryLight">System Online</span>
               </div>
 
+              {/* Chat */}
+              <ChatPanel />
+
               {/* Notifications */}
-              <button className="relative p-2 hover:bg-ntsa-primary/50 rounded-lg text-gray-400 hover:text-white transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationPanel />
 
               {/* User menu */}
               <div className="relative">

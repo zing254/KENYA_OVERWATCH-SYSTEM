@@ -32,10 +32,12 @@ interface Responder {
   type: string
   status: string
   phone: string
-  latitude: number
-  longitude: number
-  station: string
+  latitude?: number
+  longitude?: number
+  station?: string
   current_incident_id?: string
+  members?: number
+  vehicle?: string
 }
 
 interface Dispatch {
@@ -59,7 +61,7 @@ export default function DispatchPage() {
     try {
       const [incidentsRes, respondersRes, dispatchesRes] = await Promise.all([
         fetch(`${API_URL}/api/incidents`),
-        fetch(`${API_URL}/api/responders`),
+        fetch(`${API_URL}/api/teams`),
         fetch(`${API_URL}/api/dispatch/incident/${selectedIncident?.id || ''}`).catch(() => new Response('[]'))
       ])
 
@@ -67,8 +69,8 @@ export default function DispatchPage() {
       const respondersData = await respondersRes.json()
       const dispatchesData = await dispatchesRes.json()
 
-      setIncidents(incidentsData.incidents || [])
-      setResponders(respondersData.responders || [])
+      setIncidents(incidentsData.incidents || incidentsData || [])
+      setResponders(respondersData.teams || [])
       setDispatches(dispatchesData.dispatches || [])
     } catch (error) {
       console.error('Error loading dispatch data:', error)
@@ -80,8 +82,47 @@ export default function DispatchPage() {
   useEffect(() => {
     loadData()
     const interval = setInterval(loadData, 15000)
-    return () => clearInterval(interval)
-  }, [loadData])
+    
+    // WebSocket for real-time updates
+    let ws: WebSocket | null = null
+    const connectWS = () => {
+      try {
+        const wsUrl = API_URL.replace('http', 'ws') + '/ws/road_safety'
+        ws = new WebSocket(wsUrl)
+        
+        ws.onopen = () => {
+          console.log('Dispatch WebSocket connected')
+          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['dispatch', 'responders'] }))
+        }
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'responder_update') {
+              setResponders(prev => prev.map(r => 
+                r.id === data.responder_id ? { ...r, status: data.status } : r
+              ))
+            } else if (data.type === 'new_incident') {
+              setIncidents(prev => [data.incident, ...prev])
+            } else if (data.type === 'dispatch_update') {
+              setDispatches(prev => [...prev, data.dispatch])
+            }
+          } catch (e) { console.error('WS parse error:', e) }
+        }
+        
+        ws.onclose = () => {
+          setTimeout(connectWS, 5000)
+        }
+      } catch (e) { console.error('WS connect error:', e) }
+    }
+    
+    connectWS()
+    
+    return () => {
+      clearInterval(interval)
+      ws?.close()
+    }
+  }, [loadData, API_URL])
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -254,10 +295,10 @@ export default function DispatchPage() {
                   <div className="flex items-center gap-2 mt-2">
                     <span className={`w-2 h-2 rounded-full ${getStatusColor(incident.status)}`} />
                     <span className="text-xs text-gray-300 capitalize">{incident.status}</span>
-                    {incident.causalties > 0 && (
+                    {incident.casualties > 0 && (
                       <span className="text-xs text-red-400 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        {incident.causalties} killed
+                        {incident.casualties} killed
                       </span>
                     )}
                     {incident.injuries > 0 && (
