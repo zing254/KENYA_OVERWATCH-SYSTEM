@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
-import { Users, MapPin, Phone, Clock, CheckCircle, AlertCircle, Send, X, Navigation, Shield, Car, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Users, MapPin, Phone, Clock, CheckCircle, AlertCircle, Send, X, Navigation, Shield, Car, AlertTriangle, RefreshCw, Download } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
@@ -56,6 +57,42 @@ export default function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [dispatching, setDispatching] = useState(false)
+
+  const handleExport = async (format: 'json' | 'csv' = 'csv') => {
+    try {
+      const data = { total: teams.length, teams }
+      if (format === 'csv') {
+        if (teams.length > 0) {
+          const headers = Object.keys(teams[0]).join(',')
+          const rows = teams.map(t => Object.values(t).join(','))
+          const csv = [headers, ...rows].join('\n')
+          const blob = new Blob([csv], { type: 'text/csv' })
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `teams_${new Date().toISOString().split('T')[0]}.csv`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(url)
+        }
+      } else {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `teams_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }
+      toast.success('Export completed')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Export failed')
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -217,6 +254,18 @@ export default function TeamsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white"
             >
               <RefreshCw className="w-4 h-4" /> Refresh
+            </button>
+            <button 
+              onClick={() => handleExport('csv')}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white"
+            >
+              <Download className="w-4 h-4" /> CSV
+            </button>
+            <button 
+              onClick={() => handleExport('json')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"
+            >
+              <Download className="w-4 h-4" /> JSON
             </button>
           </div>
         </div>

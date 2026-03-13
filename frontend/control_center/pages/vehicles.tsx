@@ -1,7 +1,9 @@
 import Layout from '@/components/Layout'
-import { useState } from 'react'
-import { Search, Car, User, FileText, AlertTriangle, Shield, Clock, Check, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Car, User, FileText, AlertTriangle, Shield, Clock, Check, X, Download, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 interface Vehicle {
   plate_number: string
@@ -31,8 +33,60 @@ const mockVehicles: Vehicle[] = [
 export default function VehiclesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredVehicles = mockVehicles.filter(v => 
+  useEffect(() => {
+    fetchVehicles()
+  }, [])
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/vehicles`)
+      const data = await res.json()
+      setVehicles(data.vehicles || [])
+    } catch (error) {
+      console.error('Failed to fetch vehicles:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExport = async (format: 'json' | 'csv' = 'csv') => {
+    try {
+      const data = { total: vehicles.length, vehicles }
+      if (format === 'csv') {
+        const headers = Object.keys(vehicles[0] || {}).join(',')
+        const rows = vehicles.map(v => Object.values(v).join(','))
+        const csv = [headers, ...rows].join('\n')
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `vehicles_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      } else {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `vehicles_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }
+      toast.success('Export completed')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Export failed')
+    }
+  }
+
+  const filteredVehicles = vehicles.filter(v => 
     v.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.owner_name.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -50,17 +104,32 @@ export default function VehiclesPage() {
   return (
     <Layout title="Vehicle Registry - KENYA OVERWATCH">
       <div className="space-y-6">
-        {/* Search */}
+        {/* Search & Actions */}
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by plate number or owner name..."
-              value={searchTerm}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by plate number or owner name..."
+                value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-green-500 w-full"
             />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={fetchVehicles} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleExport('csv')} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm">
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+              <button onClick={() => handleExport('json')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
+                <Download className="w-4 h-4" />
+                JSON
+              </button>
+            </div>
           </div>
         </div>
 

@@ -36,10 +36,37 @@ export default function ViolationsPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const handleExport = async () => {
-    toast.loading('Exporting violations data...')
-    await new Promise(r => setTimeout(r, 1500))
-    toast.success('Exported 6 records to CSV')
+  const handleExport = async (format: 'json' | 'csv' = 'csv') => {
+    try {
+      const res = await fetch(`${API_URL}/api/export/violations?format=${format}`)
+      if (format === 'csv') {
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `violations_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        toast.success('Export completed')
+      } else {
+        const data = await res.json()
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `violations_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        toast.success('Export completed')
+      }
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Export failed')
+    }
   }
 
   const handleViewDetails = (violationId: string) => {
@@ -170,11 +197,18 @@ export default function ViolationsPage() {
               <option value="disputed">Disputed</option>
             </select>
             <button 
-              onClick={handleExport}
+              onClick={() => handleExport('csv')}
               className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
             >
               <Download className="w-4 h-4" />
-              Export
+              CSV
+            </button>
+            <button 
+              onClick={() => handleExport('json')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              JSON
             </button>
           </div>
         </div>
