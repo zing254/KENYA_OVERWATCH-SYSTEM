@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import Layout from '@/components/Layout'
-import RoadSafetyDashboard from '@/components/RoadSafetyDashboard'
 import useAuthStore from '@/store/auth'
 
-export default function Home() {
+interface AuthLayoutProps {
+  children: React.ReactNode
+}
+
+export default function AuthLayout({ children }: AuthLayoutProps) {
+  const { isAuthenticated, user } = useAuthStore()
   const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export default function Home() {
     }
   }, [mounted, isAuthenticated, router])
 
-  if (!mounted || !isAuthenticated) {
+  if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -29,9 +31,9 @@ export default function Home() {
     )
   }
 
-  return (
-    <Layout title="KENYA OVERWATCH SYSTEM - Command Center">
-      <RoadSafetyDashboard />
-    </Layout>
-  )
+  if (!isAuthenticated) {
+    return null
+  }
+
+  return <>{children}</>
 }

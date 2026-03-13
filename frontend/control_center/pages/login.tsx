@@ -3,37 +3,66 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { Shield, Lock, User, AlertCircle } from 'lucide-react'
+import useAuthStore from '@/store/auth'
 
-interface LoginProps {
-  onLogin: (user: { id: string; name: string; role: string }) => void
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
-export default function Login({ onLogin }: LoginProps) {
+export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { login } = useAuthStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        login(
+          {
+            id: data.user_id || data.id || '1',
+            name: data.name || username,
+            email: data.email || `${username}@ntsa.go.ke`,
+            role: data.role || (username.includes('admin') ? 'admin' : username.includes('dispatch') ? 'dispatcher' : 'officer'),
+            badge_number: data.badge_number,
+            station: data.station,
+          },
+          data.access_token || 'demo-token'
+        )
+        router.push('/')
+      } else {
+        setError('Invalid username or password')
+      }
+    } catch {
+      // Fallback to demo mode for development
       if (username && password) {
-        const user = {
-          id: '1',
-          name: username,
-          role: username.includes('admin') ? 'admin' : username.includes('dispatch') ? 'dispatch' : 'officer'
-        }
-        onLogin(user)
+        login(
+          {
+            id: '1',
+            name: username,
+            email: `${username}@ntsa.go.ke`,
+            role: username.includes('admin') ? 'admin' : username.includes('dispatch') ? 'dispatcher' : 'officer',
+          },
+          'demo-token'
+        )
         router.push('/')
       } else {
         setError('Please enter username and password')
       }
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   return (
@@ -44,7 +73,7 @@ export default function Login({ onLogin }: LoginProps) {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">Kenya Overwatch</h1>
-          <p className="text-gray-400">Production Control System</p>
+          <p className="text-gray-400">Control Center Login</p>
         </div>
 
         {error && (

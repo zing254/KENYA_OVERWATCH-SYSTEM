@@ -30,7 +30,9 @@ import {
   Target,
   Car,
   Footprints,
-  Activity
+  Activity,
+  Lock,
+  User
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
@@ -105,6 +107,146 @@ interface Dispatch {
 }
 
 export default function ResponderApp() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [user, setUser] = useState<{ name: string; badge: string; station: string } | null>(null)
+  
+  useEffect(() => {
+    const savedUser = localStorage.getItem('taifa_guard_user')
+    if (savedUser) {
+      setUser(JSON.parse(savedUser))
+      setIsLoggedIn(true)
+    }
+    setIsAuthLoading(false)
+  }, [])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError('')
+    
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const userData = {
+          name: data.name || loginUsername,
+          badge: data.badge_number || 'OFFICER-001',
+          station: data.station || 'Nairobi Central',
+        }
+        localStorage.setItem('taifa_guard_user', JSON.stringify(userData))
+        setUser(userData)
+        setIsLoggedIn(true)
+      } else {
+        // Demo mode fallback
+        if (loginUsername && loginPassword) {
+          const userData = {
+            name: loginUsername,
+            badge: 'OFFICER-001',
+            station: 'Nairobi Central',
+          }
+          localStorage.setItem('taifa_guard_user', JSON.stringify(userData))
+          setUser(userData)
+          setIsLoggedIn(true)
+        } else {
+          setLoginError('Please enter credentials')
+        }
+      }
+    } catch {
+      if (loginUsername && loginPassword) {
+        const userData = {
+          name: loginUsername,
+          badge: 'OFFICER-001',
+          station: 'Nairobi Central',
+        }
+        localStorage.setItem('taifa_guard_user', JSON.stringify(userData))
+        setUser(userData)
+        setIsLoggedIn(true)
+      } else {
+        setLoginError('Please enter credentials')
+      }
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('taifa_guard_user')
+    setUser(null)
+    setIsLoggedIn(false)
+  }
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    )
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="bg-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">TAIFA RSG</h1>
+            <p className="text-gray-400">Officer Response Portal</p>
+          </div>
+          
+          {loginError && (
+            <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Badge Number / Username</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter badge number"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter password"
+                />
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium">
+              Access Portal
+            </button>
+          </form>
+          <div className="mt-6 text-center text-sm text-gray-500">
+            <p>Enter any credentials for demo mode</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
@@ -475,6 +617,9 @@ export default function ResponderApp() {
               <Shield className="w-6 h-6 text-ntsa-primaryLight" />
               <span className="font-bold hidden sm:inline text-white">TAIFA RSG</span>
             </div>
+            {user && (
+              <span className="text-xs text-ntsa-primaryLight hidden md:inline">{user.name}</span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button 
@@ -492,6 +637,10 @@ export default function ResponderApp() {
               <span className={`w-2 h-2 rounded-full animate-pulse ${isTracking ? 'bg-ntsa-primaryLight' : 'bg-gray-500'}`}></span>
               <span className="text-sm text-ntsa-primaryLight hidden sm:inline">{isTracking ? 'Online' : 'Offline'}</span>
             </div>
+            <button onClick={handleLogout} className="p-2 hover:bg-ntsa-primaryLight/20 rounded flex items-center gap-1">
+              <LogOut className="w-4 h-4" />
+              <span className="text-xs hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
         
