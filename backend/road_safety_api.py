@@ -263,6 +263,149 @@ async def health_check():
         "timestamp": utcnow().isoformat()
     }
 
+
+class SystemSettings:
+    """In-memory system settings store"""
+    def __init__(self):
+        self.settings = {
+            "ai": {
+                "confidence_threshold": 0.7,
+                "risk_threshold": 0.7,
+                "detect_persons": True,
+                "detect_vehicles": True,
+                "detect_license_plates": True,
+                "detect_faces": True,
+                "detect_fire": True,
+            },
+            "alerts": {
+                "critical_alerts": True,
+                "traffic_alerts": True,
+                "vehicle_of_interest_alerts": True,
+                "person_alerts": True,
+                "camera_offline_alerts": True,
+                "dispatch_alerts": True,
+            },
+            "audio": {
+                "sound_enabled": True,
+                "voice_alerts": True,
+                "radio_simulation": True,
+                "alert_volume": 80,
+                "voice_volume": 70,
+            },
+            "notifications": {
+                "email_enabled": True,
+                "sms_enabled": True,
+                "push_enabled": True,
+                "auto_refresh": True,
+                "refresh_interval": 30,
+            },
+            "map": {
+                "map_type": "standard",
+                "auto_refresh": True,
+                "refresh_interval": 10,
+                "show_satellite": True,
+                "show_routes": True,
+                "gps_tracking": True,
+            },
+            "cameras": {
+                "default_resolution": "720p",
+                "default_fps": 30,
+                "motion_detection": True,
+                "night_vision": True,
+                "ptz_enabled": True,
+            },
+            "system": {
+                "retention_days": 90,
+                "max_upload_size": 10,
+                "maintenance_mode": False,
+            }
+        }
+    
+    def get(self, category: str = None):
+        if category:
+            return self.settings.get(category, {})
+        return self.settings
+    
+    def update(self, category: str, data: dict):
+        if category in self.settings:
+            self.settings[category].update(data)
+        else:
+            self.settings[category] = data
+        return self.settings[category]
+
+system_settings = SystemSettings()
+
+
+@app.get("/api/settings")
+async def get_settings(category: str = None):
+    """Get system settings"""
+    return system_settings.get(category)
+
+
+@app.put("/api/settings/{category}")
+async def update_settings(category: str, data: dict):
+    """Update settings for a category"""
+    return system_settings.update(category, data)
+
+
+@app.post("/api/settings/reset")
+async def reset_settings():
+    """Reset all settings to defaults"""
+    system_settings.settings = {
+        "ai": {
+            "confidence_threshold": 0.7,
+            "risk_threshold": 0.7,
+            "detect_persons": True,
+            "detect_vehicles": True,
+            "detect_license_plates": True,
+            "detect_faces": True,
+            "detect_fire": True,
+        },
+        "alerts": {
+            "critical_alerts": True,
+            "traffic_alerts": True,
+            "vehicle_of_interest_alerts": True,
+            "person_alerts": True,
+            "camera_offline_alerts": True,
+            "dispatch_alerts": True,
+        },
+        "audio": {
+            "sound_enabled": True,
+            "voice_alerts": True,
+            "radio_simulation": True,
+            "alert_volume": 80,
+            "voice_volume": 70,
+        },
+        "notifications": {
+            "email_enabled": True,
+            "sms_enabled": True,
+            "push_enabled": True,
+            "auto_refresh": True,
+            "refresh_interval": 30,
+        },
+        "map": {
+            "map_type": "standard",
+            "auto_refresh": True,
+            "refresh_interval": 10,
+            "show_satellite": True,
+            "show_routes": True,
+            "gps_tracking": True,
+        },
+        "cameras": {
+            "default_resolution": "720p",
+            "default_fps": 30,
+            "motion_detection": True,
+            "night_vision": True,
+            "ptz_enabled": True,
+        },
+        "system": {
+            "retention_days": 90,
+            "max_upload_size": 10,
+            "maintenance_mode": False,
+        }
+    }
+    return {"status": "reset", "settings": system_settings.get()}
+
 @app.get("/api/v1/health")
 async def health_check_v1():
     """V1 Health check - returns version info"""

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Layout from '@/components/Layout'
 import { 
   Settings, Save, Server, Database, Shield, Bell, Eye, Key, Activity, CheckCircle, XCircle,
   Camera, Volume2, Zap, AlertTriangle, Car, User, Target, Flame, Wifi, MapPin, Clock,
-  VolumeX, Video, Mic, Radio, MessageSquare
+  VolumeX, Video, Mic, Radio, RefreshCw, RotateCcw
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
@@ -19,80 +19,125 @@ interface SystemStatus {
   alert_system: string
 }
 
+interface SettingsData {
+  ai: {
+    confidence_threshold: number
+    risk_threshold: number
+    detect_persons: boolean
+    detect_vehicles: boolean
+    detect_license_plates: boolean
+    detect_faces: boolean
+    detect_fire: boolean
+  }
+  alerts: {
+    critical_alerts: boolean
+    traffic_alerts: boolean
+    vehicle_of_interest_alerts: boolean
+    person_alerts: boolean
+    camera_offline_alerts: boolean
+    dispatch_alerts: boolean
+  }
+  audio: {
+    sound_enabled: boolean
+    voice_alerts: boolean
+    radio_simulation: boolean
+    alert_volume: number
+    voice_volume: number
+  }
+  notifications: {
+    email_enabled: boolean
+    sms_enabled: boolean
+    push_enabled: boolean
+    auto_refresh: boolean
+    refresh_interval: number
+  }
+  map: {
+    map_type: string
+    auto_refresh: boolean
+    refresh_interval: number
+    show_satellite: boolean
+    show_routes: boolean
+    gps_tracking: boolean
+  }
+  cameras: {
+    default_resolution: string
+    default_fps: number
+    motion_detection: boolean
+    night_vision: boolean
+    ptz_enabled: boolean
+  }
+  system: {
+    retention_days: number
+    max_upload_size: number
+    maintenance_mode: boolean
+  }
+}
+
+const defaultSettings: SettingsData = {
+  ai: {
+    confidence_threshold: 0.7,
+    risk_threshold: 0.7,
+    detect_persons: true,
+    detect_vehicles: true,
+    detect_license_plates: true,
+    detect_faces: true,
+    detect_fire: true,
+  },
+  alerts: {
+    critical_alerts: true,
+    traffic_alerts: true,
+    vehicle_of_interest_alerts: true,
+    person_alerts: true,
+    camera_offline_alerts: true,
+    dispatch_alerts: true,
+  },
+  audio: {
+    sound_enabled: true,
+    voice_alerts: true,
+    radio_simulation: true,
+    alert_volume: 80,
+    voice_volume: 70,
+  },
+  notifications: {
+    email_enabled: true,
+    sms_enabled: true,
+    push_enabled: true,
+    auto_refresh: true,
+    refresh_interval: 30,
+  },
+  map: {
+    map_type: 'standard',
+    auto_refresh: true,
+    refresh_interval: 10,
+    show_satellite: true,
+    show_routes: true,
+    gps_tracking: true,
+  },
+  cameras: {
+    default_resolution: '720p',
+    default_fps: 30,
+    motion_detection: true,
+    night_vision: true,
+    ptz_enabled: true,
+  },
+  system: {
+    retention_days: 90,
+    max_upload_size: 10,
+    maintenance_mode: false,
+  }
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('system')
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-
-  const [settings, setSettings] = useState({
-    // AI Settings
-    aiConfidence: 0.7,
-    riskThreshold: 0.7,
-    detectPersons: true,
-    detectVehicles: true,
-    detectWeapons: true,
-    detectLicensePlates: true,
-    detectFaces: true,
-    detectFire: true,
-    detectAnimals: true,
-    detectAbandoned: true,
-    
-    // Camera Settings
-    defaultResolution: '720p',
-    defaultFps: 30,
-    motionDetection: true,
-    nightVision: true,
-    ptzEnabled: true,
-    mobileTestEnabled: true,
-    
-    // Alert Settings
-    criticalAlerts: true,
-    trafficAlerts: true,
-    vehicleOfInterestAlerts: true,
-    personAlerts: true,
-    cameraOfflineAlerts: true,
-    dispatchAlerts: true,
-    
-    // Audio Settings
-    soundEnabled: true,
-    voiceAlerts: true,
-    radioSimulation: true,
-    alertVolume: 80,
-    voiceVolume: 70,
-    
-    // Notification Settings
-    emailNotifications: true,
-    smsNotifications: true,
-    pushNotifications: true,
-    autoRefresh: true,
-    refreshInterval: 30,
-    
-    // Map Settings
-    mapType: 'standard',
-    autoRefreshMap: true,
-    mapRefreshInterval: 10,
-    showSatellite: true,
-    showRoutes: true,
-    gpsTracking: true,
-    
-    // System Settings
-    maxUploadSize: 10,
-    retentionDays: 90,
-    maintenanceMode: false,
-    debugMode: false,
-  })
-
-  const [detectionSettings, setDetectionSettings] = useState({
-    personMinConfidence: 0.6,
-    vehicleMinConfidence: 0.7,
-    plateMinConfidence: 0.8,
-    weaponMinConfidence: 0.9,
-    faceMinConfidence: 0.75,
-  })
+  const [settings, setSettings] = useState<SettingsData>(defaultSettings)
 
   useEffect(() => {
     fetchSystemStatus()
+    fetchSettings()
   }, [])
 
   const fetchSystemStatus = async () => {
@@ -114,9 +159,56 @@ export default function SettingsPage() {
     setLoading(false)
   }
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/settings`)
+      const data = await res.json()
+      if (data && Object.keys(data).length > 0) {
+        setSettings(data)
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const categories = ['ai', 'alerts', 'audio', 'notifications', 'map', 'cameras', 'system']
+      for (const category of categories) {
+        await fetch(`${API_URL}/api/settings/${category}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settings[category as keyof SettingsData])
+        })
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    }
+    setSaving(false)
+  }
+
+  const handleReset = async () => {
+    try {
+      await fetch(`${API_URL}/api/settings/reset`, { method: 'POST' })
+      setSettings(defaultSettings)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('Error resetting settings:', error)
+    }
+  }
+
+  const updateSetting = (category: keyof SettingsData, key: string, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [key]: value
+      }
+    }))
   }
 
   const tabs = [
@@ -127,7 +219,6 @@ export default function SettingsPage() {
     { id: 'audio', label: 'Audio', icon: Volume2 },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'map', label: 'Map', icon: MapPin },
-    { id: 'security', label: 'Security', icon: Shield },
   ]
 
   const ToggleSwitch = ({ enabled, onChange }: { enabled: boolean; onChange: () => void }) => (
@@ -151,13 +242,23 @@ export default function SettingsPage() {
             <h1 className="text-2xl font-bold text-white">Settings</h1>
             <p className="text-gray-400">Configure system preferences</p>
           </div>
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            <Save className="w-4 h-4" />
-            Save Changes
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
 
         {saved && (
@@ -168,7 +269,6 @@ export default function SettingsPage() {
         )}
 
         <div className="flex gap-6">
-          {/* Sidebar */}
           <div className="w-48 space-y-1">
             {tabs.map(tab => (
               <button
@@ -186,7 +286,6 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {/* Content */}
           <div className="flex-1 bg-gray-800 rounded-xl p-6 border border-gray-700">
             {activeTab === 'system' && (
               <div className="space-y-6">
@@ -219,8 +318,8 @@ export default function SettingsPage() {
                       <label className="text-gray-400 text-sm">Evidence Retention Period (days)</label>
                       <input
                         type="number"
-                        value={settings.retentionDays}
-                        onChange={(e) => setSettings({...settings, retentionDays: parseInt(e.target.value)})}
+                        value={settings.system.retention_days}
+                        onChange={(e) => updateSetting('system', 'retention_days', parseInt(e.target.value))}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       />
                     </div>
@@ -228,8 +327,8 @@ export default function SettingsPage() {
                       <label className="text-gray-400 text-sm">Max Upload Size (MB)</label>
                       <input
                         type="number"
-                        value={settings.maxUploadSize}
-                        onChange={(e) => setSettings({...settings, maxUploadSize: parseInt(e.target.value)})}
+                        value={settings.system.max_upload_size}
+                        onChange={(e) => updateSetting('system', 'max_upload_size', parseInt(e.target.value))}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       />
                     </div>
@@ -248,14 +347,11 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-300">Detection Types</h3>
                   {[
-                    { key: 'detectPersons', label: 'Person Detection', icon: User, desc: 'Detect and track persons' },
-                    { key: 'detectVehicles', label: 'Vehicle Detection', icon: Car, desc: 'Detect vehicles on road' },
-                    { key: 'detectLicensePlates', label: 'License Plate Recognition', icon: Target, desc: 'ANPR for plate detection' },
-                    { key: 'detectWeapons', label: 'Weapon Detection', icon: Zap, desc: 'Detect weapons and dangerous items' },
-                    { key: 'detectFaces', label: 'Face Detection', icon: Eye, desc: 'Facial recognition' },
-                    { key: 'detectFire', label: 'Fire & Smoke Detection', icon: Flame, desc: 'Fire and smoke alerts' },
-                    { key: 'detectAnimals', label: 'Animal Detection', icon: Target, desc: 'Detect animals on road' },
-                    { key: 'detectAbandoned', label: 'Abandoned Object Detection', icon: AlertTriangle, desc: 'Detect suspicious objects' },
+                    { key: 'detect_persons', label: 'Person Detection', icon: User, desc: 'Detect and track persons' },
+                    { key: 'detect_vehicles', label: 'Vehicle Detection', icon: Car, desc: 'Detect vehicles on road' },
+                    { key: 'detect_license_plates', label: 'License Plate Recognition', icon: Target, desc: 'ANPR for plate detection' },
+                    { key: 'detect_faces', label: 'Face Detection', icon: Eye, desc: 'Facial recognition' },
+                    { key: 'detect_fire', label: 'Fire & Smoke Detection', icon: Flame, desc: 'Fire and smoke alerts' },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-4">
                       <div className="flex items-center gap-3">
@@ -266,8 +362,8 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <ToggleSwitch 
-                        enabled={settings[item.key as keyof typeof settings] as boolean} 
-                        onChange={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
+                        enabled={settings.ai[item.key as keyof typeof settings.ai]} 
+                        onChange={() => updateSetting('ai', item.key, !settings.ai[item.key as keyof typeof settings.ai])}
                       />
                     </div>
                   ))}
@@ -275,46 +371,36 @@ export default function SettingsPage() {
 
                 <div className="border-t border-gray-700 pt-6">
                   <h3 className="text-lg font-medium text-gray-300 mb-4">Confidence Thresholds</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { key: 'personMinConfidence', label: 'Person Detection', value: detectionSettings.personMinConfidence },
-                      { key: 'vehicleMinConfidence', label: 'Vehicle Detection', value: detectionSettings.vehicleMinConfidence },
-                      { key: 'plateMinConfidence', label: 'License Plate', value: detectionSettings.plateMinConfidence },
-                      { key: 'weaponMinConfidence', label: 'Weapon Detection', value: detectionSettings.weaponMinConfidence },
-                      { key: 'faceMinConfidence', label: 'Face Detection', value: detectionSettings.faceMinConfidence },
-                    ].map(item => (
-                      <div key={item.key}>
-                        <label className="text-gray-400 text-sm">{item.label}: {Math.round(item.value * 100)}%</label>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="1"
-                          step="0.05"
-                          value={item.value}
-                          onChange={(e) => setDetectionSettings({...detectionSettings, [item.key]: parseFloat(e.target.value)})}
-                          className="w-full mt-1"
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-gray-400 text-sm">
+                        AI Confidence Threshold: {Math.round(settings.ai.confidence_threshold * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.05"
+                        value={settings.ai.confidence_threshold}
+                        onChange={(e) => updateSetting('ai', 'confidence_threshold', parseFloat(e.target.value))}
+                        className="w-full mt-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-sm">
+                        Risk Threshold: {Math.round(settings.ai.risk_threshold * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.05"
+                        value={settings.ai.risk_threshold}
+                        onChange={(e) => updateSetting('ai', 'risk_threshold', parseFloat(e.target.value))}
+                        className="w-full mt-2"
+                      />
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-gray-400 text-sm">
-                    Global AI Confidence Threshold: {Math.round(settings.aiConfidence * 100)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.05"
-                    value={settings.aiConfidence}
-                    onChange={(e) => setSettings({...settings, aiConfidence: parseFloat(e.target.value)})}
-                    className="w-full mt-2"
-                  />
-                  <p className="text-gray-500 text-sm mt-1">
-                    Lower = more detections but more false positives | Higher = fewer false positives but may miss some detections
-                  </p>
                 </div>
               </div>
             )}
@@ -328,10 +414,9 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                   {[
-                    { key: 'ptzEnabled', label: 'PTZ Control', desc: 'Enable pan/tilt/zoom controls' },
-                    { key: 'mobileTestEnabled', label: 'Mobile Test Cameras', desc: 'Allow MOBILE-TEST camera label' },
-                    { key: 'motionDetection', label: 'Motion Detection', desc: 'Trigger recording on motion' },
-                    { key: 'nightVision', label: 'Night Vision Mode', desc: 'Enable IR mode for low light' },
+                    { key: 'ptz_enabled', label: 'PTZ Control', desc: 'Enable pan/tilt/zoom controls' },
+                    { key: 'motion_detection', label: 'Motion Detection', desc: 'Trigger recording on motion' },
+                    { key: 'night_vision', label: 'Night Vision Mode', desc: 'Enable IR mode for low light' },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-4">
                       <div>
@@ -339,8 +424,8 @@ export default function SettingsPage() {
                         <p className="text-gray-400 text-sm">{item.desc}</p>
                       </div>
                       <ToggleSwitch 
-                        enabled={settings[item.key as keyof typeof settings] as boolean} 
-                        onChange={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
+                        enabled={settings.cameras[item.key as keyof typeof settings.cameras]} 
+                        onChange={() => updateSetting('cameras', item.key, !settings.cameras[item.key as keyof typeof settings.cameras])}
                       />
                     </div>
                   ))}
@@ -352,27 +437,25 @@ export default function SettingsPage() {
                     <div>
                       <label className="text-gray-400 text-sm">Resolution</label>
                       <select
-                        value={settings.defaultResolution}
-                        onChange={(e) => setSettings({...settings, defaultResolution: e.target.value})}
+                        value={settings.cameras.default_resolution}
+                        onChange={(e) => updateSetting('cameras', 'default_resolution', e.target.value)}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       >
                         <option value="480p">480p (SD)</option>
                         <option value="720p">720p (HD)</option>
                         <option value="1080p">1080p (Full HD)</option>
-                        <option value="4k">4K (Ultra HD)</option>
                       </select>
                     </div>
                     <div>
                       <label className="text-gray-400 text-sm">Frame Rate</label>
                       <select
-                        value={settings.defaultFps}
-                        onChange={(e) => setSettings({...settings, defaultFps: parseInt(e.target.value)})}
+                        value={settings.cameras.default_fps}
+                        onChange={(e) => updateSetting('cameras', 'default_fps', parseInt(e.target.value))}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       >
                         <option value="15">15 FPS</option>
                         <option value="24">24 FPS</option>
                         <option value="30">30 FPS</option>
-                        <option value="60">60 FPS</option>
                       </select>
                     </div>
                   </div>
@@ -389,12 +472,12 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                   {[
-                    { key: 'criticalAlerts', label: 'Critical Incidents', desc: 'High severity alerts', icon: Zap },
-                    { key: 'trafficAlerts', label: 'Traffic Violations', desc: 'Speed & red light violations', icon: Car },
-                    { key: 'vehicleOfInterestAlerts', label: 'Vehicle of Interest', desc: 'Flagged vehicle re-identification', icon: Target },
-                    { key: 'personAlerts', label: 'Person Alerts', desc: 'Unknown person detection', icon: User },
-                    { key: 'cameraOfflineAlerts', label: 'Camera Offline', desc: 'When cameras go offline', icon: Video },
-                    { key: 'dispatchAlerts', label: 'Dispatch Alerts', desc: 'Team dispatch notifications', icon: Bell },
+                    { key: 'critical_alerts', label: 'Critical Incidents', desc: 'High severity alerts', icon: Zap },
+                    { key: 'traffic_alerts', label: 'Traffic Violations', desc: 'Speed & red light violations', icon: Car },
+                    { key: 'vehicle_of_interest_alerts', label: 'Vehicle of Interest', desc: 'Flagged vehicle re-identification', icon: Target },
+                    { key: 'person_alerts', label: 'Person Alerts', desc: 'Unknown person detection', icon: User },
+                    { key: 'camera_offline_alerts', label: 'Camera Offline', desc: 'When cameras go offline', icon: Video },
+                    { key: 'dispatch_alerts', label: 'Dispatch Alerts', desc: 'Team dispatch notifications', icon: Bell },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-4">
                       <div className="flex items-center gap-3">
@@ -405,29 +488,11 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <ToggleSwitch 
-                        enabled={settings[item.key as keyof typeof settings] as boolean} 
-                        onChange={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
+                        enabled={settings.alerts[item.key as keyof typeof settings.alerts]} 
+                        onChange={() => updateSetting('alerts', item.key, !settings.alerts[item.key as keyof typeof settings.alerts])}
                       />
                     </div>
                   ))}
-                </div>
-
-                <div>
-                  <label className="text-gray-400 text-sm">
-                    Risk Alert Threshold: {Math.round(settings.riskThreshold * 100)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.05"
-                    value={settings.riskThreshold}
-                    onChange={(e) => setSettings({...settings, riskThreshold: parseFloat(e.target.value)})}
-                    className="w-full mt-2"
-                  />
-                  <p className="text-gray-500 text-sm mt-1">
-                    Only trigger alerts when risk score exceeds this threshold
-                  </p>
                 </div>
               </div>
             )}
@@ -441,9 +506,9 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                   {[
-                    { key: 'soundEnabled', label: 'Sound Alerts', desc: 'Play sound for alerts', icon: Volume2 },
-                    { key: 'voiceAlerts', label: 'Voice Announcements', desc: 'TTS voice alerts', icon: Mic },
-                    { key: 'radioSimulation', label: 'Radio Simulation', desc: 'Simulated radio calls', icon: Radio },
+                    { key: 'sound_enabled', label: 'Sound Alerts', desc: 'Play sound for alerts', icon: Volume2 },
+                    { key: 'voice_alerts', label: 'Voice Announcements', desc: 'TTS voice alerts', icon: Mic },
+                    { key: 'radio_simulation', label: 'Radio Simulation', desc: 'Simulated radio calls', icon: Radio },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-4">
                       <div className="flex items-center gap-3">
@@ -454,8 +519,8 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <ToggleSwitch 
-                        enabled={settings[item.key as keyof typeof settings] as boolean} 
-                        onChange={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
+                        enabled={settings.audio[item.key as keyof typeof settings.audio]} 
+                        onChange={() => updateSetting('audio', item.key, !settings.audio[item.key as keyof typeof settings.audio])}
                       />
                     </div>
                   ))}
@@ -465,24 +530,24 @@ export default function SettingsPage() {
                   <h3 className="text-lg font-medium text-white mb-4">Volume Controls</h3>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-gray-400 text-sm">Alert Volume: {settings.alertVolume}%</label>
+                      <label className="text-gray-400 text-sm">Alert Volume: {settings.audio.alert_volume}%</label>
                       <input
                         type="range"
                         min="0"
                         max="100"
-                        value={settings.alertVolume}
-                        onChange={(e) => setSettings({...settings, alertVolume: parseInt(e.target.value)})}
+                        value={settings.audio.alert_volume}
+                        onChange={(e) => updateSetting('audio', 'alert_volume', parseInt(e.target.value))}
                         className="w-full mt-1"
                       />
                     </div>
                     <div>
-                      <label className="text-gray-400 text-sm">Voice Volume: {settings.voiceVolume}%</label>
+                      <label className="text-gray-400 text-sm">Voice Volume: {settings.audio.voice_volume}%</label>
                       <input
                         type="range"
                         min="0"
                         max="100"
-                        value={settings.voiceVolume}
-                        onChange={(e) => setSettings({...settings, voiceVolume: parseInt(e.target.value)})}
+                        value={settings.audio.voice_volume}
+                        onChange={(e) => updateSetting('audio', 'voice_volume', parseInt(e.target.value))}
                         className="w-full mt-1"
                       />
                     </div>
@@ -500,10 +565,10 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                   {[
-                    { key: 'autoRefreshMap', label: 'Auto Refresh', desc: 'Automatically update map' },
-                    { key: 'showSatellite', label: 'Satellite View', desc: 'Show satellite imagery option' },
-                    { key: 'showRoutes', label: 'Route Navigation', desc: 'Show navigation routes' },
-                    { key: 'gpsTracking', label: 'GPS Tracking', desc: 'Track responder locations' },
+                    { key: 'auto_refresh', label: 'Auto Refresh', desc: 'Automatically update map' },
+                    { key: 'show_satellite', label: 'Satellite View', desc: 'Show satellite imagery option' },
+                    { key: 'show_routes', label: 'Route Navigation', desc: 'Show navigation routes' },
+                    { key: 'gps_tracking', label: 'GPS Tracking', desc: 'Track responder locations' },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-4">
                       <div>
@@ -511,8 +576,8 @@ export default function SettingsPage() {
                         <p className="text-gray-400 text-sm">{item.desc}</p>
                       </div>
                       <ToggleSwitch 
-                        enabled={settings[item.key as keyof typeof settings] as boolean} 
-                        onChange={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
+                        enabled={settings.map[item.key as keyof typeof settings.map]} 
+                        onChange={() => updateSetting('map', item.key, !settings.map[item.key as keyof typeof settings.map])}
                       />
                     </div>
                   ))}
@@ -524,8 +589,8 @@ export default function SettingsPage() {
                     <div>
                       <label className="text-gray-400 text-sm">Map Type</label>
                       <select
-                        value={settings.mapType}
-                        onChange={(e) => setSettings({...settings, mapType: e.target.value})}
+                        value={settings.map.map_type}
+                        onChange={(e) => updateSetting('map', 'map_type', e.target.value)}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       >
                         <option value="standard">Standard</option>
@@ -540,8 +605,8 @@ export default function SettingsPage() {
                         type="number"
                         min="5"
                         max="60"
-                        value={settings.mapRefreshInterval}
-                        onChange={(e) => setSettings({...settings, mapRefreshInterval: parseInt(e.target.value)})}
+                        value={settings.map.refresh_interval}
+                        onChange={(e) => updateSetting('map', 'refresh_interval', parseInt(e.target.value))}
                         className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                       />
                     </div>
@@ -556,26 +621,20 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                   {[
-                    { key: 'emailNotifications', label: 'Email Notifications', desc: 'Receive alerts via email' },
-                    { key: 'smsNotifications', label: 'SMS Notifications', desc: 'Receive critical alerts via SMS' },
-                    { key: 'pushNotifications', label: 'Push Notifications', desc: 'Browser push notifications' },
-                    { key: 'autoRefresh', label: 'Auto Refresh', desc: 'Automatically refresh dashboard data' },
+                    { key: 'email_enabled', label: 'Email Notifications', desc: 'Receive alerts via email' },
+                    { key: 'sms_enabled', label: 'SMS Notifications', desc: 'Receive critical alerts via SMS' },
+                    { key: 'push_enabled', label: 'Push Notifications', desc: 'Browser push notifications' },
+                    { key: 'auto_refresh', label: 'Auto Refresh', desc: 'Automatically refresh dashboard data' },
                   ].map(item => (
                     <div key={item.key} className="flex items-center justify-between bg-gray-700 rounded-lg p-4">
                       <div>
                         <p className="text-white font-medium">{item.label}</p>
                         <p className="text-gray-400 text-sm">{item.desc}</p>
                       </div>
-                      <button
-                        onClick={() => setSettings({...settings, [item.key]: !settings[item.key as keyof typeof settings]})}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          settings[item.key as keyof typeof settings] ? 'bg-blue-600' : 'bg-gray-600'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                          settings[item.key as keyof typeof settings] ? 'translate-x-6' : 'translate-x-0.5'
-                        }`} />
-                      </button>
+                      <ToggleSwitch 
+                        enabled={settings.notifications[item.key as keyof typeof settings.notifications]} 
+                        onChange={() => updateSetting('notifications', item.key, !settings.notifications[item.key as keyof typeof settings.notifications])}
+                      />
                     </div>
                   ))}
 
@@ -585,51 +644,10 @@ export default function SettingsPage() {
                       type="number"
                       min="5"
                       max="300"
-                      value={settings.refreshInterval}
-                      onChange={(e) => setSettings({...settings, refreshInterval: parseInt(e.target.value)})}
+                      value={settings.notifications.refresh_interval}
+                      onChange={(e) => updateSetting('notifications', 'refresh_interval', parseInt(e.target.value))}
                       className="mt-1 w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                     />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-white">Security Settings</h2>
-                
-                <div className="space-y-4">
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-white font-medium mb-2">
-                      <Key className="w-4 h-4" />
-                      API Keys
-                    </div>
-                    <p className="text-gray-400 text-sm">Manage API keys for external integrations</p>
-                    <button className="mt-2 text-blue-400 text-sm hover:underline">
-                      Generate New Key
-                    </button>
-                  </div>
-
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-white font-medium mb-2">
-                      <Shield className="w-4 h-4" />
-                      Two-Factor Authentication
-                    </div>
-                    <p className="text-gray-400 text-sm">Add an extra layer of security</p>
-                    <button className="mt-2 text-blue-400 text-sm hover:underline">
-                      Enable 2FA
-                    </button>
-                  </div>
-
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-white font-medium mb-2">
-                      <Eye className="w-4 h-4" />
-                      Session Management
-                    </div>
-                    <p className="text-gray-400 text-sm">View and manage active sessions</p>
-                    <button className="mt-2 text-blue-400 text-sm hover:underline">
-                      View Sessions
-                    </button>
                   </div>
                 </div>
               </div>
