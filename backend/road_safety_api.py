@@ -1098,7 +1098,10 @@ async def delete_vehicle(plate_number: str):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
     # Soft delete - mark as inactive
-    vehicle.status = "deleted"
+    if isinstance(vehicle, dict):
+        vehicle["status"] = "deleted"
+    else:
+        vehicle.status = "deleted"
     
     log_event("warning", "system", "road_safety_api.py", f"Vehicle deleted: {plate_number}")
     
@@ -1224,7 +1227,10 @@ async def delete_driver(license_number: str):
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
     
-    driver.status = "suspended"
+    if isinstance(driver, dict):
+        driver["status"] = "suspended"
+    else:
+        driver.status = "suspended"
     
     log_event("warning", "system", "road_safety_api.py", f"Driver suspended: {license_number}")
     
