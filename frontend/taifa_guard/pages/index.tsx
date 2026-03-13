@@ -35,6 +35,26 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
+const playSound = (soundType: string, volume: number = 1.0) => {
+  if (typeof window === 'undefined') return
+  const sounds: Record<string, string> = {
+    emergency: '/sounds/emergency.mp3',
+    alert: '/sounds/alert.mp3',
+    warning: '/sounds/warning.mp3',
+    notification: '/sounds/notification.mp3',
+    incident: '/sounds/incident.mp3',
+    dispatch: '/sounds/dispatch.mp3',
+    road_sign: '/sounds/road_sign.mp3',
+    speed_camera: '/sounds/speed_camera.mp3',
+  }
+  const soundPath = sounds[soundType]
+  if (soundPath) {
+    const audio = new Audio(soundPath)
+    audio.volume = volume
+    audio.play().catch(e => console.error('Error playing sound:', e))
+  }
+}
+
 const MobileMap = dynamic(() => import('../components/MobileMap'), { ssr: false })
 
 interface Incident {
@@ -157,10 +177,14 @@ export default function ResponderApp() {
               setIncidents(prev => [data.incident, ...prev.filter(i => i.id !== data.incident.id)])
             } else if (data.type === 'new_incident') {
               setIncidents(prev => [data.incident, ...prev])
+              playSound('incident', 0.7)
             } else if (data.type === 'new_alert') {
               setNotifications(prev => [data.alert, ...prev])
+              playSound('alert', 0.7)
             } else if (data.type === 'dispatch_update') {
               setDispatches(prev => [...prev.filter(d => d.id !== data.dispatch.id), data.dispatch])
+            } else if (data.type === 'emergency_alert') {
+              playSound('emergency', 1.0)
             }
           } catch (e) {
             console.error('Failed to parse WebSocket message:', e)
@@ -186,6 +210,72 @@ export default function ResponderApp() {
       if (ws) {
         ws.close()
       }
+    }
+  }, [])
+
+  // Chat WebSocket - Shared with Control Center
+  useEffect(() => {
+    let wsChat: WebSocket | null = null
+    
+    const connectChat = () => {
+      try {
+        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/api/v1/chat/ws/chat/responder_001`
+        wsChat = new WebSocket(wsUrl)
+
+        wsChat.onopen = () => {
+          console.log('Chat WebSocket connected')
+          wsChat?.send(JSON.stringify({
+            name: 'Responder Unit 001',
+            role: 'officer',
+            channel: 'general'
+          }))
+          wsChat?.send(JSON.stringify({ type: 'join_channel', channel: 'general' }))
+        }
+
+        wsChat.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'chat_message') {
+              const msg = data.message
+              setChatMessages(prev => [...prev, {
+                id: msg.message_id,
+                sender: msg.sender_name,
+                message: msg.message,
+                timestamp: msg.timestamp,
+                type: msg.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
+              }])
+            } else if (data.type === 'channel_history') {
+              const msgs = (data.messages || []).map((m: any) => ({
+                id: m.message_id,
+                sender: m.sender_name,
+                message: m.message,
+                timestamp: m.timestamp,
+                type: m.sender_id === 'responder_001' ? 'outgoing' : 'incoming'
+              }))
+              setChatMessages(msgs)
+            }
+          } catch (error) {
+            console.error('Chat parse error:', error)
+          }
+        }
+
+        wsChat.onerror = (error) => {
+          console.error('Chat WebSocket error:', error)
+        }
+
+        wsChat.onclose = () => {
+          console.log('Chat WebSocket disconnected, reconnecting...')
+          setTimeout(connectChat, 5000)
+        }
+      } catch (error) {
+        console.error('Failed to connect to chat:', error)
+      }
+    }
+
+    connectChat()
+
+    return () => {
+      if (wsChat) wsChat.close()
     }
   }, [])
 
@@ -251,7 +341,8 @@ export default function ResponderApp() {
 
   const sendMessage = () => {
     if (!newMessage.trim()) return
-    setChatMessages([...chatMessages, {
+    
+    setChatMessages(prev => [...prev, {
       id: Date.now().toString(),
       sender: 'You',
       message: newMessage,

@@ -54,7 +54,7 @@ interface Alert {
 
 export default function CitizenPortal() {
   const [report, setReport] = useState<Report>({
-    type: 'emergency',
+    type: 'accident',
     description: '',
     location: '',
     latitude: undefined,
@@ -85,12 +85,15 @@ export default function CitizenPortal() {
   const videoInputRef = useRef<HTMLInputElement>(null)
 
   const reportTypes = [
-    { id: 'emergency', label: 'Emergency', icon: '🚨', color: 'bg-red-500' },
-    { id: 'crime', label: 'Crime', icon: '⚠️', color: 'bg-orange-500' },
-    { id: 'accident', label: 'Accident', icon: '🚗', color: 'bg-yellow-500' },
-    { id: 'fire', label: 'Fire', icon: '🔥', color: 'bg-red-600' },
-    { id: 'medical', label: 'Medical', icon: '🏥', color: 'bg-blue-500' },
-    { id: 'suspicious', label: 'Suspicious Activity', icon: '👁️', color: 'bg-purple-500' },
+    { id: 'accident', label: 'Accident', icon: '🚗', color: 'bg-red-500' },
+    { id: 'speeding', label: 'Speeding', icon: '⚡', color: 'bg-yellow-500' },
+    { id: 'drunk_driver', label: 'Drunk Driver', icon: '🍺', color: 'bg-orange-500' },
+    { id: 'red_light', label: 'Red Light Jump', icon: '🔴', color: 'bg-red-600' },
+    { id: 'hazard', label: 'Road Hazard', icon: '⚠️', color: 'bg-blue-500' },
+    { id: 'pothole', label: 'Pothole', icon: '🕳️', color: 'bg-gray-500' },
+    { id: 'broken_light', label: 'Broken Traffic Light', icon: '🚦', color: 'bg-purple-500' },
+    { id: 'stolen_vehicle', label: 'Stolen Vehicle', icon: '🚙', color: 'bg-red-700' },
+    { id: 'overloading', label: 'Overloading', icon: '🚌', color: 'bg-yellow-600' },
   ]
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,20 +489,20 @@ export default function CitizenPortal() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">What type of emergency?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">What would you like to report?</label>
               <div className="grid grid-cols-3 gap-2">
                 {reportTypes.map((type) => (
                   <button
                     key={type.id}
                     type="button"
                     onClick={() => setReport(prev => ({ ...prev, type: type.id }))}
-                    className={`p-3 rounded-lg border-2 transition-all ${
+                    className={`p-2 rounded-lg border-2 transition-all ${
                       report.type === type.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className="text-2xl block mb-1">{type.icon}</span>
+                    <span className="text-xl block mb-1">{type.icon}</span>
                     <span className="text-xs font-medium">{type.label}</span>
                   </button>
                 ))}
@@ -508,12 +511,14 @@ export default function CitizenPortal() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Describe what happened
+                Description
               </label>
               <textarea
                 value={report.description}
                 onChange={(e) => setReport(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Provide as much detail as possible..."
+                placeholder={report.type === 'accident' ? "How many vehicles involved? Any injuries? Describe the situation..." : 
+                             report.type === 'pothole' ? "How big is the pothole? Is it blocking traffic?" :
+                             "Provide as much detail as possible..."}
                 required
                 rows={4}
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -705,11 +710,64 @@ export default function CitizenPortal() {
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  Submit Emergency Report
+                  Submit Report
                 </>
               )}
             </button>
           </form>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+          <h3 className="font-bold text-gray-900 mb-3">Quick Actions</h3>
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={() => setReport(p => ({...p, type: 'accident'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
+              <span className="text-xl">🚗</span>
+              <span className="text-xs mt-1">Accident</span>
+            </button>
+            <button onClick={() => setReport(p => ({...p, type: 'hazard'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
+              <span className="text-xl">⚠️</span>
+              <span className="text-xs mt-1">Hazard</span>
+            </button>
+            <button onClick={() => setReport(p => ({...p, type: 'pothole'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
+              <span className="text-xl">🕳️</span>
+              <span className="text-xs mt-1">Pothole</span>
+            </button>
+            <button onClick={() => setReport(p => ({...p, type: 'broken_light'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
+              <span className="text-xl">🚦</span>
+              <span className="text-xs mt-1">Light Out</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Road Safety Tips */}
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-4 mb-6">
+          <h3 className="font-bold text-green-800 mb-2">🛡️ Road Safety Tips</h3>
+          <ul className="text-sm text-green-700 space-y-1">
+            <li>• Always wear your seatbelt</li>
+            <li>• Don't use phone while driving</li>
+            <li>• Observe speed limits</li>
+            <li>• Report dangerous road conditions</li>
+          </ul>
+        </div>
+
+        {/* Emergency Contacts */}
+        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+          <h3 className="font-bold text-gray-900 mb-3">📞 Emergency Contacts</h3>
+          <div className="space-y-2">
+            <a href="tel:999" className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+              <span className="font-medium">Emergency (All)</span>
+              <span className="font-bold text-red-600">999</span>
+            </a>
+            <a href="tel:0700000000" className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              <span className="font-medium">Police</span>
+              <span className="font-bold text-blue-600">0700 000 000</span>
+            </a>
+            <a href="tel:0722" className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <span className="font-medium">Ambulance</span>
+              <span className="font-bold text-green-600">0722 000 000</span>
+            </a>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">

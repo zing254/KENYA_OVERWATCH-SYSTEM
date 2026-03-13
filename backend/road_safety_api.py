@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from dataclasses import asdict
 
-from road_safety_engine import (
+# Import from local modules (same package) - using relative imports
+from .road_safety_engine import (
     road_safety_engine,
     RoadAccident,
     TrafficViolation,
@@ -31,15 +32,31 @@ from road_safety_engine import (
     CauseType,
     SeverityLevel,
     IncidentStatus,
-    ViolationStatus,
     VehicleType,
-    KENYA_ROADS,
     ACCIDENT_HOTSPOTS,
-    SPEED_LIMITS,
+    ViolationStatus,
 )
 
-# Import validation models
-from models import (
+# Import database models (ORM) from database_models
+from .database_models import (
+    User,
+    Team,
+    Alert,
+    Camera,
+    RoadSegment,
+)
+
+# Import shared enums
+from .enums import (
+    UserRole,
+    AlertSeverity,
+    AlertType,
+    IncidentStatus as APIIncidentStatus,
+    SeverityLevel as APISeverityLevel,
+)
+
+# Import validation models (Pydantic)
+from .models import (
     AccidentCreate,
     ViolationCreate,
     ViolationReview,
@@ -48,13 +65,16 @@ from models import (
     SpeedDetectionInput,
     TeamDispatch,
 )
-from auth import router as auth_router, get_current_user, UserResponse
+from .auth import router as auth_router, get_current_user, UserResponse
 
 # Import ANPR module
-from anpr_api import router as anpr_router
+from .anpr_api import router as anpr_router
 
 # Import security middleware
-from security_middleware import apply_security_middleware, audit_logger
+from .security_middleware import apply_security_middleware, audit_logger
+
+# Import notifications
+from .notifications_sounds import notification_manager
 
 def utcnow():
     return datetime.now(timezone.utc)
@@ -67,6 +87,14 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    from .database import init_db, seed_demo_data
+    init_db()
+    seed_demo_data()
+
 
 # Apply security middleware (CORS, rate limiting, logging, etc.)
 apply_security_middleware(app)
@@ -105,12 +133,24 @@ app.include_router(auth_router)
 app.include_router(anpr_router)
 
 # Import reports module
-from reports_api import router as reports_router
+from .reports_api import router as reports_router
 app.include_router(reports_router)
 
 # Import service integration routes
-from services.service_routes import router as service_router
+from .services.service_routes import router as service_router
 app.include_router(service_router)
+
+# Import county analytics routes
+from .county_routes import router as county_router
+app.include_router(county_router)
+
+# Import satellite monitoring routes
+from .satellite.routes import router as satellite_router
+app.include_router(satellite_router)
+
+# Import weather and traffic integration routes
+from .integrations.routes import router as environment_router
+app.include_router(environment_router)
 
 # ==================== HELPER FUNCTIONS ====================
 def serialize_for_json(obj: Any) -> Any:
@@ -171,6 +211,88 @@ async def health_check_v1():
         "timestamp": utcnow().isoformat()
     }
 
+# ==================== INCIDENTS (alias for /api/v1/services/incidents) ====================
+@app.get("/api/incidents")
+async def list_incidents(
+    status: Optional[str] = Query(None, description="Filter by status (detected, verified, assigned, enroute, onscene, resolved, rejected)"),
+    severity: Optional[str] = Query(None, description="Filter by severity (low, medium, high, critical)"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results")
+):
+    """List all incidents"""
+    from services.incident_service import incident_service
+    
+    # Convert string parameters to enums (use enums module for compatibility with service)
+    from .enums import IncidentStatus, SeverityLevel
+    
+    status_enum = None
+    if status:
+        try:
+            status_enum = IncidentStatus(status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}")
+    
+    severity_enum = None
+    if severity:
+        try:
+            severity_enum = SeverityLevel(severity)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid severity: {severity}. Must be one of: {', '.join([s.value for s in SeverityLevel])}")
+    
+    try:
+        incidents = incident_service.get_incidents(status=status_enum, severity=severity_enum, limit=limit)
+        return {
+            "incidents": [i.to_dict() for i in incidents],
+            "total": len(incidents)
+        }
+    except Exception as e:
+        logger.error(f"Error getting incidents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting incidents: {str(e)}")
+
+@app.get("/api/incidents/active")
+async def get_active_incidents():
+    """Get all active incidents"""
+    from services.incident_service import incident_service
+    incidents = incident_service.get_active_incidents()
+    return {
+        "incidents": [i.to_dict() for i in incidents],
+        "total": len(incidents)
+    }
+
+@app.get("/api/incidents/{incident_id}")
+async def get_incident(incident_id: str):
+    """Get incident by ID"""
+    from services.incident_service import incident_service
+    incident = incident_service.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident.to_dict()
+
+@app.patch("/api/incidents/{incident_id}/status")
+async def update_incident_status(incident_id: str, status: str = Form(...)):
+    """Update incident status"""
+    from services.incident_service import incident_service
+    from .enums import IncidentStatus
+    
+    # Validate and convert status string to enum
+    try:
+        status_enum = IncidentStatus(status)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}"
+        )
+    
+    incident = incident_service.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    
+    # Update status using the service method (which handles transitions)
+    updated = incident_service.update_status(incident_id, status_enum)
+    if not updated:
+        raise HTTPException(status_code=400, detail="Invalid status transition")
+    
+    return updated.to_dict()
+
 # ==================== DASHBOARD ====================
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats():
@@ -191,6 +313,7 @@ async def get_dashboard_summary():
         "avg_response_time": road_safety_engine.stats["avg_response_time"],
         "recent_accidents": accidents[:5],
         "recent_violations": violations[:5],
+        "citizen_reports": CITIZEN_REPORTS[-10:] if CITIZEN_REPORTS else [],
     })
 
 # ==================== ACCIDENTS ====================
@@ -689,6 +812,32 @@ async def send_notification(
     )
     return result
 
+# ==================== USER NOTIFICATIONS (for frontend panel) ====================
+@app.get("/api/notifications")
+async def get_user_notifications(user_id: str = "default_user", unread_only: bool = False, limit: int = 20):
+    """Get notifications for a user"""
+    notifications = notification_manager.get_user_notifications(user_id, unread_only)
+    return {
+        "notifications": [n.model_dump() for n in notifications[:limit]],
+        "unread_count": len([n for n in notification_manager.get_user_notifications(user_id) if not n.read])
+    }
+
+@app.post("/api/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user_id: str = "default_user"):
+    """Mark a notification as read"""
+    notification_manager.mark_as_read(user_id, notification_id)
+    return {"status": "marked"}
+
+@app.post("/api/notifications/read-all")
+async def mark_all_notifications_read(user_id: str = "default_user"):
+    """Mark all notifications as read"""
+    notification_manager.mark_all_as_read(user_id)
+    return {"status": "all_marked"}
+
+# Include notifications router
+from .notifications_sounds import router as notifications_router
+app.include_router(notifications_router)
+
 # ==================== ENUMS ====================
 @app.get("/api/enums/accident-types")
 async def get_accident_types():
@@ -787,6 +936,44 @@ async def dispatch_team(team_id: str, data: TeamDispatch):
         "eta": team["eta"]
     }
 
+@app.post("/api/dispatch")
+async def create_dispatch(data: dict):
+    """Create a new dispatch (simplified endpoint)"""
+    incident_id = data.get("incident_id")
+    responder_id = data.get("responder_id")
+    
+    team = next((t for t in MOCK_TEAMS if t["id"] == responder_id), None)
+    if not team:
+        return {"error": "Responder not found", "status": 404}
+    
+    team["status"] = "dispatched"
+    team["current_incident_id"] = incident_id
+    
+    return {
+        "id": f"dispatch_{uuid.uuid4().hex[:8]}",
+        "team_id": responder_id,
+        "incident_id": incident_id,
+        "status": "dispatched",
+        "assigned_at": utcnow().isoformat(),
+        "eta": 15
+    }
+
+@app.get("/api/dispatch")
+async def list_dispatches():
+    """List all dispatches"""
+    dispatches = []
+    for team in MOCK_TEAMS:
+        if team.get("current_incident_id"):
+            dispatches.append({
+                "id": f"dispatch_{team['id']}",
+                "team_id": team["id"],
+                "incident_id": team["current_incident_id"],
+                "status": team["status"],
+                "assigned_at": utcnow().isoformat(),
+                "eta": team.get("eta", 15)
+            })
+    return {"dispatches": dispatches}
+
 # ==================== ALERTS ====================
 MOCK_ALERTS = [
     {"id": "alert_001", "title": "Heavy Traffic", "message": "Mombasa Road experiencing heavy traffic due to accident", "severity": "medium", "type": "road", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "created_at": utcnow().isoformat(), "is_active": True},
@@ -831,6 +1018,15 @@ async def dismiss_alert(alert_id: str):
     alert["is_active"] = False
     return {"message": "Alert dismissed"}
 
+@app.post("/api/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(alert_id: str):
+    """Acknowledge an alert"""
+    alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert["acknowledged"] = True
+    return {"message": "Alert acknowledged"}
+
 # ==================== CITIZEN REPORTS ====================
 CITIZEN_REPORTS = []
 
@@ -853,6 +1049,14 @@ async def create_citizen_report(data: CitizenReportCreate):
         "created_at": utcnow().isoformat()
     }
     CITIZEN_REPORTS.append(report)
+    
+    # Broadcast to connected clients
+    try:
+        from events import event_broadcaster
+        await event_broadcaster.broadcast_citizen_report(report)
+    except Exception as e:
+        logger.warning(f"Failed to broadcast citizen report: {e}")
+    
     return report
 
 @app.get("/api/citizen/reports")
@@ -868,6 +1072,53 @@ async def get_citizen_report(report_id: str):
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return report
+
+@app.put("/api/citizen/reports/{report_id}/status")
+async def update_citizen_report_status(report_id: str, status: str):
+    """Update citizen report status"""
+    report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    report["status"] = status
+    return report
+
+# ==================== EVIDENCE UPLOAD ====================
+import os
+from fastapi import UploadFile, File
+
+EVIDENCE_DIR = "backend/data/evidence"
+os.makedirs(EVIDENCE_DIR, exist_ok=True)
+
+@app.post("/api/evidence/attachments")
+async def upload_evidence(file: UploadFile = File(...)):
+    """Upload evidence files (photos/videos)"""
+    try:
+        # Generate unique filename
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+        filename = f"{timestamp}_{file.filename}"
+        filepath = os.path.join(EVIDENCE_DIR, filename)
+        
+        # Save file
+        content = await file.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+        
+        # Return URL path
+        url_path = f"/api/evidence/files/{filename}"
+        return {"url": url_path, "path": filepath, "filename": filename}
+    except Exception as e:
+        logger.error(f"Error uploading evidence: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload file")
+
+@app.get("/api/evidence/files/{filename}")
+async def get_evidence_file(filename: str):
+    """Serve uploaded evidence files"""
+    filepath = os.path.join(EVIDENCE_DIR, filename)
+    if os.path.exists(filepath):
+        from fastapi.responses import FileResponse
+        return FileResponse(filepath)
+    raise HTTPException(status_code=404, detail="File not found")
 
 # ==================== GENERATE MOCK DATA ====================
 @app.post("/api/admin/generate-mock-data")
@@ -1120,6 +1371,158 @@ WEBSOCKET_CHANNELS = {
     "admin:all": "All admin events (requires auth)",
     "admin:users": "User management events",
 }
+
+# ==================== IAM (Identity & Access Management) ====================
+from security.iam.manager import IAMManager, ResourceType, Action, UserStatus as IAMUserStatus
+
+iam_manager = IAMManager(storage_path="data/iam")
+
+@app.get("/api/iam/roles")
+async def get_roles():
+    """Get all roles"""
+    roles = iam_manager.roles.values()
+    return {"roles": [r.to_dict() for r in roles]}
+
+@app.get("/api/iam/roles/{role_id}")
+async def get_role(role_id: str):
+    """Get a specific role"""
+    role = iam_manager.get_role(role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return role.to_dict()
+
+@app.post("/api/iam/roles")
+async def create_role(
+    name: str,
+    description: str,
+    permissions: List[dict],
+    current_user: dict = Depends(lambda: {"role": "admin"})
+):
+    """Create a new role"""
+    from security.iam.manager import Permission
+    perms = [Permission.from_dict(p) for p in permissions]
+    role = iam_manager.create_role(name, description, perms)
+    return role.to_dict()
+
+@app.get("/api/iam/users")
+async def get_iam_users():
+    """Get all IAM users"""
+    users = iam_manager.users.values()
+    return {"users": [u.to_dict() for u in users]}
+
+@app.get("/api/iam/users/{user_id}")
+async def get_iam_user(user_id: str):
+    """Get a specific user"""
+    user = iam_manager.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.to_dict()
+
+@app.post("/api/iam/users")
+async def create_iam_user(
+    username: str,
+    email: str,
+    password: str,
+    role_id: str,
+    first_name: str = "",
+    last_name: str = "",
+    phone: str = "",
+    department: str = ""
+):
+    """Create a new IAM user"""
+    from auth import hash_password
+    password_hash = hash_password(password)
+    user = iam_manager.create_user(
+        username=username,
+        email=email,
+        password_hash=password_hash,
+        role_id=role_id,
+        first_name=first_name,
+        last_name=last_name,
+        phone=phone,
+        department=department
+    )
+    return user.to_dict()
+
+@app.put("/api/iam/users/{user_id}")
+async def update_iam_user(user_id: str, **kwargs):
+    """Update an IAM user"""
+    user = iam_manager.update_user(user_id, **kwargs)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.to_dict()
+
+@app.delete("/api/iam/users/{user_id}")
+async def delete_iam_user(user_id: str):
+    """Delete an IAM user"""
+    success = iam_manager.delete_user(user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "deleted"}
+
+@app.post("/api/iam/users/{user_id}/assign-role/{role_id}")
+async def assign_user_role(user_id: str, role_id: str):
+    """Assign a role to a user"""
+    success = iam_manager.assign_role(user_id, role_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User or role not found")
+    return {"status": "role_assigned"}
+
+@app.get("/api/iam/check-permission")
+async def check_permission(
+    user_id: str,
+    resource: str,
+    action: str
+):
+    """Check if a user has permission for a resource action"""
+    try:
+        resource_type = ResourceType(resource)
+        action_type = Action(action)
+        has_permission = iam_manager.check_permission(user_id, resource_type, action_type)
+        return {"user_id": user_id, "resource": resource, "action": action, "has_permission": has_permission}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Include chat router
+from .chat_system import router as chat_router
+app.include_router(chat_router)
+
+# ==================== WEBSOCKET ENDPOINT ====================
+from .events import event_broadcaster, EventType
+
+@app.websocket("/ws/road_safety")
+async def websocket_road_safety(websocket: WebSocket):
+    """WebSocket endpoint for real-time road safety updates"""
+    await websocket.accept()
+    
+    # Subscribe to events
+    event_broadcaster.subscribe(websocket, ["all", EventType.CITIZEN_REPORT.value])
+    
+    # Send initial connection message
+    await websocket.send_json({
+        "type": "connected",
+        "message": "Connected to Kenya Overwatch real-time updates"
+    })
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                # Handle subscription messages
+                if message.get("type") == "subscribe":
+                    channels = message.get("channels", [])
+                    event_broadcaster.subscribe(websocket, channels)
+                    await websocket.send_json({
+                        "type": "subscribed",
+                        "channels": channels
+                    })
+            except json.JSONDecodeError:
+                pass
+    except Exception:
+        pass
+    finally:
+        event_broadcaster.unsubscribe(websocket)
 
 # ==================== RUN ====================
 if __name__ == "__main__":
