@@ -19,23 +19,52 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from dataclasses import asdict
 
+# Handle both package and module imports
+def _import(name):
+    try:
+        return __import__(name)
+    except ImportError:
+        parts = name.split('.')
+        obj = __import__(parts[0])
+        for part in parts[1:]:
+            obj = getattr(obj, part)
+        return obj
+
 # Import from local modules (same package) - using relative imports
-from .road_safety_engine import (
-    road_safety_engine,
-    RoadAccident,
-    TrafficViolation,
-    Vehicle,
-    Driver,
-    SpeedDetection,
-    Coordinates,
-    AccidentType,
-    CauseType,
-    SeverityLevel,
-    IncidentStatus,
-    VehicleType,
-    ACCIDENT_HOTSPOTS,
-    ViolationStatus,
-)
+try:
+    from .road_safety_engine import (
+        road_safety_engine,
+        RoadAccident,
+        TrafficViolation,
+        Vehicle,
+        Driver,
+        SpeedDetection,
+        Coordinates,
+        AccidentType,
+        CauseType,
+        SeverityLevel,
+        IncidentStatus,
+        VehicleType,
+        ACCIDENT_HOTSPOTS,
+        ViolationStatus,
+    )
+except ImportError:
+    from backend.road_safety_engine import (
+        road_safety_engine,
+        RoadAccident,
+        TrafficViolation,
+        Vehicle,
+        Driver,
+        SpeedDetection,
+        Coordinates,
+        AccidentType,
+        CauseType,
+        SeverityLevel,
+        IncidentStatus,
+        VehicleType,
+        ACCIDENT_HOTSPOTS,
+        ViolationStatus,
+    )
 
 # Import database models (ORM) from database_models
 from .database_models import (
@@ -219,10 +248,16 @@ async def list_incidents(
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results")
 ):
     """List all incidents"""
-    from services.incident_service import incident_service
+    try:
+        from services.incident_service import incident_service
+    except ModuleNotFoundError:
+        from backend.services.incident_service import incident_service
     
     # Convert string parameters to enums (use enums module for compatibility with service)
-    from .enums import IncidentStatus, SeverityLevel
+    try:
+        from .enums import IncidentStatus, SeverityLevel
+    except ModuleNotFoundError:
+        from backend.enums import IncidentStatus, SeverityLevel
     
     status_enum = None
     if status:
@@ -251,7 +286,10 @@ async def list_incidents(
 @app.get("/api/incidents/active")
 async def get_active_incidents():
     """Get all active incidents"""
-    from services.incident_service import incident_service
+    try:
+        from services.incident_service import incident_service
+    except ModuleNotFoundError:
+        from backend.services.incident_service import incident_service
     incidents = incident_service.get_active_incidents()
     return {
         "incidents": [i.to_dict() for i in incidents],
@@ -261,7 +299,10 @@ async def get_active_incidents():
 @app.get("/api/incidents/{incident_id}")
 async def get_incident(incident_id: str):
     """Get incident by ID"""
-    from services.incident_service import incident_service
+    try:
+        from services.incident_service import incident_service
+    except ModuleNotFoundError:
+        from backend.services.incident_service import incident_service
     incident = incident_service.get_incident(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")

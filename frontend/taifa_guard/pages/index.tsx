@@ -128,10 +128,10 @@ export default function ResponderApp() {
     setLoginError('')
     
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `username=${encodeURIComponent(loginUsername)}&password=${encodeURIComponent(loginPassword)}`,
       })
       
       if (response.ok) {
