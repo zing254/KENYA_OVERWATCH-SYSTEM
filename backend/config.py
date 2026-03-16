@@ -4,13 +4,14 @@ Uses Pydantic Settings for environment-based configuration
 """
 
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseConfig(BaseModel):
     """Database configuration"""
+
     url: str = Field(..., description="Database connection URL")
     pool_size: int = Field(20, description="Connection pool size")
     max_overflow: int = Field(30, description="Max overflow connections")
@@ -20,6 +21,7 @@ class DatabaseConfig(BaseModel):
 
 class RedisConfig(BaseModel):
     """Redis configuration"""
+
     url: str = Field(..., description="Redis connection URL")
     decode_responses: bool = Field(True, description="Decode responses to strings")
     max_connections: int = Field(50, description="Max connections in pool")
@@ -29,10 +31,13 @@ class RedisConfig(BaseModel):
 
 class MinIOConfig(BaseModel):
     """MinIO/S3 object storage configuration"""
+
     endpoint: str = Field(..., description="MinIO endpoint URL")
     access_key: str = Field(..., description="Access key")
     secret_key: str = Field(..., description="Secret key")
-    evidence_bucket: str = Field("overwatch-evidence", description="Evidence storage bucket")
+    evidence_bucket: str = Field(
+        "overwatch-evidence", description="Evidence storage bucket"
+    )
     models_bucket: str = Field("overwatch-models", description="AI models bucket")
     backup_bucket: str = Field("overwatch-backups", description="Backup storage bucket")
     secure: bool = Field(True, description="Use HTTPS")
@@ -41,9 +46,16 @@ class MinIOConfig(BaseModel):
 
 class AIModelsConfig(BaseModel):
     """AI model configuration"""
-    yolo_weights_path: str = Field("/app/models/yolo/yolov8n.pt", description="YOLO model path")
-    anpr_model_path: str = Field("/app/models/anpr/license_plate_recognition.pt", description="ANPR model path")
-    behavior_model_path: str = Field("/app/models/behavior/behavior_model.pt", description="Behavior analysis model")
+
+    yolo_weights_path: str = Field(
+        "/app/models/yolo/yolov8n.pt", description="YOLO model path"
+    )
+    anpr_model_path: str = Field(
+        "/app/models/anpr/license_plate_recognition.pt", description="ANPR model path"
+    )
+    behavior_model_path: str = Field(
+        "/app/models/behavior/behavior_model.pt", description="Behavior analysis model"
+    )
     confidence_thresholds: Dict[str, float] = Field(
         default_factory=lambda: {
             "person": 0.6,
@@ -59,10 +71,13 @@ class AIModelsConfig(BaseModel):
 
 class PerformanceConfig(BaseModel):
     """Performance tuning configuration"""
+
     max_concurrent_streams: int = Field(10, description="Max concurrent camera streams")
     max_processing_fps: int = Field(30, description="Max FPS for AI processing")
     max_queue_size: int = Field(1000, description="Max frame queue size")
-    frame_buffer_size: int = Field(1, description="OpenCV buffer size (minimize latency)")
+    frame_buffer_size: int = Field(
+        1, description="OpenCV buffer size (minimize latency)"
+    )
     worker_threads: int = Field(4, description="Number of worker threads")
     cache_ttl_incidents: int = Field(30, description="Incident cache TTL in seconds")
     cache_ttl_cameras: int = Field(60, description="Camera cache TTL")
@@ -72,30 +87,39 @@ class PerformanceConfig(BaseModel):
 
 class SecurityConfig(BaseModel):
     """Security configuration"""
+
     jwt_secret_key: str = Field(..., description="JWT secret key")
     jwt_algorithm: str = Field("HS256", description="JWT algorithm")
     jwt_expiration_hours: int = Field(24, description="JWT token expiration")
     password_hash_rounds: int = Field(12, description="Bcrypt rounds")
     encryption_key: str = Field(..., description="Encryption key for sensitive data")
     require_https: bool = Field(True, description="Enforce HTTPS")
-    cors_origins: List[str] = Field(default_factory=list, description="Allowed CORS origins")
+    cors_origins: List[str] = Field(
+        default_factory=list, description="Allowed CORS origins"
+    )
     rate_limit_requests_per_minute: int = Field(60, description="Global rate limit")
     session_timeout_minutes: int = Field(30, description="Session timeout")
 
 
 class MonitoringConfig(BaseModel):
     """Monitoring and observability configuration"""
+
     prometheus_port: int = Field(9090, description="Prometheus metrics port")
-    health_check_interval: int = Field(30, description="Health check interval in seconds")
+    health_check_interval: int = Field(
+        30, description="Health check interval in seconds"
+    )
     log_level: str = Field("INFO", description="Log level")
     structured_logging: bool = Field(True, description="Use JSON structured logging")
     metrics_enabled: bool = Field(True, description="Enable Prometheus metrics")
     tracing_enabled: bool = Field(False, description="Enable distributed tracing")
-    jaeger_endpoint: Optional[str] = Field(None, description="Jaeger collector endpoint")
+    jaeger_endpoint: Optional[str] = Field(
+        None, description="Jaeger collector endpoint"
+    )
 
 
 class ComplianceConfig(BaseModel):
     """Compliance and data retention configuration"""
+
     gdpr_enabled: bool = Field(True, description="Enable GDPR compliance features")
     audit_log_enabled: bool = Field(True, description="Enable audit logging")
     data_anonymization: bool = Field(True, description="Anonymize PII in logs")
@@ -113,7 +137,10 @@ class ComplianceConfig(BaseModel):
 
 class AlertsConfig(BaseModel):
     """Alerting configuration"""
-    high_risk_webhook: Optional[str] = Field(None, description="Webhook for high-risk alerts")
+
+    high_risk_webhook: Optional[str] = Field(
+        None, description="Webhook for high-risk alerts"
+    )
     sms_enabled: bool = Field(True, description="Enable SMS notifications")
     email_enabled: bool = Field(True, description="Enable email notifications")
     escalation_policies: Dict[str, str] = Field(
@@ -129,16 +156,17 @@ class Settings(BaseSettings):
     """Main application settings"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="allow"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="allow"
     )
 
     # Environment
-    app_name: str = Field("Kenya Overwatch Production System", description="Application name")
+    app_name: str = Field(
+        "Kenya Overwatch Production System", description="Application name"
+    )
     version: str = Field("2.0.0", description="Application version")
-    environment: str = Field("development", description="Environment (development/staging/production)")
+    environment: str = Field(
+        "development", description="Environment (development/staging/production)"
+    )
     debug: bool = Field(False, description="Debug mode")
 
     # Component configurations
@@ -153,14 +181,18 @@ class Settings(BaseSettings):
     alerts: AlertsConfig
 
     # External services
-    sms_provider: Optional[str] = Field(None, description="SMS provider (africastalking/twilio)")
+    sms_provider: Optional[str] = Field(
+        None, description="SMS provider (africastalking/twilio)"
+    )
     sms_api_key: Optional[str] = Field(None, description="SMS API key")
     sms_username: Optional[str] = Field(None, description="SMS username")
     email_smtp_host: Optional[str] = Field(None, description="SMTP host")
     email_smtp_port: Optional[int] = Field(587, description="SMTP port")
     email_smtp_user: Optional[str] = Field(None, description="SMTP username")
     email_smtp_password: Optional[str] = Field(None, description="SMTP password")
-    map_provider: str = Field("openstreetmap", description="Map provider (openstreetmap/google)")
+    map_provider: str = Field(
+        "openstreetmap", description="Map provider (openstreetmap/google)"
+    )
 
     @validator("environment")
     def validate_environment(cls, v):

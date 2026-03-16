@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.road_safety_api import app, system_settings
@@ -39,7 +40,7 @@ class TestSettingsAPI:
             "system": {
                 "retention_days": 90,
                 "max_upload_size": 10,
-            }
+            },
         }
 
     def test_get_all_settings(self):
@@ -63,7 +64,7 @@ class TestSettingsAPI:
         client = TestClient(app)
         response = client.put(
             "/api/settings/ai",
-            json={"confidence_threshold": 0.8, "detect_persons": False}
+            json={"confidence_threshold": 0.8, "detect_persons": False},
         )
         assert response.status_code == 200
         data = response.json()
@@ -74,7 +75,7 @@ class TestSettingsAPI:
         client = TestClient(app)
         response = client.put(
             "/api/settings/alerts",
-            json={"critical_alerts": False, "traffic_alerts": True}
+            json={"critical_alerts": False, "traffic_alerts": True},
         )
         assert response.status_code == 200
         data = response.json()
@@ -83,8 +84,7 @@ class TestSettingsAPI:
     def test_update_audio_settings(self):
         client = TestClient(app)
         response = client.put(
-            "/api/settings/audio",
-            json={"sound_enabled": False, "alert_volume": 50}
+            "/api/settings/audio", json={"sound_enabled": False, "alert_volume": 50}
         )
         assert response.status_code == 200
         data = response.json()
@@ -94,8 +94,7 @@ class TestSettingsAPI:
     def test_update_map_settings(self):
         client = TestClient(app)
         response = client.put(
-            "/api/settings/map",
-            json={"map_type": "satellite", "gps_tracking": False}
+            "/api/settings/map", json={"map_type": "satellite", "gps_tracking": False}
         )
         assert response.status_code == 200
         data = response.json()
@@ -106,7 +105,7 @@ class TestSettingsAPI:
         client = TestClient(app)
         response = client.put(
             "/api/settings/cameras",
-            json={"default_resolution": "1080p", "ptz_enabled": False}
+            json={"default_resolution": "1080p", "ptz_enabled": False},
         )
         assert response.status_code == 200
         data = response.json()
@@ -116,8 +115,7 @@ class TestSettingsAPI:
     def test_update_system_settings(self):
         client = TestClient(app)
         response = client.put(
-            "/api/settings/system",
-            json={"retention_days": 30, "max_upload_size": 5}
+            "/api/settings/system", json={"retention_days": 30, "max_upload_size": 5}
         )
         assert response.status_code == 200
         data = response.json()
@@ -137,7 +135,7 @@ class TestSettingsAPI:
         client = TestClient(app)
         response = client.put(
             "/api/settings/notifications",
-            json={"email_enabled": False, "sms_enabled": True, "refresh_interval": 60}
+            json={"email_enabled": False, "sms_enabled": True, "refresh_interval": 60},
         )
         assert response.status_code == 200
         data = response.json()

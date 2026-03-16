@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Any
 from enum import Enum
 import time
-import re
 from collections import defaultdict
 import httpx
 import asyncio
@@ -48,41 +47,51 @@ class APIGateway:
             "road_safety": "http://localhost:8001",
             "control_center": "http://localhost:3000",
             "taifa_guard": "http://localhost:3001",
-            "taifaroad": "http://localhost:3002"
+            "taifaroad": "http://localhost:3002",
         }
-        
+
         # Connection pool for upstream services
         self._http_client: Optional[httpx.AsyncClient] = None
         self._client_lock = asyncio.Lock()
-        
+
         self._register_default_routes()
 
     def _register_default_routes(self):
-        self.add_route(Route(
-            path="/api/v1/services/incidents",
-            method=HttpMethod.GET,
-            upstream_url="{road_safety}/api/v1/services/incidents"
-        ))
-        self.add_route(Route(
-            path="/api/v1/services/incidents",
-            method=HttpMethod.POST,
-            upstream_url="{road_safety}/api/v1/services/incidents"
-        ))
-        self.add_route(Route(
-            path="/api/v1/services/dispatch",
-            method=HttpMethod.POST,
-            upstream_url="{road_safety}/api/v1/services/dispatch"
-        ))
-        self.add_route(Route(
-            path="/api/cameras",
-            method=HttpMethod.GET,
-            upstream_url="{road_safety}/api/cameras"
-        ))
-        self.add_route(Route(
-            path="/api/dashboard",
-            method=HttpMethod.GET,
-            upstream_url="{road_safety}/api/dashboard"
-        ))
+        self.add_route(
+            Route(
+                path="/api/v1/services/incidents",
+                method=HttpMethod.GET,
+                upstream_url="{road_safety}/api/v1/services/incidents",
+            )
+        )
+        self.add_route(
+            Route(
+                path="/api/v1/services/incidents",
+                method=HttpMethod.POST,
+                upstream_url="{road_safety}/api/v1/services/incidents",
+            )
+        )
+        self.add_route(
+            Route(
+                path="/api/v1/services/dispatch",
+                method=HttpMethod.POST,
+                upstream_url="{road_safety}/api/v1/services/dispatch",
+            )
+        )
+        self.add_route(
+            Route(
+                path="/api/cameras",
+                method=HttpMethod.GET,
+                upstream_url="{road_safety}/api/cameras",
+            )
+        )
+        self.add_route(
+            Route(
+                path="/api/dashboard",
+                method=HttpMethod.GET,
+                upstream_url="{road_safety}/api/dashboard",
+            )
+        )
 
     def add_route(self, route: Route):
         key = f"{route.method.value}:{route.path}"
@@ -103,30 +112,30 @@ class APIGateway:
     def _match_path(self, pattern: str, path: str) -> bool:
         pattern_parts = pattern.strip("/").split("/")
         path_parts = path.strip("/").split("/")
-        
+
         if len(pattern_parts) != len(path_parts):
             return False
-        
+
         for pp, p in zip(pattern_parts, path_parts):
             if pp.startswith("{"):
                 continue
             if pp != p:
                 return False
-        
+
         return True
 
     def check_rate_limit(self, client_id: str, route: Route) -> bool:
         if not route.rate_limit:
             return True
-        
+
         now = time.time()
         self.request_counts[client_id] = [
             t for t in self.request_counts[client_id] if now - t < 60
         ]
-        
+
         if len(self.request_counts[client_id]) >= route.rate_limit.requests_per_minute:
             return False
-        
+
         self.request_counts[client_id].append(now)
         return True
 
@@ -136,26 +145,20 @@ class APIGateway:
         method: str,
         headers: Dict[str, str],
         body: Optional[bytes] = None,
-        client_id: str = "anonymous"
+        client_id: str = "anonymous",
     ) -> Dict[str, Any]:
         http_method = HttpMethod(method.upper())
         route = self.find_route(path, http_method)
-        
+
         if not route:
-            return {
-                "status": 404,
-                "body": {"error": "Route not found"}
-            }
-        
+            return {"status": 404, "body": {"error": "Route not found"}}
+
         if not self.check_rate_limit(client_id, route):
-            return {
-                "status": 429,
-                "body": {"error": "Rate limit exceeded"}
-            }
-        
+            return {"status": 429, "body": {"error": "Rate limit exceeded"}}
+
         upstream_url = route.upstream_url.format(**self.service_urls)
         full_url = f"{upstream_url}{path}"
-        
+
         try:
             client = await self.get_http_client()
             response = await client.request(
@@ -163,24 +166,24 @@ class APIGateway:
                 url=full_url,
                 headers=headers,
                 content=body,
-                timeout=route.timeout
+                timeout=route.timeout,
             )
-            
+
             return {
                 "status": response.status_code,
-                "body": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
-                "headers": dict(response.headers)
+                "body": (
+                    response.json()
+                    if response.headers.get("content-type", "").startswith(
+                        "application/json"
+                    )
+                    else response.text
+                ),
+                "headers": dict(response.headers),
             }
         except httpx.TimeoutException:
-            return {
-                "status": 504,
-                "body": {"error": "Gateway timeout"}
-            }
+            return {"status": 504, "body": {"error": "Gateway timeout"}}
         except Exception as e:
-            return {
-                "status": 502,
-                "body": {"error": f"Bad gateway: {str(e)}"}
-            }
+            return {"status": 502, "body": {"error": f"Bad gateway: {str(e)}"}}
 
     def register_service(self, service_name: str, url: str):
         self.service_urls[service_name] = url
@@ -192,15 +195,11 @@ class APIGateway:
         return {
             "total_routes": len(self.routes),
             "routes": [
-                {
-                    "path": r.path,
-                    "method": r.method.value,
-                    "upstream": r.upstream_url
-                }
+                {"path": r.path, "method": r.method.value, "upstream": r.upstream_url}
                 for r in self.routes.values()
-            ]
+            ],
         }
-    
+
     async def get_http_client(self) -> httpx.AsyncClient:
         """Get or create shared HTTP client with connection pooling"""
         async with self._client_lock:
@@ -209,15 +208,15 @@ class APIGateway:
                 limits = httpx.Limits(
                     max_keepalive_connections=20,
                     max_connections=100,
-                    keepalive_expiry=30.0
+                    keepalive_expiry=30.0,
                 )
                 self._http_client = httpx.AsyncClient(
                     timeout=30.0,
                     limits=limits,
-                    http2=True  # Enable HTTP/2 for better performance
+                    http2=True,  # Enable HTTP/2 for better performance
                 )
             return self._http_client
-    
+
     async def close(self):
         """Close the HTTP client (call on shutdown)"""
         async with self._client_lock:

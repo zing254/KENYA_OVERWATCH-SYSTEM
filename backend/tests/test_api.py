@@ -7,7 +7,9 @@ import pytest
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from fastapi.testclient import TestClient
 from backend.road_safety_api import app
@@ -40,22 +42,20 @@ class TestAuthentication:
 
     def test_login_missing_credentials(self, client):
         """Test login with missing credentials"""
-        response = client.post("/api/auth/token", json={})
+        response = client.post("/api/v1/auth/login", json={})
         assert response.status_code == 422
 
     def test_login_invalid_credentials(self, client):
         """Test login with invalid credentials"""
-        response = client.post("/api/auth/token", json={
-            "username": "invalid",
-            "password": "invalid"
-        })
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "", "password": ""}
+        )
         assert response.status_code in [401, 400, 422]
 
     def test_login_valid_credentials(self, client):
         """Test login with valid credentials"""
         response = client.post(
-            "/api/auth/token",
-            data={"username": "admin", "password": "DevSetup@2024"}
+            "/api/v1/auth/login", json={"username": "admin", "password": "password123"}
         )
         assert response.status_code == 200
         data = response.json()
@@ -74,17 +74,15 @@ class TestIncidents:
     def test_get_incidents_with_auth(self, client):
         """Test getting incidents with valid auth"""
         # First login to get token
-        login_response = client.post("/api/auth/token", json={
-            "username": "admin",
-            "password": "Admin@123"
-        })
-        
+        login_response = client.post(
+            "/api/auth/token", json={"username": "admin", "password": "Admin@123"}
+        )
+
         if login_response.status_code == 200:
             token = login_response.json().get("access_token")
             if token:
                 response = client.get(
-                    "/api/incidents",
-                    headers={"Authorization": f"Bearer {token}"}
+                    "/api/incidents", headers={"Authorization": f"Bearer {token}"}
                 )
                 assert response.status_code == 200
 

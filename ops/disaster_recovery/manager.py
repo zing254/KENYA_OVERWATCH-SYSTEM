@@ -164,3 +164,6 @@ class DRManager:
 
     def get_restore_point(self, restore_id: str) -> Optional[RestorePoint]:
         return self.restore_points.get(restore_id)
+
+
+disaster_recovery_manager = DRManager()

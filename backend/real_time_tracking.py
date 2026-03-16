@@ -1,10 +1,8 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from datetime import datetime
 import json
-import asyncio
-
 
 router = APIRouter(prefix="/api/v1/tracking", tags=["Real-time Tracking"])
 
@@ -58,7 +56,7 @@ class ConnectionManager:
 
     async def update_responder_location(self, location: LocationUpdate):
         responder_id = location.responder_id
-        
+
         self.responder_locations[responder_id] = ResponderLocation(
             responder_id=responder_id,
             responder_name=f"Responder {responder_id}",
@@ -68,39 +66,36 @@ class ConnectionManager:
             longitude=location.longitude,
             speed=location.speed,
             heading=location.heading,
-            timestamp=location.timestamp or datetime.now().isoformat()
+            timestamp=location.timestamp or datetime.now().isoformat(),
         )
-        
+
         await self.broadcast_location_update(self.responder_locations[responder_id])
 
     async def broadcast_location_update(self, location: ResponderLocation):
-        message = {
-            "type": "location_update",
-            "data": location.model_dump()
-        }
-        
+        message = {"type": "location_update", "data": location.model_dump()}
+
         for dashboard in self.dashboard_connections:
             try:
                 await dashboard.send_json(message)
-            except:
+            except Exception:
                 pass
 
     async def send_all_locations(self, websocket: WebSocket):
         locations = list(self.responder_locations.values())
-        await websocket.send_json({
-            "type": "all_locations",
-            "data": [loc.model_dump() for loc in locations]
-        })
+        await websocket.send_json(
+            {"type": "all_locations", "data": [loc.model_dump() for loc in locations]}
+        )
 
-    async def broadcast_incident_assignment(self, responder_id: str, incident_id: str, incident_location: dict):
+    async def broadcast_incident_assignment(
+        self, responder_id: str, incident_id: str, incident_location: dict
+    ):
         if responder_id in self.active_connections:
-            await self.active_connections[responder_id].send_json({
-                "type": "incident_assignment",
-                "data": {
-                    "incident_id": incident_id,
-                    "location": incident_location
+            await self.active_connections[responder_id].send_json(
+                {
+                    "type": "incident_assignment",
+                    "data": {"incident_id": incident_id, "location": incident_location},
                 }
-            })
+            )
 
 
 manager = ConnectionManager()
@@ -119,7 +114,7 @@ async def websocket_responder(websocket: WebSocket, responder_id: str):
                 longitude=location_data.get("longitude", 0),
                 speed=location_data.get("speed", 0),
                 heading=location_data.get("heading", 0),
-                timestamp=location_data.get("timestamp", datetime.now().isoformat())
+                timestamp=location_data.get("timestamp", datetime.now().isoformat()),
             )
             await manager.update_responder_location(location)
     except WebSocketDisconnect:
@@ -152,14 +147,9 @@ async def get_responder_location(responder_id: str):
 
 @router.post("/locations/{responder_id}/assignment")
 async def assign_incident(
-    responder_id: str,
-    incident_id: str,
-    incident_lat: float,
-    incident_lng: float
+    responder_id: str, incident_id: str, incident_lat: float, incident_lng: float
 ):
     await manager.broadcast_incident_assignment(
-        responder_id,
-        incident_id,
-        {"latitude": incident_lat, "longitude": incident_lng}
+        responder_id, incident_id, {"latitude": incident_lat, "longitude": incident_lng}
     )
     return {"status": "assigned"}

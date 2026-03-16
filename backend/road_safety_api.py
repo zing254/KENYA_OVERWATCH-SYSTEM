@@ -4,7 +4,21 @@ Real-time Road Safety Monitoring, Accident Detection, and Traffic Violation Mana
 Version: 2.0.0 - Enhanced Security Edition
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query, Depends, Request, APIRouter
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    WebSocket,
+    UploadFile,
+    File,
+    Form,
+    Query,
+    Depends,
+    Request,
+    APIRouter,
+    Header,
+    Body,
+)
+from .roles import require_roles
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
@@ -20,22 +34,23 @@ import logging
 
 logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
-from dataclasses import asdict
+
 
 # Handle both package and module imports
 def _import(name):
     try:
         return __import__(name)
     except ImportError:
-        parts = name.split('.')
+        parts = name.split(".")
         obj = __import__(parts[0])
         for part in parts[1:]:
             obj = getattr(obj, part)
         return obj
 
+
 # Import from local modules (same package) - using relative imports
 try:
-    from .road_safety_engine import (
+    from .road_safety_engine import (  # noqa: F401
         road_safety_engine,
         RoadAccident,
         TrafficViolation,
@@ -50,15 +65,11 @@ try:
         VehicleType,
         ACCIDENT_HOTSPOTS,
         ViolationStatus,
+        CITIZEN_REPORTS,
     )
 except ImportError:
     from backend.road_safety_engine import (
         road_safety_engine,
-        RoadAccident,
-        TrafficViolation,
-        Vehicle,
-        Driver,
-        SpeedDetection,
         Coordinates,
         AccidentType,
         CauseType,
@@ -67,25 +78,12 @@ except ImportError:
         VehicleType,
         ACCIDENT_HOTSPOTS,
         ViolationStatus,
+        CITIZEN_REPORTS,
     )
 
 # Import database models (ORM) from database_models
-from .database_models import (
-    User,
-    Team,
-    Alert,
-    Camera,
-    RoadSegment,
-)
 
 # Import shared enums
-from .enums import (
-    UserRole,
-    AlertSeverity,
-    AlertType,
-    IncidentStatus as APIIncidentStatus,
-    SeverityLevel as APISeverityLevel,
-)
 
 # Import validation models (Pydantic)
 from .models import (
@@ -99,14 +97,27 @@ from .models import (
 )
 from .auth import router as auth_router, get_current_user, UserResponse
 
+
+async def get_current_user_optional(
+    token: Optional[str] = Header(None),
+    x_role: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+) -> Optional[UserResponse]:
+    """Optional auth - returns None if not authenticated"""
+    try:
+        return await get_current_user(token=token, x_role=x_role, authorization=authorization)
+    except Exception:
+        return None
+
 # Import ANPR module
 from .anpr_api import router as anpr_router
 
 # Import security middleware
-from .security_middleware import apply_security_middleware, audit_logger
+from .security_middleware import apply_security_middleware
 
 # Import notifications
 from .notifications_sounds import notification_manager
+
 
 def utcnow():
     return datetime.now(timezone.utc)
@@ -114,9 +125,12 @@ def utcnow():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from .database import init_db, seed_demo_data
-    init_db()
-    seed_demo_data()
+    # Lean production: only initialize DB in dev when explicitly requested
+    if os.environ.get("INIT_DB", "0").lower() in {"1", "true", "yes"}:
+        from .database import init_db, seed_demo_data
+
+        init_db()
+        seed_demo_data()
     yield
 
 
@@ -149,12 +163,9 @@ APIs are rate-limited to ensure fair usage.
     contact={
         "name": "NTSA Kenya",
         "url": "https://www.ntsa.go.ke",
-        "email": "support@overwatch.go.ke"
+        "email": "support@overwatch.go.ke",
     },
-    license_info={
-        "name": "Proprietary",
-        "url": "https://overwatch.go.ke/license"
-    }
+    license_info={"name": "Proprietary", "url": "https://overwatch.go.ke/license"},
 )
 
 
@@ -164,26 +175,34 @@ apply_security_middleware(app)
 # ==================== API VERSIONING ====================
 api_v1 = APIRouter(prefix="/api/v1", tags=["v1"])
 
+
 # ==================== CENTRALIZED ERROR HANDLING ====================
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = []
     for error in exc.errors():
-        field = ".".join(str(loc) for loc in error.get("loc", []) if loc not in ("body", "query", "path"))
-        errors.append({
-            "field": field,
-            "message": error.get("msg", "Validation error"),
-            "type": error.get("type")
-        })
+        field = ".".join(
+            str(loc)
+            for loc in error.get("loc", [])
+            if loc not in ("body", "query", "path")
+        )
+        errors.append(
+            {
+                "field": field,
+                "message": error.get("msg", "Validation error"),
+                "type": error.get("type"),
+            }
+        )
     return JSONResponse(
         status_code=422,
         content={
             "error": "Validation error",
             "details": errors,
             "status_code": 422,
-            "timestamp": utcnow().isoformat()
-        }
+            "timestamp": utcnow().isoformat(),
+        },
     )
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -192,9 +211,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={
             "error": exc.detail,
             "status_code": exc.status_code,
-            "timestamp": utcnow().isoformat()
-        }
+            "timestamp": utcnow().isoformat(),
+        },
     )
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
@@ -204,9 +224,10 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal server error",
             "status_code": 500,
-            "timestamp": utcnow().isoformat()
-        }
+            "timestamp": utcnow().isoformat(),
+        },
     )
+
 
 # Include authentication routes
 app.include_router(auth_router)
@@ -216,23 +237,29 @@ app.include_router(anpr_router)
 
 # Import reports module
 from .reports_api import router as reports_router
+
 app.include_router(reports_router)
 
 # Import service integration routes
 from .services.service_routes import router as service_router
+
 app.include_router(service_router)
 
 # Import county analytics routes
 from .county_routes import router as county_router
+
 app.include_router(county_router)
 
 # Import satellite monitoring routes
 from .satellite.routes import router as satellite_router
+
 app.include_router(satellite_router)
 
 # Import weather and traffic integration routes
 from .integrations.routes import router as environment_router
+
 app.include_router(environment_router)
+
 
 # ==================== HELPER FUNCTIONS ====================
 def serialize_for_json(obj: Any) -> Any:
@@ -241,7 +268,7 @@ def serialize_for_json(obj: Any) -> Any:
         return None
     elif isinstance(obj, datetime):
         return obj.isoformat()
-    elif hasattr(obj, '__dataclass_fields__'):
+    elif hasattr(obj, "__dataclass_fields__"):
         result = {}
         for field in obj.__dataclass_fields__:
             value = getattr(obj, field)
@@ -251,10 +278,11 @@ def serialize_for_json(obj: Any) -> Any:
         return {k: serialize_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [serialize_for_json(item) for item in obj]
-    elif hasattr(obj, 'value'):
+    elif hasattr(obj, "value"):
         return obj.value
     else:
         return obj
+
 
 # ==================== ROOT & HEALTH ====================
 @app.get("/")
@@ -266,8 +294,23 @@ async def root():
         "authority": "National Transport and Safety Authority",
         "status": "operational",
         "security": "enabled",
-        "timestamp": utcnow().isoformat()
+        "timestamp": utcnow().isoformat(),
     }
+
+
+@app.get("/metrics")
+async def get_metrics():
+    # Lean, opt-in metrics endpoint to avoid perf impact when disabled
+    if os.environ.get("ENABLE_METRICS", "0").lower() not in {"1", "true", "yes"}:
+        return {"status": "disabled"}
+    # Minimal example metrics payload
+    return {
+        "status": "ok",
+        "uptime_seconds": 0,
+        "incidents": 0,
+        "violations": 0,
+    }
+
 
 @app.get("/api/health")
 async def health_check():
@@ -279,14 +322,15 @@ async def health_check():
             "accident_db": "up",
             "violation_db": "up",
             "speed_detection": "up",
-            "websocket": "up"
+            "websocket": "up",
         },
-        "timestamp": utcnow().isoformat()
+        "timestamp": utcnow().isoformat(),
     }
 
 
 class SystemSettings:
     """In-memory system settings store"""
+
     def __init__(self):
         self.settings = {
             "ai": {
@@ -339,20 +383,21 @@ class SystemSettings:
                 "retention_days": 90,
                 "max_upload_size": 10,
                 "maintenance_mode": False,
-            }
+            },
         }
-    
+
     def get(self, category: str = None):
         if category:
             return self.settings.get(category, {})
         return self.settings
-    
+
     def update(self, category: str, data: dict):
         if category in self.settings:
             self.settings[category].update(data)
         else:
             self.settings[category] = data
         return self.settings[category]
+
 
 system_settings = SystemSettings()
 
@@ -364,13 +409,17 @@ async def get_settings(category: str = None):
 
 
 @app.put("/api/settings/{category}")
-async def update_settings(category: str, data: dict):
+async def update_settings(
+    category: str, data: dict, current_user: UserResponse = Depends(get_current_user)
+):
+    require_roles(current_user, "admin", "officer")
     """Update settings for a category"""
     return system_settings.update(category, data)
 
 
 @app.post("/api/settings/reset")
-async def reset_settings():
+async def reset_settings(current_user: UserResponse = Depends(get_current_user)):
+    require_roles(current_user, "admin")
     """Reset all settings to defaults"""
     system_settings.settings = {
         "ai": {
@@ -423,18 +472,15 @@ async def reset_settings():
             "retention_days": 90,
             "max_upload_size": 10,
             "maintenance_mode": False,
-        }
+        },
     }
     return {"status": "reset", "settings": system_settings.get()}
+
 
 @app.get("/api/v1/health")
 async def health_check_v1():
     """V1 Health check - returns version info"""
-    return {
-        "status": "healthy",
-        "api_version": "v1",
-        "timestamp": utcnow().isoformat()
-    }
+    return {"status": "healthy", "api_version": "v1", "timestamp": utcnow().isoformat()}
 
 
 @app.get("/api/cache/stats")
@@ -444,18 +490,19 @@ async def get_cache_stats():
         from .cache import cache
     except ModuleNotFoundError:
         from backend.cache import cache
-    
+
     return cache.get_stats()
 
 
 @app.post("/api/cache/clear")
-async def clear_cache():
+async def clear_cache(current_user: UserResponse = Depends(get_current_user)):
+    require_roles(current_user, "admin")
     """Clear the cache"""
     try:
         from .cache import cache
     except ModuleNotFoundError:
         from backend.cache import cache
-    
+
     cache.clear()
     return {"status": "cleared", "message": "Cache cleared successfully"}
 
@@ -463,22 +510,35 @@ async def clear_cache():
 # ==================== SYSTEM LOGS ====================
 @app.get("/api/logs")
 async def get_logs(
-    level: Optional[str] = Query(None, description="Filter by level (debug, info, warning, error, critical)"),
-    category: Optional[str] = Query(None, description="Filter by category (api, auth, database, security, incident, violation, websocket, system)"),
+    level: Optional[str] = Query(
+        None, description="Filter by level (debug, info, warning, error, critical)"
+    ),
+    category: Optional[str] = Query(
+        None,
+        description="Filter by category (api, auth, database, security, incident, violation, websocket, system)",
+    ),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
-    offset: int = Query(0, ge=0, description="Offset for pagination")
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
     """Get system logs with optional filtering"""
     try:
         from .logging_system import log_manager, log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_manager, log_event
-    
+
     # Generate some initial logs if empty
     if log_manager._logs:
-        log_event("info", "api", "road_safety_api.py", "API request received", request_id=f"req_{random.randint(1000, 9999)}")
-    
-    return log_manager.get_logs(level=level, category=category, limit=limit, offset=offset)
+        log_event(
+            "info",
+            "api",
+            "road_safety_api.py",
+            "API request received",
+            request_id=f"req_{random.randint(1000, 9999)}",
+        )
+
+    return log_manager.get_logs(
+        level=level, category=category, limit=limit, offset=offset
+    )
 
 
 @app.post("/api/logs")
@@ -487,24 +547,27 @@ async def create_log(
     category: str = Query(..., description="Log category"),
     source: str = Query("", description="Source file/component"),
     message: str = Query("", description="Log message"),
-    details: Optional[str] = Query(None, description="JSON details")
+    details: Optional[str] = Query(None, description="JSON details"),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """Create a new log entry"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     import json
+
     details_dict = None
     if details:
         try:
             details_dict = json.loads(details)
-        except:
+        except Exception:
             pass
-    
+
     log_event(level, category, source, message, details=details_dict)
-    
+
     return {"status": "created", "message": "Log entry added"}
 
 
@@ -515,52 +578,66 @@ async def clear_logs():
         from .logging_system import log_manager
     except ModuleNotFoundError:
         from backend.logging_system import log_manager
-    
+
     log_manager.clear_logs()
     return {"status": "cleared", "message": "All logs cleared"}
+
 
 # ==================== INCIDENTS (alias for /api/v1/services/incidents) ====================
 @app.get("/api/incidents")
 async def list_incidents(
-    status: Optional[str] = Query(None, description="Filter by status (detected, verified, assigned, enroute, onscene, resolved, rejected)"),
-    severity: Optional[str] = Query(None, description="Filter by severity (low, medium, high, critical)"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of results")
+    status: Optional[str] = Query(
+        None,
+        description="Filter by status (detected, verified, assigned, enroute, onscene, resolved, rejected)",
+    ),
+    severity: Optional[str] = Query(
+        None, description="Filter by severity (low, medium, high, critical)"
+    ),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
 ):
     """List all incidents"""
     try:
         from services.incident_service import incident_service
     except ModuleNotFoundError:
         from backend.services.incident_service import incident_service
-    
+
     # Convert string parameters to enums (use enums module for compatibility with service)
     try:
         from .enums import IncidentStatus, SeverityLevel
     except ModuleNotFoundError:
         from backend.enums import IncidentStatus, SeverityLevel
-    
+
     status_enum = None
     if status:
         try:
             status_enum = IncidentStatus(status)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}")
-    
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}",
+            )
+
     severity_enum = None
     if severity:
         try:
             severity_enum = SeverityLevel(severity)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid severity: {severity}. Must be one of: {', '.join([s.value for s in SeverityLevel])}")
-    
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid severity: {severity}. Must be one of: {', '.join([s.value for s in SeverityLevel])}",
+            )
+
     try:
-        incidents = incident_service.get_incidents(status=status_enum, severity=severity_enum, limit=limit)
-        return {
-            "incidents": [i.to_dict() for i in incidents],
-            "total": len(incidents)
-        }
+        incidents = incident_service.get_incidents(
+            status=status_enum, severity=severity_enum, limit=limit
+        )
+        return {"incidents": [i.to_dict() for i in incidents], "total": len(incidents)}
     except Exception as e:
         logger.error(f"Error getting incidents: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting incidents: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error getting incidents: {str(e)}"
+        )
+
 
 @app.get("/api/incidents/active")
 async def get_active_incidents():
@@ -570,10 +647,8 @@ async def get_active_incidents():
     except ModuleNotFoundError:
         from backend.services.incident_service import incident_service
     incidents = incident_service.get_active_incidents()
-    return {
-        "incidents": [i.to_dict() for i in incidents],
-        "total": len(incidents)
-    }
+    return {"incidents": [i.to_dict() for i in incidents], "total": len(incidents)}
+
 
 @app.get("/api/incidents/{incident_id}")
 async def get_incident(incident_id: str):
@@ -587,30 +662,31 @@ async def get_incident(incident_id: str):
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident.to_dict()
 
+
 @app.patch("/api/incidents/{incident_id}/status")
 async def update_incident_status(incident_id: str, status: str = Form(...)):
     """Update incident status"""
     from services.incident_service import incident_service
     from .enums import IncidentStatus
-    
+
     # Validate and convert status string to enum
     try:
         status_enum = IncidentStatus(status)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}"
+            detail=f"Invalid status: {status}. Must be one of: {', '.join([s.value for s in IncidentStatus])}",
         )
-    
+
     incident = incident_service.get_incident(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
-    
+
     # Update status using the service method (which handles transitions)
     updated = incident_service.update_status(incident_id, status_enum)
     if not updated:
         raise HTTPException(status_code=400, detail="Invalid status transition")
-    
+
     return updated.to_dict()
 
 
@@ -624,23 +700,25 @@ async def create_incident(
     location: str = Form(..., min_length=3),
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """Create a new incident"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     try:
         from .enums import SeverityLevel
     except ModuleNotFoundError:
         from backend.enums import SeverityLevel
-    
+
     try:
         severity_enum = SeverityLevel(severity)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid severity: {severity}")
-    
+
     incident_data = {
         "title": title,
         "description": description,
@@ -649,16 +727,21 @@ async def create_incident(
         "location": location,
         "latitude": latitude,
         "longitude": longitude,
-        "status": "detected"
+        "status": "detected",
     }
-    
+
     incident_id = f"INC-{random.randint(100000, 999999)}"
     incident_data["id"] = incident_id
     incident_data["created_at"] = utcnow().isoformat()
-    
-    log_event("info", "incident", "road_safety_api.py", f"Incident created: {incident_id}", 
-              details={"title": title, "type": incident_type, "severity": severity})
-    
+
+    log_event(
+        "info",
+        "incident",
+        "road_safety_api.py",
+        f"Incident created: {incident_id}",
+        details={"title": title, "type": incident_type, "severity": severity},
+    )
+
     return {"status": "created", "incident": incident_data}
 
 
@@ -669,29 +752,41 @@ async def update_incident(
     description: Optional[str] = Form(None),
     severity: Optional[str] = Form(None),
     location: Optional[str] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """Update an existing incident"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
-    log_event("info", "incident", "road_safety_api.py", f"Incident updated: {incident_id}",
-              details={"title": title, "severity": severity})
-    
+
+    log_event(
+        "info",
+        "incident",
+        "road_safety_api.py",
+        f"Incident updated: {incident_id}",
+        details={"title": title, "severity": severity},
+    )
+
     return {"status": "updated", "incident_id": incident_id}
 
 
 @app.delete("/api/incidents/{incident_id}")
-async def delete_incident(incident_id: str):
+async def delete_incident(
+    incident_id: str, current_user: UserResponse = Depends(get_current_user)
+):
     """Delete an incident"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
-    log_event("warning", "incident", "road_safety_api.py", f"Incident deleted: {incident_id}")
-    
+
+    log_event(
+        "warning", "incident", "road_safety_api.py", f"Incident deleted: {incident_id}"
+    )
+
     return {"status": "deleted", "incident_id": incident_id}
 
 
@@ -701,22 +796,35 @@ async def get_dashboard_stats():
     stats = road_safety_engine.get_dashboard_stats()
     return serialize_for_json(stats)
 
+
 @app.get("/api/dashboard/summary")
 async def get_dashboard_summary():
     accidents = road_safety_engine.get_all_accidents(limit=10)
     violations = road_safety_engine.get_all_violations(limit=10)
-    
-    return serialize_for_json({
-        "active_incidents": len([a for a in accidents if a.status in [IncidentStatus.REPORTED, IncidentStatus.DISPATCHED]]),
-        "today_accidents": road_safety_engine.stats["total_accidents_today"],
-        "today_violations": road_safety_engine.stats["total_violations_today"],
-        "pending_violations": len([v for v in violations if v.status == ViolationStatus.DETECTED]),
-        "total_casualties_today": road_safety_engine.stats["total_casualties_today"],
-        "avg_response_time": road_safety_engine.stats["avg_response_time"],
-        "recent_accidents": accidents[:5],
-        "recent_violations": violations[:5],
-        "citizen_reports": CITIZEN_REPORTS[-10:] if CITIZEN_REPORTS else [],
-    })
+
+    return serialize_for_json(
+        {
+            "active_incidents": len(
+                [
+                    a
+                    for a in accidents
+                    if a.status in [IncidentStatus.REPORTED, IncidentStatus.DISPATCHED]
+                ]
+            ),
+            "today_accidents": road_safety_engine.stats["total_accidents_today"],
+            "today_violations": road_safety_engine.stats["total_violations_today"],
+            "pending_violations": len(
+                [v for v in violations if v.status == ViolationStatus.DETECTED]
+            ),
+            "total_casualties_today": road_safety_engine.stats[
+                "total_casualties_today"
+            ],
+            "avg_response_time": road_safety_engine.stats["avg_response_time"],
+            "recent_accidents": accidents[:5],
+            "recent_violations": violations[:5],
+            "citizen_reports": CITIZEN_REPORTS[-10:] if CITIZEN_REPORTS else [],
+        }
+    )
 
 
 @app.get("/api/dashboard/metrics")
@@ -726,20 +834,22 @@ async def get_realtime_metrics():
         from .logging_system import log_manager
     except ModuleNotFoundError:
         from backend.logging_system import log_manager
-    
+
     # Get live data
     active_incidents = len([t for t in MOCK_TEAMS if t.get("current_incident_id")])
     available_teams = len([t for t in MOCK_TEAMS if t["status"] == "available"])
     dispatched_teams = len([t for t in MOCK_TEAMS if t["status"] == "dispatched"])
-    
+
     # Get log counts for the last hour
     logs = log_manager.get_logs(limit=1000)
     log_counts = {
         "total": logs["total"],
-        "errors": len([l for l in logs["logs"] if l.get("level") in ["error", "critical"]]),
+        "errors": len(
+            [l for l in logs["logs"] if l.get("level") in ["error", "critical"]]
+        ),
         "warnings": len([l for l in logs["logs"] if l.get("level") == "warning"]),
     }
-    
+
     return {
         "timestamp": utcnow().isoformat(),
         "incidents": {
@@ -764,7 +874,9 @@ async def get_realtime_metrics():
         },
         "alerts": {
             "active": len([a for a in MOCK_ALERTS if a.get("is_active")]),
-            "critical": len([a for a in MOCK_ALERTS if a.get("severity") == "critical"]),
+            "critical": len(
+                [a for a in MOCK_ALERTS if a.get("severity") == "critical"]
+            ),
         },
         "logs": log_counts,
     }
@@ -775,8 +887,7 @@ async def get_chart_data(
     period: str = Query("week", description="Time period: day, week, month")
 ):
     """Get chart data for dashboard visualizations"""
-    import calendar
-    
+
     if period == "day":
         hours = list(range(24))
         data = [random.randint(0, 10) for _ in hours]
@@ -789,7 +900,7 @@ async def get_chart_data(
         weeks = [f"W{i}" for i in range(1, 5)]
         data = [random.randint(100, 300) for _ in weeks]
         labels = weeks
-    
+
     return {
         "period": period,
         "labels": labels,
@@ -798,26 +909,26 @@ async def get_chart_data(
         "labels_y_axis": "Count",
     }
 
+
 # ==================== ACCIDENTS ====================
 @app.get("/api/accidents")
 async def list_accidents(
     status: Optional[str] = None,
     severity: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0
+    offset: int = 0,
 ):
     accidents = road_safety_engine.get_all_accidents(
-        status=IncidentStatus(status) if status else None,
-        limit=limit + offset
+        status=IncidentStatus(status) if status else None, limit=limit + offset
     )
-    
+
     if severity:
         accidents = [a for a in accidents if a.severity.value == severity]
-    
-    return serialize_for_json({
-        "total": len(accidents),
-        "accidents": accidents[offset:offset+limit]
-    })
+
+    return serialize_for_json(
+        {"total": len(accidents), "accidents": accidents[offset : offset + limit]}
+    )
+
 
 @app.get("/api/accidents/{accident_id}")
 async def get_accident(accident_id: str):
@@ -826,32 +937,35 @@ async def get_accident(accident_id: str):
         raise HTTPException(status_code=404, detail="Accident not found")
     return serialize_for_json(accident)
 
+
 @app.post("/api/accidents", status_code=201)
-async def create_accident(data: AccidentCreate):
+async def create_accident(
+    data: AccidentCreate, current_user: UserResponse = Depends(get_current_user)
+):
     """Create a new accident report with validation"""
+    require_roles(current_user, "admin", "officer")
     try:
         accident = road_safety_engine.create_accident_report(
             accident_type=AccidentType(data.accident_type.value),
             cause=CauseType(data.cause.value),
             location=data.location,
             road_name=data.road_name,
-            coordinates=Coordinates(
-                lat=data.lat,
-                lng=data.lng
-            ),
+            coordinates=Coordinates(lat=data.lat, lng=data.lng),
             severity=SeverityLevel(data.severity.value),
             vehicles_involved=data.vehicles,
             description=data.description,
             weather=data.weather,
-            road_conditions=data.road_conditions
+            road_conditions=data.road_conditions,
         )
         return serialize_for_json(accident)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.get("/api/accidents/hotspots")
 async def get_accident_hotspots():
     return serialize_for_json(ACCIDENT_HOTSPOTS)
+
 
 # ==================== VIOLATIONS ====================
 @app.get("/api/violations")
@@ -860,21 +974,21 @@ async def list_violations(
     plate_number: Optional[str] = None,
     violation_type: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0
+    offset: int = 0,
 ):
     violations = road_safety_engine.get_all_violations(
         status=ViolationStatus(status) if status else None,
         plate_number=plate_number,
-        limit=limit + offset
+        limit=limit + offset,
     )
-    
+
     if violation_type:
         violations = [v for v in violations if v.violation_type.value == violation_type]
-    
-    return serialize_for_json({
-        "total": len(violations),
-        "violations": violations[offset:offset+limit]
-    })
+
+    return serialize_for_json(
+        {"total": len(violations), "violations": violations[offset : offset + limit]}
+    )
+
 
 @app.get("/api/violations/{violation_id}")
 async def get_violation(violation_id: str):
@@ -883,9 +997,13 @@ async def get_violation(violation_id: str):
         raise HTTPException(status_code=404, detail="Violation not found")
     return serialize_for_json(violation)
 
+
 @app.post("/api/violations", status_code=201)
-async def create_violation(data: ViolationCreate):
+async def create_violation(
+    data: ViolationCreate, current_user: UserResponse = Depends(get_current_user)
+):
     """Create a new violation with validation"""
+    require_roles(current_user, "admin", "officer")
     try:
         violation = road_safety_engine.record_violation(
             violation_type=CauseType(data.violation_type.value),
@@ -893,26 +1011,29 @@ async def create_violation(data: ViolationCreate):
             vehicle_type=VehicleType(data.vehicle_type.value),
             location=data.location,
             road_name=data.road_name,
-            coordinates=Coordinates(
-                lat=data.lat,
-                lng=data.lng
-            ),
+            coordinates=Coordinates(lat=data.lat, lng=data.lng),
             camera_id=data.camera_id,
             speed_detected=data.speed_detected,
             speed_limit=data.speed_limit,
-            evidence_image=data.evidence_image
+            evidence_image=data.evidence_image,
         )
         return serialize_for_json(violation)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.post("/api/violations/{violation_id}/review")
-async def review_violation(violation_id: str, data: ViolationReview):
+async def review_violation(
+    violation_id: str,
+    data: ViolationReview,
+    current_user: UserResponse = Depends(get_current_user),
+):
     """Review a violation"""
+    require_roles(current_user, "admin", "officer")
     violation = road_safety_engine.get_violation(violation_id)
     if not violation:
         raise HTTPException(status_code=404, detail="Violation not found")
-    
+
     if data.decision == "approve":
         violation.status = ViolationStatus.ISSUED
         violation.issued_at = utcnow()
@@ -920,33 +1041,48 @@ async def review_violation(violation_id: str, data: ViolationReview):
         violation.officer_id = data.officer_id
     else:
         violation.status = ViolationStatus.CANCELLED
-    
+
     violation.notes = data.notes
-    
+
     return serialize_for_json(violation)
 
+
 @app.post("/api/violations/{violation_id}/pay")
-async def pay_violation(violation_id: str):
+async def pay_violation(
+    violation_id: str, current_user: UserResponse = Depends(get_current_user)
+):
+    require_roles(current_user, "admin", "officer")
     violation = road_safety_engine.get_violation(violation_id)
     if not violation:
         raise HTTPException(status_code=404, detail="Violation not found")
-    
+
     violation.status = ViolationStatus.PAID
     violation.paid_at = utcnow()
-    
+
     return serialize_for_json(violation)
+
 
 @app.get("/api/violations/stats/revenue")
 async def get_violation_revenue():
     violations = road_safety_engine.get_all_violations()
-    issued = [v for v in violations if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]]
-    
-    return serialize_for_json({
-        "total_fines_issued": sum(v.fine_amount for v in issued),
-        "total_fines_paid": sum(v.fine_amount for v in issued if v.status == ViolationStatus.PAID),
-        "total_fines_pending": sum(v.fine_amount for v in issued if v.status == ViolationStatus.ISSUED),
-        "total_points_deducted": sum(v.penalty_points for v in issued),
-    })
+    issued = [
+        v
+        for v in violations
+        if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]
+    ]
+
+    return serialize_for_json(
+        {
+            "total_fines_issued": sum(v.fine_amount for v in issued),
+            "total_fines_paid": sum(
+                v.fine_amount for v in issued if v.status == ViolationStatus.PAID
+            ),
+            "total_fines_pending": sum(
+                v.fine_amount for v in issued if v.status == ViolationStatus.ISSUED
+            ),
+            "total_points_deducted": sum(v.penalty_points for v in issued),
+        }
+    )
 
 
 # ==================== VIOLATIONS CRUD ====================
@@ -956,45 +1092,62 @@ async def update_violation(
     plate_number: Optional[str] = Form(None),
     location: Optional[str] = Form(None),
     speed_detected: Optional[float] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """Update a violation"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     violation = road_safety_engine.get_violation(violation_id)
     if not violation:
         raise HTTPException(status_code=404, detail="Violation not found")
-    
+
     if plate_number:
         violation.plate_number = plate_number
     if location:
         violation.location = location
     if speed_detected:
         violation.speed_detected = speed_detected
-    
-    log_event("info", "violation", "road_safety_api.py", f"Violation updated: {violation_id}")
-    
+
+    log_event(
+        "info", "violation", "road_safety_api.py", f"Violation updated: {violation_id}"
+    )
+
     return serialize_for_json(violation)
 
 
 @app.delete("/api/violations/{violation_id}")
-async def delete_violation(violation_id: str):
+async def delete_violation(
+    violation_id: str, current_user: UserResponse = Depends(get_current_user)
+):
     """Delete a violation"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     violation = road_safety_engine.get_violation(violation_id)
     if not violation:
         raise HTTPException(status_code=404, detail="Violation not found")
-    
+
     violation.status = ViolationStatus.CANCELLED
-    
-    log_event("warning", "violation", "road_safety_api.py", f"Violation deleted: {violation_id}")
-    
+
+    log_event(
+        "info", "violation", "road_safety_api.py", f"Violation deleted: {violation_id}"
+    )
+
+    return serialize_for_json(violation)
+    log_event(
+        "warning",
+        "violation",
+        "road_safety_api.py",
+        f"Violation deleted: {violation_id}",
+    )
+
     return {"status": "deleted", "violation_id": violation_id}
 
 
@@ -1003,10 +1156,10 @@ async def delete_violation(violation_id: str):
 async def list_vehicles(limit: int = 100):
     """List all registered vehicles"""
     vehicles = list(road_safety_engine.vehicles.values())[:limit]
-    return serialize_for_json({
-        "total": len(road_safety_engine.vehicles),
-        "vehicles": vehicles
-    })
+    return serialize_for_json(
+        {"total": len(road_safety_engine.vehicles), "vehicles": vehicles}
+    )
+
 
 @app.get("/api/vehicles/{plate_number}")
 async def get_vehicle(plate_number: str):
@@ -1016,14 +1169,17 @@ async def get_vehicle(plate_number: str):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return serialize_for_json(vehicle)
 
+
 @app.get("/api/vehicles/{plate_number}/violations")
 async def get_vehicle_violations(plate_number: str):
     violations = road_safety_engine.get_all_violations(plate_number=plate_number)
-    return serialize_for_json({
-        "plate_number": plate_number,
-        "total_violations": len(violations),
-        "violations": violations
-    })
+    return serialize_for_json(
+        {
+            "plate_number": plate_number,
+            "total_violations": len(violations),
+            "violations": violations,
+        }
+    )
 
 
 @app.post("/api/vehicles")
@@ -1035,18 +1191,20 @@ async def create_vehicle(
     year: Optional[int] = Form(None),
     color: Optional[str] = Form(None),
     owner_name: Optional[str] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """Register a new vehicle"""
+    require_roles(current_user, "admin", "officer")
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     # Check if vehicle already exists
     existing = road_safety_engine.get_vehicle(plate_number)
     if existing:
         raise HTTPException(status_code=400, detail="Vehicle already registered")
-    
+
     # Create vehicle data
     vehicle_data = {
         "plate_number": plate_number.upper(),
@@ -1057,14 +1215,19 @@ async def create_vehicle(
         "color": color,
         "owner_name": owner_name,
         "registered_at": utcnow().isoformat(),
-        "status": "active"
+        "status": "active",
     }
-    
+
     road_safety_engine.vehicles[plate_number.upper()] = vehicle_data
-    
-    log_event("info", "system", "road_safety_api.py", f"Vehicle registered: {plate_number}",
-              details={"type": vehicle_type, "make": make})
-    
+
+    log_event(
+        "info",
+        "system",
+        "road_safety_api.py",
+        f"Vehicle registered: {plate_number}",
+        details={"type": vehicle_type, "make": make},
+    )
+
     return {"status": "created", "vehicle": vehicle_data}
 
 
@@ -1077,17 +1240,19 @@ async def update_vehicle(
     color: Optional[str] = Form(None),
     owner_name: Optional[str] = Form(None),
     status: Optional[str] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
+    require_roles(current_user, "admin", "officer")
     """Update vehicle details"""
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     vehicle = road_safety_engine.get_vehicle(plate_number)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    
+
     if vehicle_type:
         vehicle.vehicle_type = vehicle_type
     if make:
@@ -1100,32 +1265,39 @@ async def update_vehicle(
         vehicle.owner_name = owner_name
     if status:
         vehicle.status = status
-    
-    log_event("info", "system", "road_safety_api.py", f"Vehicle updated: {plate_number}")
-    
+
+    log_event(
+        "info", "system", "road_safety_api.py", f"Vehicle updated: {plate_number}"
+    )
+
     return serialize_for_json(vehicle)
 
 
 @app.delete("/api/vehicles/{plate_number}")
-async def delete_vehicle(plate_number: str):
+async def delete_vehicle(
+    plate_number: str, current_user: UserResponse = Depends(get_current_user)
+):
+    require_roles(current_user, "admin", "officer")
     """Delete/deactivate a vehicle"""
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     vehicle = road_safety_engine.get_vehicle(plate_number)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    
+
     # Soft delete - mark as inactive
     if isinstance(vehicle, dict):
         vehicle["status"] = "deleted"
     else:
         vehicle.status = "deleted"
-    
-    log_event("warning", "system", "road_safety_api.py", f"Vehicle deleted: {plate_number}")
-    
+
+    log_event(
+        "warning", "system", "road_safety_api.py", f"Vehicle deleted: {plate_number}"
+    )
+
     return {"status": "deleted", "plate_number": plate_number}
 
 
@@ -1137,24 +1309,29 @@ async def get_driver(license_number: str):
         raise HTTPException(status_code=404, detail="Driver not found")
     return serialize_for_json(driver)
 
+
 @app.get("/api/drivers/{license_number}/violations")
 async def get_driver_violations(license_number: str):
     violations = road_safety_engine.get_all_violations()
-    return serialize_for_json({
-        "license_number": license_number,
-        "total_violations": len(violations),
-        "violations": violations
-    })
+    return serialize_for_json(
+        {
+            "license_number": license_number,
+            "total_violations": len(violations),
+            "violations": violations,
+        }
+    )
 
 
 # ==================== DRIVERS CRUD ====================
 @app.get("/api/drivers")
 async def list_drivers(limit: int = 100):
     """List all registered drivers"""
-    return serialize_for_json({
-        "total": len(road_safety_engine.drivers),
-        "drivers": list(road_safety_engine.drivers.values())[:limit]
-    })
+    return serialize_for_json(
+        {
+            "total": len(road_safety_engine.drivers),
+            "drivers": list(road_safety_engine.drivers.values())[:limit],
+        }
+    )
 
 
 @app.post("/api/drivers")
@@ -1166,17 +1343,19 @@ async def create_driver(
     phone: Optional[str] = Form(None),
     email: Optional[str] = Form(None),
     address: Optional[str] = Form(None),
+    current_user: UserResponse = Depends(get_current_user),
 ):
+    require_roles(current_user, "admin", "officer")
     """Register a new driver"""
     try:
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     existing = road_safety_engine.get_driver(license_number)
     if existing:
         raise HTTPException(status_code=400, detail="Driver already registered")
-    
+
     driver_data = {
         "license_number": license_number.upper(),
         "first_name": first_name,
@@ -1187,14 +1366,19 @@ async def create_driver(
         "address": address,
         "registered_at": utcnow().isoformat(),
         "status": "active",
-        "points": 12
+        "points": 12,
     }
-    
+
     road_safety_engine.drivers[license_number.upper()] = driver_data
-    
-    log_event("info", "system", "road_safety_api.py", f"Driver registered: {license_number}",
-              details={"name": f"{first_name} {last_name}"})
-    
+
+    log_event(
+        "info",
+        "system",
+        "road_safety_api.py",
+        f"Driver registered: {license_number}",
+        details={"name": f"{first_name} {last_name}"},
+    )
+
     return {"status": "created", "driver": driver_data}
 
 
@@ -1213,11 +1397,11 @@ async def update_driver(
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     driver = road_safety_engine.get_driver(license_number)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
-    
+
     if first_name:
         driver.first_name = first_name
     if last_name:
@@ -1230,9 +1414,11 @@ async def update_driver(
         driver.address = address
     if status:
         driver.status = status
-    
-    log_event("info", "system", "road_safety_api.py", f"Driver updated: {license_number}")
-    
+
+    log_event(
+        "info", "system", "road_safety_api.py", f"Driver updated: {license_number}"
+    )
+
     return serialize_for_json(driver)
 
 
@@ -1243,18 +1429,20 @@ async def delete_driver(license_number: str):
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     driver = road_safety_engine.get_driver(license_number)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
-    
+
     if isinstance(driver, dict):
         driver["status"] = "suspended"
     else:
         driver.status = "suspended"
-    
-    log_event("warning", "system", "road_safety_api.py", f"Driver suspended: {license_number}")
-    
+
+    log_event(
+        "warning", "system", "road_safety_api.py", f"Driver suspended: {license_number}"
+    )
+
     return {"status": "deleted", "license_number": license_number}
 
 
@@ -1268,27 +1456,22 @@ async def detect_speed(data: SpeedDetectionInput):
         vehicle_type=VehicleType(data.vehicle_type.value),
         speed_detected=data.speed_detected,
         location=data.location,
-        coordinates=Coordinates(
-            lat=data.lat,
-            lng=data.lng
-        ),
+        coordinates=Coordinates(lat=data.lat, lng=data.lng),
         image_front=data.image_front,
-        image_rear=data.image_rear
+        image_rear=data.image_rear,
     )
-    
-    return serialize_for_json({
-        "detection": detection,
-        "violation": violation
-    })
+
+    return serialize_for_json({"detection": detection, "violation": violation})
+
 
 @app.get("/api/speed/detections")
 async def list_speed_detections(limit: int = 100):
     detections = list(road_safety_engine.speed_detections.values())
     detections.sort(key=lambda d: d.timestamp, reverse=True)
-    return serialize_for_json({
-        "total": len(detections),
-        "detections": detections[:limit]
-    })
+    return serialize_for_json(
+        {"total": len(detections), "detections": detections[:limit]}
+    )
+
 
 # ==================== ROADS ====================
 @app.get("/api/roads")
@@ -1296,10 +1479,12 @@ async def list_roads():
     roads = road_safety_engine.get_dashboard_stats()["roads"]
     return serialize_for_json(roads)
 
+
 @app.get("/api/roads/segments")
 async def list_road_segments():
     segments = list(road_safety_engine.road_segments.values())
     return serialize_for_json(segments)
+
 
 @app.get("/api/roads/{road_name}/stats")
 async def get_road_stats(road_name: str):
@@ -1308,37 +1493,58 @@ async def get_road_stats(road_name: str):
         if seg.name.lower() in road_name.lower():
             segment = seg
             break
-    
+
     if not segment:
         raise HTTPException(status_code=404, detail="Road segment not found")
-    
-    accidents = [a for a in road_safety_engine.get_all_accidents() if a.road_name.lower() == road_name.lower()]
-    violations = [v for v in road_safety_engine.get_all_violations() if v.road_name.lower() == road_name.lower()]
-    
-    return serialize_for_json({
-        "segment": segment,
-        "accidents_30d": len(accidents),
-        "violations_30d": len(violations),
-        "average_daily_traffic": segment.average_daily_traffic,
-        "risk_level": segment.current_risk_level.value,
-    })
+
+    accidents = [
+        a
+        for a in road_safety_engine.get_all_accidents()
+        if a.road_name.lower() == road_name.lower()
+    ]
+    violations = [
+        v
+        for v in road_safety_engine.get_all_violations()
+        if v.road_name.lower() == road_name.lower()
+    ]
+
+    return serialize_for_json(
+        {
+            "segment": segment,
+            "accidents_30d": len(accidents),
+            "violations_30d": len(violations),
+            "average_daily_traffic": segment.average_daily_traffic,
+            "risk_level": segment.current_risk_level.value,
+        }
+    )
+
 
 # ==================== ANALYTICS ====================
 @app.get("/api/analytics/trends")
 async def get_trends(hours: int = 24):
     return serialize_for_json(road_safety_engine.get_dashboard_stats()["trend"])
 
+
 @app.get("/api/analytics/accidents/by-type")
 async def get_accidents_by_type():
-    return serialize_for_json(road_safety_engine.get_dashboard_stats()["accidents"]["by_type"])
+    return serialize_for_json(
+        road_safety_engine.get_dashboard_stats()["accidents"]["by_type"]
+    )
+
 
 @app.get("/api/analytics/accidents/by-cause")
 async def get_accidents_by_cause():
-    return serialize_for_json(road_safety_engine.get_dashboard_stats()["accidents"]["by_cause"])
+    return serialize_for_json(
+        road_safety_engine.get_dashboard_stats()["accidents"]["by_cause"]
+    )
+
 
 @app.get("/api/analytics/violations/by-type")
 async def get_violations_by_type():
-    return serialize_for_json(road_safety_engine.get_dashboard_stats()["violations"]["by_type"])
+    return serialize_for_json(
+        road_safety_engine.get_dashboard_stats()["violations"]["by_type"]
+    )
+
 
 # Enhanced Analytics Endpoints
 @app.get("/api/analytics/overview")
@@ -1346,60 +1552,64 @@ async def get_analytics_overview():
     """Get comprehensive analytics overview"""
     accidents = road_safety_engine.get_all_accidents()
     violations = road_safety_engine.get_all_violations()
-    
+
     # Time-based analysis
     now = utcnow()
     last_7_days = []
     last_30_days = []
-    
+
     for i in range(7):
         day = now - timedelta(days=i)
         day_accidents = [a for a in accidents if a.reported_at.date() == day.date()]
         day_violations = [v for v in violations if v.detected_at.date() == day.date()]
-        last_7_days.append({
-            "date": day.strftime("%Y-%m-%d"),
-            "accidents": len(day_accidents),
-            "violations": len(day_violations),
-            "casualties": sum(a.casualties for a in day_accidents),
-            "injuries": sum(a.injuries for a in day_accidents)
-        })
-    
+        last_7_days.append(
+            {
+                "date": day.strftime("%Y-%m-%d"),
+                "accidents": len(day_accidents),
+                "violations": len(day_violations),
+                "casualties": sum(a.casualties for a in day_accidents),
+                "injuries": sum(a.injuries for a in day_accidents),
+            }
+        )
+
     for i in range(30):
         day = now - timedelta(days=i)
         day_accidents = [a for a in accidents if a.reported_at.date() == day.date()]
         day_violations = [v for v in violations if v.detected_at.date() == day.date()]
-        last_30_days.append({
-            "date": day.strftime("%Y-%m-%d"),
-            "accidents": len(day_accidents),
-            "violations": len(day_violations),
-            "casualties": sum(a.casualties for a in day_accidents),
-            "injuries": sum(a.injuries for a in day_accidents)
-        })
-    
+        last_30_days.append(
+            {
+                "date": day.strftime("%Y-%m-%d"),
+                "accidents": len(day_accidents),
+                "violations": len(day_violations),
+                "casualties": sum(a.casualties for a in day_accidents),
+                "injuries": sum(a.injuries for a in day_accidents),
+            }
+        )
+
     # Severity distribution
     severity_dist = {}
     for severity in SeverityLevel:
         count = len([a for a in accidents if a.severity == severity])
         severity_dist[severity.value] = count
-    
+
     # Status distribution
     status_dist = {}
     for status in IncidentStatus:
         count = len([a for a in accidents if a.status == status])
         status_dist[status.value] = count
-    
+
     # Top hotspots
     hotspot_counts = {}
     for a in accidents:
         key = a.location
         hotspot_counts[key] = hotspot_counts.get(key, 0) + 1
-    
+
     top_hotspots = sorted(hotspot_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    
+
     return {
         "period": {
             "last_7_days": list(reversed(last_7_days)),
-            "last_30_days": list(reversed(last_30_days))
+            "last_30_days": list(reversed(last_30_days)),
         },
         "severity_distribution": severity_dist,
         "status_distribution": status_dist,
@@ -1410,31 +1620,34 @@ async def get_analytics_overview():
             "total_casualties": sum(a.casualties for a in accidents),
             "total_injuries": sum(a.injuries for a in accidents),
             "avg_daily_accidents": len(accidents) / 30,
-            "avg_daily_violations": len(violations) / 30
-        }
+            "avg_daily_violations": len(violations) / 30,
+        },
     }
+
 
 @app.get("/api/analytics/roads/{road_name}/analysis")
 async def get_road_analysis(road_name: str):
     """Get detailed analysis for a specific road"""
     accidents = road_safety_engine.get_all_accidents()
     violations = road_safety_engine.get_all_violations()
-    
+
     road_accidents = [a for a in accidents if road_name.lower() in a.road_name.lower()]
-    road_violations = [v for v in violations if road_name.lower() in v.road_name.lower()]
-    
+    road_violations = [
+        v for v in violations if road_name.lower() in v.road_name.lower()
+    ]
+
     # Time distribution
     hourly_accidents = {}
     hourly_violations = {}
-    
+
     for a in road_accidents:
         hour = a.reported_at.hour
         hourly_accidents[hour] = hourly_accidents.get(hour, 0) + 1
-    
+
     for v in road_violations:
         hour = v.detected_at.hour
         hourly_violations[hour] = hourly_violations.get(hour, 0) + 1
-    
+
     return {
         "road_name": road_name,
         "total_accidents": len(road_accidents),
@@ -1443,38 +1656,44 @@ async def get_road_analysis(road_name: str):
         "total_injuries": sum(a.injuries for a in road_accidents),
         "by_hour": {
             "accidents": {str(h): hourly_accidents.get(h, 0) for h in range(24)},
-            "violations": {str(h): hourly_violations.get(h, 0) for h in range(24)}
+            "violations": {str(h): hourly_violations.get(h, 0) for h in range(24)},
         },
-        "by_severity": {s.value: len([a for a in road_accidents if a.severity == s]) for s in SeverityLevel},
+        "by_severity": {
+            s.value: len([a for a in road_accidents if a.severity == s])
+            for s in SeverityLevel
+        },
         "by_type": {},
-        "avg_response_time": "8.5 minutes"
+        "avg_response_time": "8.5 minutes",
     }
+
 
 @app.get("/api/analytics/revenue")
 async def get_revenue_analytics():
     """Get revenue analytics and fines collection"""
     violations = road_safety_engine.get_all_violations()
-    
+
     now = utcnow()
-    
+
     # Daily revenue
     daily_revenue = {}
     weekly_revenue = {}
     monthly_revenue = {}
     yearly_revenue = {}
-    
+
     for v in violations:
         if v.status == ViolationStatus.PAID and v.paid_at:
             day_key = v.paid_at.strftime("%Y-%m-%d")
             week_key = v.paid_at.strftime("%Y-W%W")
             month_key = v.paid_at.strftime("%Y-%m")
             year_key = v.paid_at.strftime("%Y")
-            
+
             daily_revenue[day_key] = daily_revenue.get(day_key, 0) + v.fine_amount
             weekly_revenue[week_key] = weekly_revenue.get(week_key, 0) + v.fine_amount
-            monthly_revenue[month_key] = monthly_revenue.get(month_key, 0) + v.fine_amount
+            monthly_revenue[month_key] = (
+                monthly_revenue.get(month_key, 0) + v.fine_amount
+            )
             yearly_revenue[year_key] = yearly_revenue.get(year_key, 0) + v.fine_amount
-    
+
     # By violation type
     by_type = {}
     for v in violations:
@@ -1485,7 +1704,7 @@ async def get_revenue_analytics():
         by_type[vtype]["total_fine"] += v.fine_amount
         if v.status == ViolationStatus.PAID:
             by_type[vtype]["collected"] += v.fine_amount
-    
+
     return {
         "daily": dict(sorted(daily_revenue.items(), reverse=True)[:30]),
         "weekly": dict(sorted(weekly_revenue.items(), reverse=True)[:12]),
@@ -1493,27 +1712,40 @@ async def get_revenue_analytics():
         "yearly": yearly_revenue,
         "by_violation_type": by_type,
         "summary": {
-            "total_issued": sum(v.fine_amount for v in violations if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]),
-            "total_collected": sum(v.fine_amount for v in violations if v.status == ViolationStatus.PAID),
-            "total_pending": sum(v.fine_amount for v in violations if v.status == ViolationStatus.ISSUED),
-            "collection_rate": len([v for v in violations if v.status == ViolationStatus.PAID]) / max(len(violations), 1) * 100
-        }
+            "total_issued": sum(
+                v.fine_amount
+                for v in violations
+                if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]
+            ),
+            "total_collected": sum(
+                v.fine_amount for v in violations if v.status == ViolationStatus.PAID
+            ),
+            "total_pending": sum(
+                v.fine_amount for v in violations if v.status == ViolationStatus.ISSUED
+            ),
+            "collection_rate": len(
+                [v for v in violations if v.status == ViolationStatus.PAID]
+            )
+            / max(len(violations), 1)
+            * 100,
+        },
     }
+
 
 @app.get("/api/analytics/response-time")
 async def get_response_time_analytics():
     """Get response time analytics"""
     accidents = road_safety_engine.get_all_accidents()
-    
+
     # Calculate average response times
     response_times = []
     for a in accidents:
         if a.response_time_minutes:
             response_times.append(a.response_time_minutes)
-    
+
     if not response_times:
         return {"message": "No response time data available"}
-    
+
     return {
         "average": sum(response_times) / len(response_times),
         "min": min(response_times),
@@ -1521,24 +1753,50 @@ async def get_response_time_analytics():
         "count": len(response_times),
         "by_severity": {
             s.value: {
-                "count": len([a for a in accidents if a.severity == s and a.response_time_minutes]),
-                "avg": sum(a.response_time_minutes for a in accidents if a.severity == s and a.response_time_minutes) / max(len([a for a in accidents if a.severity == s and a.response_time_minutes]), 1)
-            } for s in SeverityLevel
-        }
+                "count": len(
+                    [
+                        a
+                        for a in accidents
+                        if a.severity == s and a.response_time_minutes
+                    ]
+                ),
+                "avg": sum(
+                    a.response_time_minutes
+                    for a in accidents
+                    if a.severity == s and a.response_time_minutes
+                )
+                / max(
+                    len(
+                        [
+                            a
+                            for a in accidents
+                            if a.severity == s and a.response_time_minutes
+                        ]
+                    ),
+                    1,
+                ),
+            }
+            for s in SeverityLevel
+        },
     }
+
 
 # ==================== NOTIFICATIONS ====================
 @app.get("/api/notifications/stats")
 async def get_notification_stats():
     """Get notification statistics"""
     from services.notification_service import notification_service
+
     return notification_service.get_stats()
+
 
 @app.get("/api/notifications/history")
 async def get_notification_history(limit: int = 100):
     """Get notification history"""
     from services.notification_service import notification_service
+
     return notification_service.get_history(limit)
+
 
 @app.post("/api/notifications/send")
 async def send_notification(
@@ -1546,29 +1804,39 @@ async def send_notification(
     email: Optional[str] = None,
     sms_message: Optional[str] = None,
     email_subject: Optional[str] = None,
-    email_body: Optional[str] = None
+    email_body: Optional[str] = None,
 ):
     """Send a custom notification"""
     from services.notification_service import notification_service
-    
+
     result = await notification_service.send(
         phone=phone,
         email=email,
         sms=sms_message,
         subject=email_subject,
-        email_body=email_body
+        email_body=email_body,
     )
     return result
 
+
 # ==================== USER NOTIFICATIONS (for frontend panel) ====================
 @app.get("/api/notifications")
-async def get_user_notifications(user_id: str = "default_user", unread_only: bool = False, limit: int = 20):
+async def get_user_notifications(
+    user_id: str = "default_user", unread_only: bool = False, limit: int = 20
+):
     """Get notifications for a user"""
     notifications = notification_manager.get_user_notifications(user_id, unread_only)
     return {
         "notifications": [n.model_dump() for n in notifications[:limit]],
-        "unread_count": len([n for n in notification_manager.get_user_notifications(user_id) if not n.read])
+        "unread_count": len(
+            [
+                n
+                for n in notification_manager.get_user_notifications(user_id)
+                if not n.read
+            ]
+        ),
     }
+
 
 @app.post("/api/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, user_id: str = "default_user"):
@@ -1576,44 +1844,141 @@ async def mark_notification_read(notification_id: str, user_id: str = "default_u
     notification_manager.mark_as_read(user_id, notification_id)
     return {"status": "marked"}
 
+
 @app.post("/api/notifications/read-all")
 async def mark_all_notifications_read(user_id: str = "default_user"):
     """Mark all notifications as read"""
     notification_manager.mark_all_as_read(user_id)
     return {"status": "all_marked"}
 
+
 # Include notifications router
 from .notifications_sounds import router as notifications_router
+
 app.include_router(notifications_router)
+
 
 # ==================== ENUMS ====================
 @app.get("/api/enums/accident-types")
 async def get_accident_types():
     return [t.value for t in AccidentType]
 
+
 @app.get("/api/enums/cause-types")
 async def get_cause_types():
     return [t.value for t in CauseType]
+
 
 @app.get("/api/enums/severity-levels")
 async def get_severity_levels():
     return [t.value for t in SeverityLevel]
 
+
 @app.get("/api/enums/vehicle-types")
 async def get_vehicle_types():
     return [t.value for t in VehicleType]
 
+
 # ==================== CAMERAS ====================
 MOCK_CAMERAS = [
-    {"id": "cam_001", "name": "Mombasa Road - Junction", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "road_name": "A109", "type": "speed", "status": "online", "speed_limit": 100, "last_update": utcnow().isoformat()},
-    {"id": "cam_002", "name": "Thika Superhighway - Exit", "location": "Thika Road", "latitude": -1.0800, "longitude": 37.1000, "road_name": "A2", "type": "ANPR", "status": "online", "speed_limit": 80, "last_update": utcnow().isoformat()},
-    {"id": "cam_003", "name": "Kenyatta Ave - CBD", "location": "Kenyatta Avenue", "latitude": -1.2864, "longitude": 36.8232, "road_name": "Kenyatta Ave", "type": "red_light", "status": "online", "speed_limit": 50, "last_update": utcnow().isoformat()},
-    {"id": "cam_004", "name": "Ngong Road - Roundabout", "location": "Ngong Road", "latitude": -1.3100, "longitude": 36.7800, "road_name": "Ngong Road", "type": "surveillance", "status": "online", "speed_limit": 60, "last_update": utcnow().isoformat()},
-    {"id": "cam_005", "name": "Nairobi Expressway - Entry", "location": "Expressway", "latitude": -1.3200, "longitude": 36.8900, "road_name": "Expressway", "type": "speed", "status": "online", "speed_limit": 80, "last_update": utcnow().isoformat()},
-    {"id": "cam_006", "name": "Nakuru Town - CBD", "location": "Nakuru", "latitude": -0.3031, "longitude": 36.0800, "road_name": "A104", "type": "red_light", "status": "maintenance", "speed_limit": 50, "last_update": utcnow().isoformat()},
-    {"id": "cam_007", "name": "Mombasa Road - Airport", "location": "Airport Road", "latitude": -1.3500, "longitude": 36.9500, "road_name": "A109", "type": "ANPR", "status": "online", "speed_limit": 100, "last_update": utcnow().isoformat()},
-    {"id": "cam_008", "name": "Kisumu Airport Road", "location": "Kisumu", "latitude": -0.1000, "longitude": 34.7500, "road_name": "A1", "type": "speed", "status": "offline", "speed_limit": 80, "last_update": utcnow().isoformat()},
+    {
+        "id": "cam_001",
+        "name": "Mombasa Road - Junction",
+        "location": "Mombasa Road",
+        "latitude": -1.3300,
+        "longitude": 36.9800,
+        "road_name": "A109",
+        "type": "speed",
+        "status": "online",
+        "speed_limit": 100,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_002",
+        "name": "Thika Superhighway - Exit",
+        "location": "Thika Road",
+        "latitude": -1.0800,
+        "longitude": 37.1000,
+        "road_name": "A2",
+        "type": "ANPR",
+        "status": "online",
+        "speed_limit": 80,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_003",
+        "name": "Kenyatta Ave - CBD",
+        "location": "Kenyatta Avenue",
+        "latitude": -1.2864,
+        "longitude": 36.8232,
+        "road_name": "Kenyatta Ave",
+        "type": "red_light",
+        "status": "online",
+        "speed_limit": 50,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_004",
+        "name": "Ngong Road - Roundabout",
+        "location": "Ngong Road",
+        "latitude": -1.3100,
+        "longitude": 36.7800,
+        "road_name": "Ngong Road",
+        "type": "surveillance",
+        "status": "online",
+        "speed_limit": 60,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_005",
+        "name": "Nairobi Expressway - Entry",
+        "location": "Expressway",
+        "latitude": -1.3200,
+        "longitude": 36.8900,
+        "road_name": "Expressway",
+        "type": "speed",
+        "status": "online",
+        "speed_limit": 80,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_006",
+        "name": "Nakuru Town - CBD",
+        "location": "Nakuru",
+        "latitude": -0.3031,
+        "longitude": 36.0800,
+        "road_name": "A104",
+        "type": "red_light",
+        "status": "maintenance",
+        "speed_limit": 50,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_007",
+        "name": "Mombasa Road - Airport",
+        "location": "Airport Road",
+        "latitude": -1.3500,
+        "longitude": 36.9500,
+        "road_name": "A109",
+        "type": "ANPR",
+        "status": "online",
+        "speed_limit": 100,
+        "last_update": utcnow().isoformat(),
+    },
+    {
+        "id": "cam_008",
+        "name": "Kisumu Airport Road",
+        "location": "Kisumu",
+        "latitude": -0.1000,
+        "longitude": 34.7500,
+        "road_name": "A1",
+        "type": "speed",
+        "status": "offline",
+        "speed_limit": 80,
+        "last_update": utcnow().isoformat(),
+    },
 ]
+
 
 @app.get("/api/cameras")
 async def list_cameras(status: Optional[str] = None, type: Optional[str] = None):
@@ -1624,6 +1989,7 @@ async def list_cameras(status: Optional[str] = None, type: Optional[str] = None)
         cameras = [c for c in cameras if c["type"] == type]
     return cameras
 
+
 @app.get("/api/cameras/{camera_id}")
 async def get_camera(camera_id: str):
     camera = next((c for c in MOCK_CAMERAS if c["id"] == camera_id), None)
@@ -1631,22 +1997,85 @@ async def get_camera(camera_id: str):
         raise HTTPException(status_code=404, detail="Camera not found")
     return camera
 
+
 @app.get("/api/cameras/{camera_id}/latest")
 async def get_camera_latest(camera_id: str):
     camera = next((c for c in MOCK_CAMERAS if c["id"] == camera_id), None)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
-    return {"image_url": f"/static/cameras/{camera_id}_latest.jpg", "timestamp": utcnow().isoformat()}
+    return {
+        "image_url": f"/static/cameras/{camera_id}_latest.jpg",
+        "timestamp": utcnow().isoformat(),
+    }
+
 
 # ==================== TEAMS ====================
 MOCK_TEAMS = [
-    {"id": "team_001", "name": "Alpha Team", "type": "police", "status": "available", "base": "CBD Station", "members": 4, "latitude": -1.2864, "longitude": 36.8232},
-    {"id": "team_002", "name": "Beta Team", "type": "ambulance", "status": "available", "base": "Kenyatta Hospital", "members": 3, "latitude": -1.3000, "longitude": 36.8000},
-    {"id": "team_003", "name": "Gamma Team", "type": "fire", "status": "dispatched", "base": "Industrial Area", "members": 6, "latitude": -1.3200, "longitude": 36.8500, "current_incident_id": "acc_001", "eta": "5 min"},
-    {"id": "team_004", "name": "Delta Team", "type": "traffic", "status": "on_scene", "base": "Mombasa Road", "members": 2, "latitude": -1.3300, "longitude": 36.9800, "current_incident_id": "acc_002"},
-    {"id": "team_005", "name": "Epsilon Team", "type": "police", "status": "off_duty", "base": "Thika Station", "members": 4, "latitude": -1.0800, "longitude": 37.1000},
-    {"id": "team_006", "name": "Zeta Team", "type": "ambulance", "status": "available", "base": "Nairobi Hospital", "members": 3, "latitude": -1.2800, "longitude": 36.8200},
+    {
+        "id": "team_001",
+        "name": "Alpha Team",
+        "type": "police",
+        "status": "available",
+        "base": "CBD Station",
+        "members": 4,
+        "latitude": -1.2864,
+        "longitude": 36.8232,
+    },
+    {
+        "id": "team_002",
+        "name": "Beta Team",
+        "type": "ambulance",
+        "status": "available",
+        "base": "Kenyatta Hospital",
+        "members": 3,
+        "latitude": -1.3000,
+        "longitude": 36.8000,
+    },
+    {
+        "id": "team_003",
+        "name": "Gamma Team",
+        "type": "fire",
+        "status": "dispatched",
+        "base": "Industrial Area",
+        "members": 6,
+        "latitude": -1.3200,
+        "longitude": 36.8500,
+        "current_incident_id": "acc_001",
+        "eta": "5 min",
+    },
+    {
+        "id": "team_004",
+        "name": "Delta Team",
+        "type": "traffic",
+        "status": "on_scene",
+        "base": "Mombasa Road",
+        "members": 2,
+        "latitude": -1.3300,
+        "longitude": 36.9800,
+        "current_incident_id": "acc_002",
+    },
+    {
+        "id": "team_005",
+        "name": "Epsilon Team",
+        "type": "police",
+        "status": "off_duty",
+        "base": "Thika Station",
+        "members": 4,
+        "latitude": -1.0800,
+        "longitude": 37.1000,
+    },
+    {
+        "id": "team_006",
+        "name": "Zeta Team",
+        "type": "ambulance",
+        "status": "available",
+        "base": "Nairobi Hospital",
+        "members": 3,
+        "latitude": -1.2800,
+        "longitude": 36.8200,
+    },
 ]
+
 
 @app.get("/api/teams")
 async def list_teams(type: Optional[str] = None, status: Optional[str] = None):
@@ -1657,6 +2086,7 @@ async def list_teams(type: Optional[str] = None, status: Optional[str] = None):
         teams = [t for t in teams if t["status"] == status]
     return teams
 
+
 @app.get("/api/teams/{team_id}")
 async def get_team(team_id: str):
     team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
@@ -1664,47 +2094,27 @@ async def get_team(team_id: str):
         raise HTTPException(status_code=404, detail="Team not found")
     return team
 
+
 @app.post("/api/teams/{team_id}/dispatch")
 async def dispatch_team(team_id: str, data: TeamDispatch):
     """Dispatch a team to an incident"""
     team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
+
     team["status"] = "dispatched"
     team["current_incident_id"] = data.incident_id
     team["eta"] = data.eta
-    
+
     return {
         "id": f"dispatch_{uuid.uuid4().hex[:8]}",
         "team_id": team_id,
         "incident_id": data.incident_id,
         "status": "dispatched",
         "assigned_at": utcnow().isoformat(),
-        "eta": team["eta"]
+        "eta": team["eta"],
     }
 
-@app.post("/api/dispatch")
-async def create_dispatch(data: dict):
-    """Create a new dispatch (simplified endpoint)"""
-    incident_id = data.get("incident_id")
-    responder_id = data.get("responder_id")
-    
-    team = next((t for t in MOCK_TEAMS if t["id"] == responder_id), None)
-    if not team:
-        return {"error": "Responder not found", "status": 404}
-    
-    team["status"] = "dispatched"
-    team["current_incident_id"] = incident_id
-    
-    return {
-        "id": f"dispatch_{uuid.uuid4().hex[:8]}",
-        "team_id": responder_id,
-        "incident_id": incident_id,
-        "status": "dispatched",
-        "assigned_at": utcnow().isoformat(),
-        "eta": 15
-    }
 
 @app.get("/api/dispatch")
 async def list_dispatches():
@@ -1712,14 +2122,16 @@ async def list_dispatches():
     dispatches = []
     for team in MOCK_TEAMS:
         if team.get("current_incident_id"):
-            dispatches.append({
-                "id": f"dispatch_{team['id']}",
-                "team_id": team["id"],
-                "incident_id": team["current_incident_id"],
-                "status": team["status"],
-                "assigned_at": utcnow().isoformat(),
-                "eta": team.get("eta", 15)
-            })
+            dispatches.append(
+                {
+                    "id": f"dispatch_{team['id']}",
+                    "team_id": team["id"],
+                    "incident_id": team["current_incident_id"],
+                    "status": team["status"],
+                    "assigned_at": utcnow().isoformat(),
+                    "eta": team.get("eta", 15),
+                }
+            )
     return {"dispatches": dispatches}
 
 
@@ -1736,7 +2148,7 @@ async def create_team(
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     team_id = f"team_{uuid.uuid4().hex[:8]}"
     new_team = {
         "id": team_id,
@@ -1747,13 +2159,18 @@ async def create_team(
         "members": members,
         "latitude": -1.2921,
         "longitude": 36.8219,
-        "capabilities": ["medical", "rescue", "traffic"]
+        "capabilities": ["medical", "rescue", "traffic"],
     }
     MOCK_TEAMS.append(new_team)
-    
-    log_event("info", "system", "road_safety_api.py", f"Team created: {name}", 
-              details={"team_id": team_id, "type": team_type, "base": base})
-    
+
+    log_event(
+        "info",
+        "system",
+        "road_safety_api.py",
+        f"Team created: {name}",
+        details={"team_id": team_id, "type": team_type, "base": base},
+    )
+
     return {"status": "created", "team": new_team}
 
 
@@ -1770,11 +2187,11 @@ async def update_team(
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
+
     if name:
         team["name"] = name
     if status:
@@ -1783,10 +2200,15 @@ async def update_team(
         team["base"] = base
     if members:
         team["members"] = members
-    
-    log_event("info", "system", "road_safety_api.py", f"Team updated: {team_id}",
-              details={"name": name, "status": status})
-    
+
+    log_event(
+        "info",
+        "system",
+        "road_safety_api.py",
+        f"Team updated: {team_id}",
+        details={"name": name, "status": status},
+    )
+
     return {"status": "updated", "team": team}
 
 
@@ -1797,27 +2219,63 @@ async def delete_team(team_id: str):
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     team = next((t for t in MOCK_TEAMS if t["id"] == team_id), None)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
+
     MOCK_TEAMS.remove(team)
-    
+
     log_event("warning", "system", "road_safety_api.py", f"Team deleted: {team_id}")
-    
+
     return {"status": "deleted", "team_id": team_id}
 
 
 # ==================== ALERTS ====================
 MOCK_ALERTS = [
-    {"id": "alert_001", "title": "Heavy Traffic", "message": "Mombasa Road experiencing heavy traffic due to accident", "severity": "medium", "type": "road", "location": "Mombasa Road", "latitude": -1.3300, "longitude": 36.9800, "created_at": utcnow().isoformat(), "is_active": True},
-    {"id": "alert_002", "title": "Weather Warning", "message": "Heavy rainfall expected in Nairobi region", "severity": "high", "type": "weather", "location": "Nairobi", "latitude": -1.2864, "longitude": 36.8232, "created_at": utcnow().isoformat(), "is_active": True},
-    {"id": "alert_003", "title": "Road Closure", "message": "Ngong Road closed for repairs between Roundabout and Karen", "severity": "critical", "type": "road", "location": "Ngong Road", "latitude": -1.3100, "longitude": 36.7800, "created_at": utcnow().isoformat(), "is_active": True},
+    {
+        "id": "alert_001",
+        "title": "Heavy Traffic",
+        "message": "Mombasa Road experiencing heavy traffic due to accident",
+        "severity": "medium",
+        "type": "road",
+        "location": "Mombasa Road",
+        "latitude": -1.3300,
+        "longitude": 36.9800,
+        "created_at": utcnow().isoformat(),
+        "is_active": True,
+    },
+    {
+        "id": "alert_002",
+        "title": "Weather Warning",
+        "message": "Heavy rainfall expected in Nairobi region",
+        "severity": "high",
+        "type": "weather",
+        "location": "Nairobi",
+        "latitude": -1.2864,
+        "longitude": 36.8232,
+        "created_at": utcnow().isoformat(),
+        "is_active": True,
+    },
+    {
+        "id": "alert_003",
+        "title": "Road Closure",
+        "message": "Ngong Road closed for repairs between Roundabout and Karen",
+        "severity": "critical",
+        "type": "road",
+        "location": "Ngong Road",
+        "latitude": -1.3100,
+        "longitude": 36.7800,
+        "created_at": utcnow().isoformat(),
+        "is_active": True,
+    },
 ]
 
+
 @app.get("/api/alerts")
-async def list_alerts(severity: Optional[str] = None, type: Optional[str] = None, active: bool = True):
+async def list_alerts(
+    severity: Optional[str] = None, type: Optional[str] = None, active: bool = True
+):
     alerts = MOCK_ALERTS
     if severity:
         alerts = [a for a in alerts if a["severity"] == severity]
@@ -1826,6 +2284,7 @@ async def list_alerts(severity: Optional[str] = None, type: Optional[str] = None
     if active is not None:
         alerts = [a for a in alerts if a["is_active"] == active]
     return alerts
+
 
 @app.post("/api/alerts", status_code=201)
 async def create_alert(data: AlertCreate):
@@ -1840,10 +2299,11 @@ async def create_alert(data: AlertCreate):
         "latitude": data.latitude,
         "longitude": data.longitude,
         "created_at": utcnow().isoformat(),
-        "is_active": True
+        "is_active": True,
     }
     MOCK_ALERTS.append(alert)
     return alert
+
 
 @app.post("/api/alerts/{alert_id}/dismiss")
 async def dismiss_alert(alert_id: str):
@@ -1852,6 +2312,7 @@ async def dismiss_alert(alert_id: str):
         raise HTTPException(status_code=404, detail="Alert not found")
     alert["is_active"] = False
     return {"message": "Alert dismissed"}
+
 
 @app.post("/api/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: str):
@@ -1877,11 +2338,11 @@ async def update_alert(
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-    
+
     if title:
         alert["title"] = title
     if message:
@@ -1890,9 +2351,9 @@ async def update_alert(
         alert["severity"] = severity
     if is_active is not None:
         alert["is_active"] = is_active
-    
+
     log_event("info", "system", "road_safety_api.py", f"Alert updated: {alert_id}")
-    
+
     return {"status": "updated", "alert": alert}
 
 
@@ -1903,20 +2364,21 @@ async def delete_alert(alert_id: str):
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     alert = next((a for a in MOCK_ALERTS if a["id"] == alert_id), None)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-    
+
     MOCK_ALERTS.remove(alert)
-    
+
     log_event("warning", "system", "road_safety_api.py", f"Alert deleted: {alert_id}")
-    
+
     return {"status": "deleted", "alert_id": alert_id}
 
 
 # ==================== CITIZEN REPORTS ====================
 CITIZEN_REPORTS = []
+
 
 @app.post("/api/citizen/reports", status_code=201)
 async def create_citizen_report(data: CitizenReportCreate):
@@ -1934,18 +2396,20 @@ async def create_citizen_report(data: CitizenReportCreate):
         "anonymous": data.anonymous,
         "attachments": data.attachments,
         "status": "pending",
-        "created_at": utcnow().isoformat()
+        "created_at": utcnow().isoformat(),
     }
     CITIZEN_REPORTS.append(report)
-    
+
     # Broadcast to connected clients
     try:
         from events import event_broadcaster
+
         await event_broadcaster.broadcast_citizen_report(report)
     except Exception as e:
         logger.warning(f"Failed to broadcast citizen report: {e}")
-    
+
     return report
+
 
 @app.get("/api/citizen/reports")
 async def list_citizen_reports(status: Optional[str] = None):
@@ -1954,6 +2418,7 @@ async def list_citizen_reports(status: Optional[str] = None):
         reports = [r for r in reports if r["status"] == status]
     return {"total": len(reports), "reports": reports}
 
+
 @app.get("/api/citizen/reports/{report_id}")
 async def get_citizen_report(report_id: str):
     report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
@@ -1961,13 +2426,14 @@ async def get_citizen_report(report_id: str):
         raise HTTPException(status_code=404, detail="Report not found")
     return report
 
+
 @app.put("/api/citizen/reports/{report_id}/status")
 async def update_citizen_report_status(report_id: str, status: str):
     """Update citizen report status"""
     report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     report["status"] = status
     return report
 
@@ -1984,18 +2450,20 @@ async def update_citizen_report(
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     if description:
         report["description"] = description
     if location:
         report["location"] = location
-    
-    log_event("info", "system", "road_safety_api.py", f"Citizen report updated: {report_id}")
-    
+
+    log_event(
+        "info", "system", "road_safety_api.py", f"Citizen report updated: {report_id}"
+    )
+
     return {"status": "updated", "report": report}
 
 
@@ -2006,24 +2474,28 @@ async def delete_citizen_report(report_id: str):
         from .logging_system import log_event
     except ModuleNotFoundError:
         from backend.logging_system import log_event
-    
+
     report = next((r for r in CITIZEN_REPORTS if r["id"] == report_id), None)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     CITIZEN_REPORTS.remove(report)
-    
-    log_event("warning", "system", "road_safety_api.py", f"Citizen report deleted: {report_id}")
-    
+
+    log_event(
+        "warning",
+        "system",
+        "road_safety_api.py",
+        f"Citizen report deleted: {report_id}",
+    )
+
     return {"status": "deleted", "report_id": report_id}
 
 
 # ==================== EVIDENCE UPLOAD ====================
-import os
-from fastapi import UploadFile, File
 
 EVIDENCE_DIR = "backend/data/evidence"
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
+
 
 @app.post("/api/evidence/attachments")
 async def upload_evidence(file: UploadFile = File(...)):
@@ -2033,12 +2505,12 @@ async def upload_evidence(file: UploadFile = File(...)):
         timestamp = int(datetime.now(timezone.utc).timestamp())
         filename = f"{timestamp}_{file.filename}"
         filepath = os.path.join(EVIDENCE_DIR, filename)
-        
+
         # Save file
         content = await file.read()
         with open(filepath, "wb") as f:
             f.write(content)
-        
+
         # Return URL path
         url_path = f"/api/evidence/files/{filename}"
         return {"url": url_path, "path": filepath, "filename": filename}
@@ -2046,14 +2518,17 @@ async def upload_evidence(file: UploadFile = File(...)):
         logger.error(f"Error uploading evidence: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload file")
 
+
 @app.get("/api/evidence/files/{filename}")
 async def get_evidence_file(filename: str):
     """Serve uploaded evidence files"""
     filepath = os.path.join(EVIDENCE_DIR, filename)
     if os.path.exists(filepath):
         from fastapi.responses import FileResponse
+
         return FileResponse(filepath)
     raise HTTPException(status_code=404, detail="File not found")
+
 
 # ==================== GENERATE MOCK DATA ====================
 @app.post("/api/admin/generate-mock-data")
@@ -2061,138 +2536,160 @@ async def generate_mock_data():
     road_safety_engine.generate_mock_data()
     return {"message": "Mock data generated successfully"}
 
+
 # ==================== DATABASE MANAGEMENT ====================
 @app.get("/api/admin/database/stats")
 async def get_database_stats():
     """Get database statistics"""
     from database_service import get_statistics
+
     return get_statistics()
+
 
 @app.post("/api/admin/database/backup")
 async def backup_database(backup_name: Optional[str] = None):
     """Create database backup"""
     from database_service import backup_database as backup_db
     from database_service import initialize_from_engine
-    
+
     # First save current engine data
-    initialize_from_engine({
-        "vehicles": {v.plate_number: v.__dict__ for v in road_safety_engine.vehicles.values()},
-        "accidents": road_safety_engine.accidents.values(),
-        "violations": road_safety_engine.violations.values(),
-        "drivers": road_safety_engine.drivers,
-        "speed_detections": road_safety_engine.speed_detections
-    })
-    
+    initialize_from_engine(
+        {
+            "vehicles": {
+                v.plate_number: v.__dict__ for v in road_safety_engine.vehicles.values()
+            },
+            "accidents": road_safety_engine.accidents.values(),
+            "violations": road_safety_engine.violations.values(),
+            "drivers": road_safety_engine.drivers,
+            "speed_detections": road_safety_engine.speed_detections,
+        }
+    )
+
     backup_path = backup_db(backup_name)
     return {"message": "Database backed up successfully", "backup_file": backup_path}
+
 
 @app.post("/api/admin/database/restore")
 async def restore_database(backup_file: str):
     """Restore database from backup"""
     from database_service import restore_database as restore_db
+
     success = restore_db(backup_file)
     if success:
         return {"message": "Database restored successfully"}
     raise HTTPException(status_code=400, detail="Failed to restore database")
 
+
 @app.post("/api/admin/database/clear")
 async def clear_database():
     """Clear database"""
     from database_service import clear_database
+
     clear_database()
     return {"message": "Database cleared successfully"}
+
 
 # ==================== WEBSOCKET ====================
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.authenticated_connections: Dict[str, Dict] = {}
-    
-    async def connect(self, websocket: WebSocket, client_id: str, token: Optional[str] = None):
+
+    async def connect(
+        self, websocket: WebSocket, client_id: str, token: Optional[str] = None
+    ):
         """Connect with optional authentication - token required in production"""
         await websocket.accept()
-        
+
         # Check if authentication is required
         import os
+
         env = os.environ.get("OVERWATCH_ENV", "development")
         require_auth = env == "production"
-        
+
         # Try to authenticate
         authenticated = False
         user_id = None
         role = None
-        
+
         if token:
             try:
                 from auth import verify_access_token
+
                 payload = verify_access_token(token)
                 authenticated = True
                 user_id = payload.sub
                 role = payload.role
-            except Exception as e:
+            except Exception:
                 if require_auth:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Invalid or expired token"
-                    })
+                    await websocket.send_json(
+                        {"type": "error", "message": "Invalid or expired token"}
+                    )
                     await websocket.close(code=4001)
                     return
         elif require_auth:
-            await websocket.send_json({
-                "type": "error",
-                "message": "Authentication required"
-            })
+            await websocket.send_json(
+                {"type": "error", "message": "Authentication required"}
+            )
             await websocket.close(code=4001)
             return
-        
+
         self.active_connections[client_id] = websocket
         self.authenticated_connections[client_id] = {
             "connected_at": datetime.now(timezone.utc),
             "authenticated": authenticated,
             "user_id": user_id,
             "role": role,
-            "channels": []
+            "channels": [],
         }
-        
+
         # Send auth status
-        await websocket.send_json({
-            "type": "connected",
-            "authenticated": authenticated,
-            "user_id": user_id,
-            "role": role
-        })
-    
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "authenticated": authenticated,
+                "user_id": user_id,
+                "role": role,
+            }
+        )
+
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
             del self.active_connections[client_id]
         if client_id in self.authenticated_connections:
             del self.authenticated_connections[client_id]
-    
+
     async def send_personal_message(self, message: dict, client_id: str):
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_json(message)
-    
+
     async def broadcast(self, message: dict):
         for connection in self.active_connections.values():
             await connection.send_json(message)
-    
+
     def is_authenticated(self, client_id: str) -> bool:
-        return self.authenticated_connections.get(client_id, {}).get("authenticated", False)
-    
+        return self.authenticated_connections.get(client_id, {}).get(
+            "authenticated", False
+        )
+
     def get_authenticated_users(self) -> Dict[str, Dict]:
         """Get all authenticated connections"""
         return {
-            cid: info for cid, info in self.authenticated_connections.items()
+            cid: info
+            for cid, info in self.authenticated_connections.items()
             if info.get("authenticated")
         }
 
+
 manager = ConnectionManager()
+
 
 # ==================== CCTV & STREAMS ====================
 @app.get("/api/cctv/simulate/{camera_id}/frame")
 async def simulate_camera_frame(camera_id: str):
     """Simulate a camera frame"""
     from services.cctv_simulation import cctv_simulator
+
     frame = cctv_simulator.generate_frame(camera_id)
     return {
         "camera_id": frame.camera_id,
@@ -2202,50 +2699,64 @@ async def simulate_camera_frame(camera_id: str):
         "average_speed": frame.average_speed,
         "detections": frame.detections,
         "anomaly_detected": frame.anomaly_detected,
-        "image_quality": frame.image_quality
+        "image_quality": frame.image_quality,
     }
+
 
 @app.post("/api/cctv/simulate/{camera_id}/start")
 async def start_cctv_stream(camera_id: str):
     """Start a simulated camera stream"""
     from services.cctv_simulation import cctv_simulator
+
     cctv_simulator.start_stream(camera_id)
     return {"message": "Stream started", "camera_id": camera_id}
+
 
 @app.post("/api/cctv/simulate/{camera_id}/stop")
 async def stop_cctv_stream(camera_id: str):
     """Stop a simulated camera stream"""
     from services.cctv_simulation import cctv_simulator
+
     cctv_simulator.stop_stream(camera_id)
     return {"message": "Stream stopped", "camera_id": camera_id}
+
 
 @app.get("/api/cctv/anpr/process/{camera_id}")
 async def process_anpr(camera_id: str):
     """Process ANPR on simulated frame"""
     from services.cctv_simulation import cctv_simulator, anpr_simulator
+
     frame = cctv_simulator.generate_frame(camera_id)
     result = anpr_simulator.process_frame(frame)
     return result
+
 
 @app.get("/api/cctv/anpr/stats")
 async def get_anpr_stats():
     """Get ANPR statistics"""
     from services.cctv_simulation import anpr_simulator
+
     return anpr_simulator.get_statistics()
+
 
 @app.get("/api/cctv/traffic/peak-hours")
 async def get_peak_hours():
     """Get peak traffic hours"""
     from services.cctv_simulation import traffic_analyzer
+
     return traffic_analyzer.get_peak_hours()
+
 
 @app.get("/api/cctv/traffic/score/{hour}")
 async def get_traffic_score(hour: int):
     """Get traffic score for an hour"""
     from services.cctv_simulation import traffic_analyzer
+
     return {"hour": hour, "score": traffic_analyzer.get_traffic_score(hour)}
 
+
 # ==================== RUN ====================
+
 
 # Background task to broadcast updates
 async def broadcast_updates():
@@ -2254,52 +2765,67 @@ async def broadcast_updates():
         await asyncio.sleep(30)
         try:
             stats = road_safety_engine.get_dashboard_stats()
-            await manager.broadcast({
-                "type": "stats_update",
-                "data": serialize_for_json(stats),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            })
+            await manager.broadcast(
+                {
+                    "type": "stats_update",
+                    "data": serialize_for_json(stats),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
         except Exception as e:
             logger.error(f"Error broadcasting updates: {e}")
+
 
 # Real-time event notification system
 async def notify_accident_created(accident_data: dict):
     """Notify all clients about new accident"""
-    await manager.broadcast({
-        "type": "accident_created",
-        "data": accident_data,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    await manager.broadcast(
+        {
+            "type": "accident_created",
+            "data": accident_data,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
 
 async def notify_violation_created(violation_data: dict):
     """Notify all clients about new violation"""
-    await manager.broadcast({
-        "type": "violation_created",
-        "data": violation_data,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    await manager.broadcast(
+        {
+            "type": "violation_created",
+            "data": violation_data,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
 
 async def notify_alert_created(alert_data: dict):
     """Notify all clients about new alert"""
-    await manager.broadcast({
-        "type": "alert_created",
-        "data": alert_data,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    await manager.broadcast(
+        {
+            "type": "alert_created",
+            "data": alert_data,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
 
 async def notify_speed_violation(detection_data: dict, violation_data: dict):
     """Notify about speed violation"""
-    await manager.broadcast({
-        "type": "speed_violation",
-        "detection": detection_data,
-        "violation": violation_data,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    await manager.broadcast(
+        {
+            "type": "speed_violation",
+            "detection": detection_data,
+            "violation": violation_data,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
 
 # WebSocket channel types
 WEBSOCKET_CHANNELS = {
     "accidents": "Real-time accident updates",
-    "violations": "Real-time violation updates", 
+    "violations": "Real-time violation updates",
     "alerts": "Real-time alert broadcasts",
     "speed": "Speed detection events",
     "dashboard": "Dashboard statistics",
@@ -2308,15 +2834,17 @@ WEBSOCKET_CHANNELS = {
 }
 
 # ==================== IAM (Identity & Access Management) ====================
-from security.iam.manager import IAMManager, ResourceType, Action, UserStatus as IAMUserStatus
+from security.iam.manager import IAMManager, ResourceType, Action
 
 iam_manager = IAMManager(storage_path="data/iam")
+
 
 @app.get("/api/iam/roles")
 async def get_roles():
     """Get all roles"""
     roles = iam_manager.roles.values()
     return {"roles": [r.to_dict() for r in roles]}
+
 
 @app.get("/api/iam/roles/{role_id}")
 async def get_role(role_id: str):
@@ -2326,24 +2854,28 @@ async def get_role(role_id: str):
         raise HTTPException(status_code=404, detail="Role not found")
     return role.to_dict()
 
+
 @app.post("/api/iam/roles")
 async def create_role(
     name: str,
     description: str,
     permissions: List[dict],
-    current_user: dict = Depends(lambda: {"role": "admin"})
+    current_user: dict = Depends(lambda: {"role": "admin"}),
 ):
     """Create a new role"""
     from security.iam.manager import Permission
+
     perms = [Permission.from_dict(p) for p in permissions]
     role = iam_manager.create_role(name, description, perms)
     return role.to_dict()
+
 
 @app.get("/api/iam/users")
 async def get_iam_users():
     """Get all IAM users"""
     users = iam_manager.users.values()
     return {"users": [u.to_dict() for u in users]}
+
 
 @app.get("/api/iam/users/{user_id}")
 async def get_iam_user(user_id: str):
@@ -2352,6 +2884,7 @@ async def get_iam_user(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.to_dict()
+
 
 @app.post("/api/iam/users")
 async def create_iam_user(
@@ -2362,10 +2895,11 @@ async def create_iam_user(
     first_name: str = "",
     last_name: str = "",
     phone: str = "",
-    department: str = ""
+    department: str = "",
 ):
     """Create a new IAM user"""
     from auth import hash_password
+
     password_hash = hash_password(password)
     user = iam_manager.create_user(
         username=username,
@@ -2375,9 +2909,10 @@ async def create_iam_user(
         first_name=first_name,
         last_name=last_name,
         phone=phone,
-        department=department
+        department=department,
     )
     return user.to_dict()
+
 
 @app.put("/api/iam/users/{user_id}")
 async def update_iam_user(user_id: str, **kwargs):
@@ -2387,6 +2922,7 @@ async def update_iam_user(user_id: str, **kwargs):
         raise HTTPException(status_code=404, detail="User not found")
     return user.to_dict()
 
+
 @app.delete("/api/iam/users/{user_id}")
 async def delete_iam_user(user_id: str):
     """Delete an IAM user"""
@@ -2394,6 +2930,7 @@ async def delete_iam_user(user_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
     return {"status": "deleted"}
+
 
 @app.post("/api/iam/users/{user_id}/assign-role/{role_id}")
 async def assign_user_role(user_id: str, role_id: str):
@@ -2403,42 +2940,51 @@ async def assign_user_role(user_id: str, role_id: str):
         raise HTTPException(status_code=404, detail="User or role not found")
     return {"status": "role_assigned"}
 
+
 @app.get("/api/iam/check-permission")
-async def check_permission(
-    user_id: str,
-    resource: str,
-    action: str
-):
+async def check_permission(user_id: str, resource: str, action: str):
     """Check if a user has permission for a resource action"""
     try:
         resource_type = ResourceType(resource)
         action_type = Action(action)
-        has_permission = iam_manager.check_permission(user_id, resource_type, action_type)
-        return {"user_id": user_id, "resource": resource, "action": action, "has_permission": has_permission}
+        has_permission = iam_manager.check_permission(
+            user_id, resource_type, action_type
+        )
+        return {
+            "user_id": user_id,
+            "resource": resource,
+            "action": action,
+            "has_permission": has_permission,
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # Include chat router
 from .chat_system import router as chat_router
+
 app.include_router(chat_router)
 
 # ==================== WEBSOCKET ENDPOINT ====================
 from .events import event_broadcaster, EventType
 
+
 @app.websocket("/ws/road_safety")
 async def websocket_road_safety(websocket: WebSocket):
     """WebSocket endpoint for real-time road safety updates"""
     await websocket.accept()
-    
+
     # Subscribe to events
     event_broadcaster.subscribe(websocket, ["all", EventType.CITIZEN_REPORT.value])
-    
+
     # Send initial connection message
-    await websocket.send_json({
-        "type": "connected",
-        "message": "Connected to Kenya Overwatch real-time updates"
-    })
-    
+    await websocket.send_json(
+        {
+            "type": "connected",
+            "message": "Connected to Kenya Overwatch real-time updates",
+        }
+    )
+
     try:
         while True:
             data = await websocket.receive_text()
@@ -2448,10 +2994,9 @@ async def websocket_road_safety(websocket: WebSocket):
                 if message.get("type") == "subscribe":
                     channels = message.get("channels", [])
                     event_broadcaster.subscribe(websocket, channels)
-                    await websocket.send_json({
-                        "type": "subscribed",
-                        "channels": channels
-                    })
+                    await websocket.send_json(
+                        {"type": "subscribed", "channels": channels}
+                    )
             except json.JSONDecodeError:
                 pass
     except Exception:
@@ -2468,9 +3013,9 @@ async def get_system_overview():
         from .cache import cache
     except ModuleNotFoundError:
         from backend.cache import cache
-    
+
     cache_stats = cache.get_stats()
-    
+
     return {
         "timestamp": utcnow().isoformat(),
         "status": "healthy",
@@ -2478,13 +3023,15 @@ async def get_system_overview():
         "services": {
             "api": "operational",
             "database": "connected",
-            "cache": "operational" if cache_stats.get("backend") == "redis" else "in-memory",
+            "cache": (
+                "operational" if cache_stats.get("backend") == "redis" else "in-memory"
+            ),
             "websocket": "operational",
         },
         "resources": {
             "cpu_percent": psutil.cpu_percent(),
             "memory_percent": psutil.virtual_memory().percent,
-            "disk_percent": psutil.disk_usage('/').percent,
+            "disk_percent": psutil.disk_usage("/").percent,
         },
         "cache": cache_stats,
         "settings": system_settings.get(),
@@ -2498,15 +3045,15 @@ async def get_metrics():
         from .cache import cache
     except ModuleNotFoundError:
         from backend.cache import cache
-    
+
     cache_stats = cache.get_stats()
-    
+
     return {
         "timestamp": utcnow().isoformat(),
         "system": {
             "cpu_percent": psutil.cpu_percent(),
             "memory_percent": psutil.virtual_memory().percent,
-            "disk_percent": psutil.disk_usage('/').percent,
+            "disk_percent": psutil.disk_usage("/").percent,
         },
         "cache": cache_stats,
         "uptime": time.time(),
@@ -2518,8 +3065,8 @@ async def prometheus_metrics():
     """Prometheus-formatted metrics"""
     cpu = psutil.cpu_percent()
     mem = psutil.virtual_memory()
-    disk = psutil.disk_usage('/')
-    
+    disk = psutil.disk_usage("/")
+
     metrics = f"""# HELP kenya_overwatch_cpu_percent CPU usage percentage
 # TYPE kenya_overwatch_cpu_percent gauge
 kenya_overwatch_cpu_percent {cpu}
@@ -2551,28 +3098,28 @@ kenya_overwatch_active_teams {random.randint(3, 10)}
 @app.get("/api/export/incidents")
 async def export_incidents(format: str = "json"):
     """Export incidents data in various formats"""
-    incidents = MOCK_INCIDENTS
-    
+    incidents = [a.to_dict() for a in road_safety_engine.get_all_accidents()]
+
     if format == "csv":
         csv_data = "id,type,location,severity,status,created_at\n"
         for inc in incidents:
-            csv_data += f'{inc.get("incident_id", "")},{inc.get("incident_type", "")},{inc.get("location", "")},{inc.get("severity", "")},{inc.get("status", "")},{inc.get("created_at", "")}\n'
+            csv_data += f'{inc.get("id", "")},{inc.get("accident_type", "")},{inc.get("location", "")},{inc.get("severity", "")},{inc.get("status", "")},{inc.get("reported_at", "")}\n'
         return PlainTextResponse(csv_data, media_type="text/csv")
-    
+
     return {"total": len(incidents), "incidents": incidents}
 
 
 @app.get("/api/export/violations")
 async def export_violations(format: str = "json"):
     """Export violations data in various formats"""
-    violations = MOCK_VIOLATIONS
-    
+    violations = [v.to_dict() for v in road_safety_engine.get_all_violations()]
+
     if format == "csv":
         csv_data = "id,type,vehicle_plate,speed_detected,speed_limit,location,status,created_at\n"
         for v in violations:
-            csv_data += f'{v.get("violation_id", "")},{v.get("violation_type", "")},{v.get("vehicle_plate", "")},{v.get("speed_detected", "")},{v.get("speed_limit", "")},{v.get("location", "")},{v.get("status", "")},{v.get("created_at", "")}\n'
+            csv_data += f'{v.get("id", "")},{v.get("violation_type", "")},{v.get("plate_number", "")},{v.get("speed_detected", "")},{v.get("speed_limit", "")},{v.get("location", "")},{v.get("status", "")},{v.get("detected_at", "")}\n'
         return PlainTextResponse(csv_data, media_type="text/csv")
-    
+
     return {"total": len(violations), "violations": violations}
 
 
@@ -2580,65 +3127,1048 @@ async def export_violations(format: str = "json"):
 async def export_citizen_reports(format: str = "json"):
     """Export citizen reports in various formats"""
     reports = CITIZEN_REPORTS
-    
+
     if format == "csv":
         csv_data = "id,type,location,status,anonymous,created_at\n"
         for r in reports:
             csv_data += f'{r.get("id", "")},{r.get("type", "")},{r.get("location", "")},{r.get("status", "")},{r.get("anonymous", "")},{r.get("created_at", "")}\n'
         return PlainTextResponse(csv_data, media_type="text/csv")
-    
+
     return {"total": len(reports), "reports": reports}
 
 
 @app.get("/api/reports/generate")
 async def generate_report(
-    report_type: str = Query(..., description="Type of report: incidents, violations, summary"),
+    report_type: str = Query(
+        ..., description="Type of report: incidents, violations, summary"
+    ),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    format: str = Query("json", description="Output format: json, csv")
+    format: str = Query("json", description="Output format: json, csv"),
 ):
     """Generate comprehensive reports"""
     from datetime import datetime
-    
+
     try:
         start = datetime.fromisoformat(start_date) if start_date else datetime.now()
         end = datetime.fromisoformat(end_date) if end_date else datetime.now()
-    except:
+    except Exception:
         start = datetime.now()
         end = datetime.now()
-    
+
     if report_type == "incidents":
-        data = MOCK_INCIDENTS
+        data = [a.to_dict() for a in road_safety_engine.get_all_accidents()]
     elif report_type == "violations":
-        data = MOCK_VIOLATIONS
+        data = [v.to_dict() for v in road_safety_engine.get_all_violations()]
     elif report_type == "summary":
         data = {
-            "total_incidents": len(MOCK_INCIDENTS),
-            "total_violations": len(MOCK_VIOLATIONS),
+            "total_incidents": len(road_safety_engine.accidents),
+            "total_violations": len(road_safety_engine.violations),
             "total_citizen_reports": len(CITIZEN_REPORTS),
-            "total_vehicles": len(MOCK_VEHICLES),
-            "total_drivers": len(MOCK_DRIVERS),
-            "generated_at": utcnow().isoformat()
+            "total_vehicles": len(road_safety_engine.vehicles),
+            "total_drivers": len(road_safety_engine.drivers),
+            "generated_at": utcnow().isoformat(),
         }
     else:
         data = []
-    
+
     if format == "csv" and isinstance(data, list):
         csv_data = "data\n"
         for item in data:
             csv_data += f"{json.dumps(item)}\n"
         return PlainTextResponse(csv_data, media_type="text/csv")
-    
+
     return {
         "report_type": report_type,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "generated_at": utcnow().isoformat(),
-        "data": data
+        "data": data,
     }
+
+
+# ==================== COUNTY ANALYSIS ====================
+
+KENYA_COUNTIES = [
+    {"code": "001", "name": "Mombasa", "region": "Coastal", "capital": "Mombasa", "population": 1208333},
+    {"code": "002", "name": "Kwale", "region": "Coastal", "capital": "Kwale", "population": 866820},
+    {"code": "003", "name": "Kilifi", "region": "Coastal", "capital": "Kilifi", "population": 1453787},
+    {"code": "004", "name": "Tana River", "region": "Coastal", "capital": "Hola", "population": 315943},
+    {"code": "005", "name": "Lamu", "region": "Coastal", "capital": "Lamu", "population": 143920},
+    {"code": "006", "name": "Taita Taveta", "region": "Coastal", "capital": "Voi", "population": 340671},
+    {"code": "007", "name": "Garissa", "region": "North Eastern", "capital": "Garissa", "population": 841353},
+    {"code": "008", "name": "Wajir", "region": "North Eastern", "capital": "Wajir", "population": 781263},
+    {"code": "009", "name": "Mandera", "region": "North Eastern", "capital": "Mandera", "population": 867457},
+    {"code": "010", "name": "Marsabit", "region": "Eastern", "capital": "Marsabit", "population": 459785},
+    {"code": "011", "name": "Isiolo", "region": "Eastern", "capital": "Isiolo", "population": 268002},
+    {"code": "012", "name": "Meru", "region": "Eastern", "capital": "Meru", "population": 1545714},
+    {"code": "013", "name": "Tharaka Nithi", "region": "Eastern", "capital": "Chuka", "population": 393177},
+    {"code": "014", "name": "Embu", "region": "Eastern", "capital": "Embu", "population": 608599},
+    {"code": "015", "name": "Kitui", "region": "Eastern", "capital": "Kitui", "population": 1136187},
+    {"code": "016", "name": "Machakos", "region": "Eastern", "capital": "Machakos", "population": 1421932},
+    {"code": "017", "name": "Makueni", "region": "Eastern", "capital": "Wote", "population": 987653},
+    {"code": "018", "name": "Nyandarua", "region": "Central", "capital": "Ol Kalou", "population": 638289},
+    {"code": "019", "name": "Nyeri", "region": "Central", "capital": "Nyeri", "population": 759164},
+    {"code": "020", "name": "Kirinyaga", "region": "Central", "capital": "Kerugoya", "population": 610411},
+    {"code": "021", "name": "Murang'a", "region": "Central", "capital": "Murang'a", "population": 1056640},
+    {"code": "022", "name": "Kiambu", "region": "Central", "capital": "Kiambu", "population": 2417735},
+    {"code": "023", "name": "Turkana", "region": "Rift Valley", "capital": "Lodwar", "population": 926976},
+    {"code": "024", "name": "West Pokot", "region": "Rift Valley", "capital": "Kapenguria", "population": 621241},
+    {"code": "025", "name": "Samburu", "region": "Rift Valley", "capital": "Maralal", "population": 310327},
+    {"code": "026", "name": "Trans Nzoia", "region": "Rift Valley", "capital": "Kitale", "population": 990341},
+    {"code": "027", "name": "Uasin Gishu", "region": "Rift Valley", "capital": "Eldoret", "population": 1163186},
+    {"code": "028", "name": "Elgeyo Marakwet", "region": "Rift Valley", "capital": "Iten", "population": 454480},
+    {"code": "029", "name": "Nandi", "region": "Rift Valley", "capital": "Kapsabet", "population": 885711},
+    {"code": "030", "name": "Baringo", "region": "Rift Valley", "capital": "Kabarnet", "population": 666763},
+    {"code": "031", "name": "Laikipia", "region": "Rift Valley", "capital": "Rumuruti", "population": 518560},
+    {"code": "032", "name": "Nakuru", "region": "Rift Valley", "capital": "Nakuru", "population": 2162202},
+    {"code": "033", "name": "Narok", "region": "Rift Valley", "capital": "Narok", "population": 1157873},
+    {"code": "034", "name": "Kajiado", "region": "Rift Valley", "capital": "Kajiado", "population": 1117840},
+    {"code": "035", "name": "Kericho", "region": "Rift Valley", "capital": "Kericho", "population": 901777},
+    {"code": "036", "name": "Bomet", "region": "Rift Valley", "capital": "Bomet", "population": 875689},
+    {"code": "037", "name": "Kakamega", "region": "Western", "capital": "Kakamega", "population": 1867579},
+    {"code": "038", "name": "Vihiga", "region": "Western", "capital": "Vihiga", "population": 590013},
+    {"code": "039", "name": "Bungoma", "region": "Western", "capital": "Bungoma", "population": 1670570},
+    {"code": "040", "name": "Busia", "region": "Western", "capital": "Busia", "population": 893681},
+    {"code": "041", "name": "Siaya", "region": "Nyanza", "capital": "Siaya", "population": 993183},
+    {"code": "042", "name": "Kisumu", "region": "Nyanza", "capital": "Kisumu", "population": 1155574},
+    {"code": "043", "name": "Homa Bay", "region": "Nyanza", "capital": "Homa Bay", "population": 1131950},
+    {"code": "044", "name": "Migori", "region": "Nyanza", "capital": "Migori", "population": 1116436},
+    {"code": "045", "name": "Kisii", "region": "Nyanza", "capital": "Kisii", "population": 1266860},
+    {"code": "046", "name": "Nyamira", "region": "Nyanza", "capital": "Nyamira", "population": 605576},
+    {"code": "047", "name": "Nairobi", "region": "Nairobi", "capital": "Nairobi", "population": 4397073},
+]
+
+
+def _generate_county_data():
+    """Generate realistic county road safety data"""
+    import random
+    random.seed(42)
+    counties = []
+    for county in KENYA_COUNTIES:
+        risk = random.randint(15, 95)
+        accidents = random.randint(50, 800)
+        violations = random.randint(200, 5000)
+        fatalities = random.randint(5, 120)
+        injuries = random.randint(20, 400)
+        counties.append({
+            **county,
+            "road_density": round(random.uniform(0.2, 2.5), 2),
+            "total_accidents": accidents,
+            "total_violations": violations,
+            "fatalities": fatalities,
+            "injuries": injuries,
+            "risk_score": risk,
+            "trend": random.choice(["increasing", "decreasing", "stable"]),
+        })
+    return counties
+
+
+def _generate_region_data(counties_data):
+    """Aggregate county data by region"""
+    regions = {}
+    for c in counties_data:
+        r = c["region"]
+        if r not in regions:
+            regions[r] = {
+                "region": r,
+                "county_count": 0,
+                "total_accidents": 0,
+                "total_violations": 0,
+                "total_fatalities": 0,
+                "total_injuries": 0,
+                "total_population": 0,
+                "risk_scores": [],
+            }
+        regions[r]["county_count"] += 1
+        regions[r]["total_accidents"] += c["total_accidents"]
+        regions[r]["total_violations"] += c["total_violations"]
+        regions[r]["total_fatalities"] += c["fatalities"]
+        regions[r]["total_injuries"] += c["injuries"]
+        regions[r]["total_population"] += c["population"]
+        regions[r]["risk_scores"].append(c["risk_score"])
+
+    result = []
+    for r in regions.values():
+        result.append({
+            "region": r["region"],
+            "county_count": r["county_count"],
+            "total_accidents": r["total_accidents"],
+            "total_violations": r["total_violations"],
+            "total_fatalities": r["total_fatalities"],
+            "total_injuries": r["total_injuries"],
+            "total_population": r["total_population"],
+            "risk_score": round(sum(r["risk_scores"]) / len(r["risk_scores"]), 1),
+        })
+    return result
+
+
+COUNTY_DATA = _generate_county_data()
+REGION_DATA = _generate_region_data(COUNTY_DATA)
+
+
+@app.get("/api/county/summary")
+async def get_county_summary(
+    period: str = Query("month", description="Period: week, month, year"),
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Get road safety summary for all counties"""
+    return {
+        "period": period,
+        "counties": COUNTY_DATA,
+        "total_counties": len(COUNTY_DATA),
+        "generated_at": utcnow().isoformat(),
+    }
+
+
+@app.get("/api/county/regions")
+async def get_county_regions(
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Get aggregated regional data"""
+    return {"regions": REGION_DATA, "total_regions": len(REGION_DATA)}
+
+
+@app.get("/api/county/{county_name}")
+async def get_county_detail(
+    county_name: str,
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Get detailed data for a specific county"""
+    for county in COUNTY_DATA:
+        if county["name"].lower() == county_name.lower():
+            return {"county": county}
+    raise HTTPException(status_code=404, detail="County not found")
+
+
+@app.get("/api/county/weather/impact")
+async def get_weather_impact(
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Get weather impact data by county"""
+    import random
+    random.seed(42)
+    weather_data = []
+    for county in KENYA_COUNTIES:
+        weather_data.append({
+            "county": county["name"],
+            "region": county["region"],
+            "rainfall_risk": random.choice(["Low", "Medium", "High"]),
+            "flood_risk": random.choice(["Low", "Medium", "High", "Critical"]),
+            "fog_visibility": random.choice(["Good", "Moderate", "Poor"]),
+            "heat_wave_risk": random.choice(["Low", "Medium", "High"]),
+            "affected_roads": random.randint(0, 15),
+        })
+    return {"weather_impact": weather_data}
+
+
+@app.get("/api/county/traffic/congestion")
+async def get_traffic_congestion(
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Get traffic congestion data by county"""
+    import random
+    random.seed(42)
+    congestion_data = []
+    for county in KENYA_COUNTIES:
+        congestion_data.append({
+            "county": county["name"],
+            "region": county["region"],
+            "congestion_index": round(random.uniform(0.2, 0.95), 2),
+            "avg_travel_time_min": random.randint(15, 90),
+            "peak_hour_delay_min": random.randint(5, 45),
+            "road_capacity_pct": random.randint(40, 120),
+            "primary_congestion_cause": random.choice([
+                "Accident", "Road works", "Weather", "Traffic volume",
+                "Vehicle breakdown", "Flooding", "Market day"
+            ]),
+        })
+    return {"congestion_index": congestion_data}
+
+
+@app.get("/api/county/report/{county_name}")
+async def get_county_report(
+    county_name: str,
+    report_type: str = Query("executive"),
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Generate a county road safety report"""
+    county = None
+    for c in COUNTY_DATA:
+        if c["name"].lower() == county_name.lower():
+            county = c
+            break
+    if not county:
+        raise HTTPException(status_code=404, detail="County not found")
+    return {
+        "county": county["name"],
+        "report_type": report_type,
+        "period": "month",
+        "summary": {
+            "total_accidents": county["total_accidents"],
+            "total_violations": county["total_violations"],
+            "fatalities": county["fatalities"],
+            "injuries": county["injuries"],
+            "risk_score": county["risk_score"],
+            "trend": county["trend"],
+        },
+        "recommendations": [
+            f"Increase patrol frequency on high-risk roads in {county['name']}",
+            "Install additional speed cameras at accident hotspots",
+            "Conduct road safety awareness campaigns",
+        ],
+        "generated_at": utcnow().isoformat(),
+    }
+
+
+# ==================== DISPATCH ENDPOINTS ====================
+
+DISPATCHES = []
+
+
+@app.get("/api/dispatch")
+async def get_dispatches():
+    """Get all dispatches"""
+    return {"dispatches": DISPATCHES}
+
+
+@app.post("/api/dispatch")
+async def create_dispatch(
+    incident_id: str = Body(...),
+    responder_id: str = Body(...),
+    notes: Optional[str] = Body(None),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Create a new dispatch"""
+    from .roles import require_roles
+    require_roles(current_user, "admin", "officer")
+
+    dispatch = {
+        "id": f"DSP-{len(DISPATCHES) + 1:04d}",
+        "incident_id": incident_id,
+        "responder_id": responder_id,
+        "status": "dispatched",
+        "dispatched_at": utcnow().isoformat(),
+        "eta_minutes": 15,
+        "notes": notes,
+        "dispatched_by": current_user.username,
+    }
+    DISPATCHES.append(dispatch)
+
+    try:
+        from .logging_system import log_event
+    except ImportError:
+        from backend.logging_system import log_event
+    log_event("info", "dispatch", "road_safety_api.py", f"Dispatch created: {dispatch['id']}")
+
+    return dispatch
+
+
+@app.get("/api/dispatch/incident/{incident_id}")
+async def get_dispatch_for_incident(incident_id: str):
+    """Get dispatches for a specific incident"""
+    incident_dispatches = [d for d in DISPATCHES if d["incident_id"] == incident_id]
+    return {"dispatches": incident_dispatches}
+
+
+# ==================== SATELLITE ENDPOINTS ====================
+
+SATELLITE_IMAGERY = [
+    {"satellite_id": "S2A_MSIL2A", "satellite_type": "Sentinel-2", "sensor": "MSI",
+     "acquisition_date": "2026-03-14T08:30:00Z", "cloud_coverage": 12.5, "spatial_resolution": 10},
+    {"satellite_id": "S2B_MSIL2A", "satellite_type": "Sentinel-2", "sensor": "MSI",
+     "acquisition_date": "2026-03-13T09:15:00Z", "cloud_coverage": 8.2, "spatial_resolution": 10},
+    {"satellite_id": "S1A_IW_GRD", "satellite_type": "Sentinel-1", "sensor": "SAR",
+     "acquisition_date": "2026-03-14T04:00:00Z", "cloud_coverage": 0, "spatial_resolution": 20},
+    {"satellite_id": "LC08_L2SP", "satellite_type": "Landsat-8", "sensor": "OLI",
+     "acquisition_date": "2026-03-12T07:45:00Z", "cloud_coverage": 22.1, "spatial_resolution": 30},
+    {"satellite_id": "LC09_L2SP", "satellite_type": "Landsat-9", "sensor": "OLI-2",
+     "acquisition_date": "2026-03-11T08:00:00Z", "cloud_coverage": 15.8, "spatial_resolution": 30},
+]
+
+SATELLITE_HAZARDS = [
+    {"id": "HZ001", "hazard_type": "Flooding", "severity": "High", "confidence": 0.87,
+     "latitude": -1.29, "longitude": 36.82, "county": "Nairobi", "roads_affected": ["Mombasa Road", "Outer Ring"]},
+    {"id": "HZ002", "hazard_type": "Landslide", "severity": "Medium", "confidence": 0.72,
+     "latitude": -0.36, "longitude": 36.95, "county": "Nakuru", "roads_affected": ["Nakuru-Eldoret Highway"]},
+    {"id": "HZ003", "hazard_type": "Road Damage", "severity": "High", "confidence": 0.91,
+     "latitude": -4.05, "longitude": 39.66, "county": "Mombasa", "roads_affected": ["Mombasa-Malindi Road"]},
+    {"id": "HZ004", "hazard_type": "Water Accumulation", "severity": "Low", "confidence": 0.65,
+     "latitude": -0.09, "longitude": 34.77, "county": "Kisumu", "roads_affected": ["Kisumu-Busia Road"]},
+    {"id": "HZ005", "hazard_type": "Flooding", "severity": "Critical", "confidence": 0.94,
+     "latitude": -1.52, "longitude": 37.27, "county": "Machakos", "roads_affected": ["Nairobi-Mombasa Highway"]},
+]
+
+
+@app.get("/api/satellite/imagery")
+async def get_satellite_imagery():
+    """Get satellite imagery data"""
+    return {"images": SATELLITE_IMAGERY}
+
+
+@app.get("/api/satellite/hazards")
+async def get_satellite_hazards():
+    """Get detected hazards from satellite imagery"""
+    return {"hazards": SATELLITE_HAZARDS}
+
+
+@app.get("/api/satellite/coverage/statistics")
+async def get_satellite_coverage_stats():
+    """Get satellite coverage statistics"""
+    return {
+        "statistics": {
+            "total_images": len(SATELLITE_IMAGERY),
+            "by_satellite": {"Sentinel-2": 2, "Sentinel-1": 1, "Landsat-8": 1, "Landsat-9": 1},
+            "total_hazards": len(SATELLITE_HAZARDS),
+            "hazard_types": {"Flooding": 2, "Landslide": 1, "Road Damage": 1, "Water Accumulation": 1},
+            "severity_distribution": {"Critical": 1, "High": 2, "Medium": 1, "Low": 1},
+            "counties_affected": 5,
+        }
+    }
+
+
+# ==================== KENYAN PLATE SYSTEM ====================
+
+try:
+    from .kenyan_plates import classify_plate, validate_plate, get_plate_display_info, PlateCategory, EXAMPLE_PLATES
+except ImportError:
+    from backend.kenyan_plates import classify_plate, validate_plate, get_plate_display_info, PlateCategory, EXAMPLE_PLATES
+
+
+@app.get("/api/plates/classify/{plate_number}")
+async def classify_number_plate(plate_number: str):
+    """Classify a Kenyan number plate and return detailed information"""
+    info = classify_plate(plate_number)
+    return {
+        "plate": info.normalized_plate,
+        "category": info.category.value,
+        "is_valid": info.is_valid,
+        "region": info.region,
+        "generation": info.generation,
+        "vehicle_class": info.vehicle_class,
+        "front_color": info.front_color,
+        "rear_color": info.rear_color,
+        "text_color": info.text_color,
+        "country_code": info.country_code,
+        "organization": info.organization,
+        "rank": info.rank,
+        "warnings": info.warnings,
+    }
+
+
+@app.get("/api/plates/validate/{plate_number}")
+async def validate_number_plate(plate_number: str):
+    """Validate a Kenyan number plate"""
+    is_valid, warnings = validate_plate(plate_number)
+    return {
+        "plate": plate_number.upper(),
+        "is_valid": is_valid,
+        "warnings": warnings,
+    }
+
+
+@app.get("/api/plates/categories")
+async def get_plate_categories():
+    """Get all Kenyan plate categories"""
+    return {
+        "categories": [
+            {"id": cat.value, "name": cat.value.replace("_", " ").title()}
+            for cat in PlateCategory if cat != PlateCategory.UNKNOWN
+        ]
+    }
+
+
+@app.get("/api/plates/examples")
+async def get_plate_examples():
+    """Get example plates for each category"""
+    examples = []
+    for plate in EXAMPLE_PLATES:
+        info = classify_plate(plate)
+        examples.append({
+            "plate": plate,
+            "category": info.category.value,
+            "vehicle_class": info.vehicle_class,
+            "colors": f"{info.front_color}/{info.rear_color}",
+        })
+    return {"examples": examples}
 
 
 # ==================== RUN ====================
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+
+# ==================== PSV ROUTES & PUBLIC TRANSPORT ====================
+
+try:
+    from .psv_routes import (
+        get_all_routes, get_route_by_number, get_route_by_id,
+        get_all_stages, get_stage_by_name,
+        get_all_saccos, get_sacco_by_id, get_saccos_for_route,
+        get_intercity_routes, get_route_hotspots, search_routes,
+        get_fare_estimate, get_network_summary, RouteLine
+    )
+except ImportError:
+    from backend.psv_routes import (
+        get_all_routes, get_route_by_number, get_route_by_id,
+        get_all_stages, get_stage_by_name,
+        get_all_saccos, get_sacco_by_id, get_saccos_for_route,
+        get_intercity_routes, get_route_hotspots, search_routes,
+        get_fare_estimate, get_network_summary, RouteLine
+    )
+
+
+@app.get("/api/psv/network-summary")
+async def psv_network_summary():
+    """Get PSV network summary statistics"""
+    return get_network_summary()
+
+
+@app.get("/api/psv/routes")
+async def psv_routes(
+    line: Optional[str] = Query(None, description="Filter by line (A-J)"),
+    stage: Optional[str] = Query(None, description="Filter by CBD stage"),
+):
+    """Get all PSV routes with optional filters"""
+    return {"routes": get_all_routes(line=line, stage=stage)}
+
+
+@app.get("/api/psv/routes/search")
+async def psv_search_routes(q: str = Query(..., description="Search query")):
+    """Search routes by destination, corridor, or stage"""
+    return {"routes": search_routes(q)}
+
+
+@app.get("/api/psv/routes/{route_number}")
+async def psv_get_route(route_number: str):
+    """Get routes by route number"""
+    routes = get_route_by_number(route_number)
+    if not routes:
+        return {"routes": [], "message": f"No routes found for {route_number}"}
+    return {"routes": routes}
+
+
+@app.get("/api/psv/route-id/{route_id}")
+async def psv_get_route_by_id(route_id: str):
+    """Get a specific route by ID"""
+    route = get_route_by_id(route_id)
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    return route
+
+
+@app.get("/api/psv/fare/{route_number}")
+async def psv_fare_estimate(route_number: str):
+    """Get fare estimate for a route"""
+    fare = get_fare_estimate(route_number)
+    if not fare:
+        raise HTTPException(status_code=404, detail="Route not found")
+    return fare
+
+
+@app.get("/api/psv/stages")
+async def psv_stages():
+    """Get all CBD boarding stages/termini"""
+    return {"stages": get_all_stages()}
+
+
+@app.get("/api/psv/stages/{stage_name}")
+async def psv_get_stage(stage_name: str):
+    """Get a specific CBD stage"""
+    stage = get_stage_by_name(stage_name)
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    return stage
+
+
+@app.get("/api/psv/saccos")
+async def psv_saccos(
+    corridor: Optional[str] = Query(None, description="Filter by corridor"),
+):
+    """Get all SACCO operators"""
+    return {"saccos": get_all_saccos(corridor=corridor)}
+
+
+@app.get("/api/psv/saccos/{sacco_id}")
+async def psv_get_sacco(sacco_id: str):
+    """Get a specific SACCO"""
+    sacco = get_sacco_by_id(sacco_id)
+    if not sacco:
+        raise HTTPException(status_code=404, detail="SACCO not found")
+    return sacco
+
+
+@app.get("/api/psv/saccos/for-route/{route_number}")
+async def psv_saccos_for_route(route_number: str):
+    """Get SACCOs operating a specific route"""
+    return {"saccos": get_saccos_for_route(route_number)}
+
+
+@app.get("/api/psv/intercity")
+async def psv_intercity_routes(
+    from_city: Optional[str] = Query(None, description="Filter by departure city"),
+):
+    """Get intercity/long-distance routes"""
+    return {"routes": get_intercity_routes(from_city=from_city)}
+
+
+@app.get("/api/psv/hotspots")
+async def psv_route_hotspots(
+    route: Optional[str] = Query(None, description="Filter by route number"),
+):
+    """Get crash hotspots related to PSV routes"""
+    return {"hotspots": get_route_hotspots(route=route)}
+
+
+@app.get("/api/psv/lines")
+async def psv_lines():
+    """Get all route lines (A-J corridors)"""
+    return {
+        "lines": [
+            {"id": line.value, "name": f"Line {line.value}"}
+            for line in RouteLine
+        ]
+    }
+
+
+@app.get("/api/psv/lines/{line_id}")
+async def psv_get_line(line_id: str):
+    """Get all routes for a specific line"""
+    routes = get_all_routes(line=line_id)
+    return {"line": line_id, "routes": routes}
+
+
+# ==================== NEWS & UPDATES ====================
+
+NEWS_ITEMS = [
+    {
+        "id": "news_001",
+        "title": "AI-Powered Traffic Cameras Deployed on Mombasa Highway",
+        "summary": "NTSA has deployed 50 new AI cameras capable of detecting speeding, distracted driving, and seatbelt violations in real-time.",
+        "content": "The National Transport and Safety Authority (NTSA) has completed the deployment of 50 AI-powered traffic cameras along the Mombasa-Nairobi Highway. These cameras use advanced computer vision to detect traffic violations including speeding, distracted driving, and failure to wear seatbelts. Violations will result in instant fines sent via SMS to registered vehicle owners.",
+        "category": "enforcement",
+        "published_at": "2026-03-15T08:00:00Z",
+        "urgent": True,
+        "author": "NTSA Communications"
+    },
+    {
+        "id": "news_002",
+        "title": "New Speed Limit Regulations on Thika Superhighway",
+        "summary": "Speed limits reduced to 80km/h on accident-prone sections of Thika Superhighway following safety review.",
+        "content": "Following a comprehensive safety review, NTSA has reduced the speed limit from 100km/h to 80km/h on three accident-prone sections of the Thika Superhighway. The new limits are effective immediately and will be enforced through automated speed cameras.",
+        "category": "regulation",
+        "published_at": "2026-03-14T10:30:00Z",
+        "urgent": False,
+        "author": "Ministry of Transport"
+    },
+    {
+        "id": "news_003",
+        "title": "Road Safety Awareness Week Begins Monday",
+        "summary": "Nationwide campaign to educate drivers on defensive driving and road safety best practices.",
+        "content": "NTSA in partnership with the Kenya Police Service will kick off Road Safety Awareness Week starting Monday. The campaign will include free vehicle inspection centers, driving refresher courses, and public education on the new instant fines system.",
+        "category": "campaign",
+        "published_at": "2026-03-13T09:00:00Z",
+        "urgent": False,
+        "author": "NTSA Safety Division"
+    },
+    {
+        "id": "news_004",
+        "title": "Flood Warning: Multiple Roads Affected in Western Kenya",
+        "summary": "Heavy rainfall has caused flooding on several major roads. Exercise caution.",
+        "content": "The Kenya Meteorological Department has issued a flood warning for Western Kenya counties. Multiple roads including the Kisumu-Busia highway and parts of the Kakamega-Webuye road are experiencing waterlogging. Motorists are advised to exercise extreme caution and consider alternative routes.",
+        "category": "weather",
+        "published_at": "2026-03-15T06:00:00Z",
+        "urgent": True,
+        "author": "Kenya Met Department"
+    },
+    {
+        "id": "news_005",
+        "title": "Smart Driving License Renewal Now Available Online",
+        "summary": "Drivers can now renew their smart driving licenses entirely through the eCitizen portal.",
+        "content": "NTSA has streamlined the driving license renewal process. Drivers can now complete the entire renewal process online through the eCitizen portal, including medical fitness declaration and photo update. Physical cards will be delivered within 5 business days.",
+        "category": "services",
+        "published_at": "2026-03-12T14:00:00Z",
+        "urgent": False,
+        "author": "NTSA Digital Services"
+    },
+]
+
+
+@app.get("/api/news")
+async def get_news(
+    category: Optional[str] = Query(None),
+    urgent_only: bool = Query(False),
+):
+    """Get news items"""
+    results = NEWS_ITEMS
+    if category:
+        results = [n for n in results if n["category"] == category]
+    if urgent_only:
+        results = [n for n in results if n["urgent"]]
+    return {"news": results, "total": len(results)}
+
+
+@app.get("/api/news/{news_id}")
+async def get_news_item(news_id: str):
+    """Get specific news item"""
+    for item in NEWS_ITEMS:
+        if item["id"] == news_id:
+            return item
+    raise HTTPException(status_code=404, detail="News item not found")
+
+
+# ==================== TRIVIA / ROAD SAFETY QUIZ ====================
+
+TRIVIA_QUESTIONS = [
+    {
+        "id": "q001",
+        "question": "What is the speed limit in urban areas in Kenya?",
+        "options": ["30 km/h", "50 km/h", "60 km/h", "80 km/h"],
+        "correct_index": 1,
+        "explanation": "The speed limit in urban areas in Kenya is 50 km/h as per the Traffic Act.",
+        "points": 10,
+        "category": "speed_limits"
+    },
+    {
+        "id": "q002",
+        "question": "What is the emergency number for police in Kenya?",
+        "options": ["112", "911", "999", "Both 999 and 112"],
+        "correct_index": 3,
+        "explanation": "Both 999 and 112 are emergency numbers in Kenya for police, ambulance, and fire services.",
+        "points": 10,
+        "category": "emergency"
+    },
+    {
+        "id": "q003",
+        "question": "Is wearing a seatbelt mandatory for all car occupants in Kenya?",
+        "options": ["Only for driver", "Only front seats", "All occupants", "Only on highways"],
+        "correct_index": 2,
+        "explanation": "Seatbelts are mandatory for ALL occupants in a vehicle in Kenya.",
+        "points": 10,
+        "category": "safety"
+    },
+    {
+        "id": "q004",
+        "question": "What side of the road do Kenyans drive on?",
+        "options": ["Right", "Left", "Either", "Depends on the road"],
+        "correct_index": 1,
+        "explanation": "Kenya drives on the LEFT side of the road, with the steering wheel on the right.",
+        "points": 10,
+        "category": "general"
+    },
+    {
+        "id": "q005",
+        "question": "What is the fine for using a mobile phone while driving?",
+        "options": ["KSh 1,000", "KSh 2,000", "KSh 5,000", "KSh 10,000"],
+        "correct_index": 1,
+        "explanation": "Using a mobile phone while driving carries a fine of KSh 2,000 under the instant fines system.",
+        "points": 10,
+        "category": "fines"
+    },
+    {
+        "id": "q006",
+        "question": "How many demerit points lead to license suspension?",
+        "options": ["10 points", "15 points", "20 points", "25 points"],
+        "correct_index": 2,
+        "explanation": "20 demerit points on a driving record leads to license suspension under the NTSA system.",
+        "points": 10,
+        "category": "penalties"
+    },
+    {
+        "id": "q007",
+        "question": "What is the Blood Alcohol Concentration (BAC) limit for drivers in Kenya?",
+        "options": ["0.05%", "0.08%", "0.10%", "Zero tolerance"],
+        "correct_index": 1,
+        "explanation": "The BAC limit in Kenya is 0.08% (0.35 mg per liter of breath).",
+        "points": 10,
+        "category": "safety"
+    },
+    {
+        "id": "q008",
+        "question": "What should you do immediately after a traffic accident?",
+        "options": ["Drive away", "Stop and call police", "Move the vehicle", "Argue with the other driver"],
+        "correct_index": 1,
+        "explanation": "You must stop immediately and call emergency services. Leaving the scene is a criminal offence.",
+        "points": 10,
+        "category": "accidents"
+    },
+    {
+        "id": "q009",
+        "question": "What is the speed limit on Kenyan highways for private vehicles?",
+        "options": ["80 km/h", "100 km/h", "110 km/h", "120 km/h"],
+        "correct_index": 2,
+        "explanation": "The speed limit on highways is 110 km/h for private motor vehicles.",
+        "points": 10,
+        "category": "speed_limits"
+    },
+    {
+        "id": "q010",
+        "question": "Is wearing a helmet mandatory for motorcycle passengers in Kenya?",
+        "options": ["Only for the rider", "Only on highways", "Yes, for all", "No, it's optional"],
+        "correct_index": 2,
+        "explanation": "Helmets are mandatory for BOTH the rider and passenger on motorcycles.",
+        "points": 10,
+        "category": "safety"
+    },
+]
+
+
+@app.get("/api/trivia")
+async def get_trivia_questions(
+    count: int = Query(5, description="Number of questions to return"),
+    category: Optional[str] = Query(None),
+):
+    """Get trivia questions for road safety quiz"""
+    import random
+    questions = TRIVIA_QUESTIONS
+    if category:
+        questions = [q for q in questions if q["category"] == category]
+    selected = random.sample(questions, min(count, len(questions)))
+    # Remove correct_index from response (don't give away answers)
+    safe_questions = [{k: v for k, v in q.items() if k != "correct_index"} for q in selected]
+    return {"questions": safe_questions, "total": len(selected)}
+
+
+@app.post("/api/trivia/answer")
+async def submit_trivia_answer(
+    question_id: str = Body(...),
+    selected_index: int = Body(...),
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Submit answer to trivia question"""
+    for q in TRIVIA_QUESTIONS:
+        if q["id"] == question_id:
+            correct = q["correct_index"] == selected_index
+            return {
+                "correct": correct,
+                "correct_index": q["correct_index"],
+                "explanation": q["explanation"],
+                "points_earned": q["points"] if correct else 0,
+            }
+    raise HTTPException(status_code=404, detail="Question not found")
+
+
+# ==================== REWARDS / GAMIFICATION ====================
+
+REWARD_TIERS = [
+    {"tier": "Bronze", "min_points": 0, "max_points": 100, "badge_color": "#CD7F32", "benefits": ["Basic reporting access"]},
+    {"tier": "Silver", "min_points": 101, "max_points": 500, "badge_color": "#C0C0C0", "benefits": ["Priority response", "Monthly newsletter"]},
+    {"tier": "Gold", "min_points": 501, "max_points": 1000, "badge_color": "#FFD700", "benefits": ["Direct officer chat", "Exclusive alerts", "Priority dispatch"]},
+    {"tier": "Platinum", "min_points": 1001, "max_points": 5000, "badge_color": "#E5E4E2", "benefits": ["VIP status", "Custom notifications", "Road safety council invite"]},
+    {"tier": "Diamond", "min_points": 5001, "max_points": None, "badge_color": "#B9F2FF", "benefits": ["All benefits", "NTSA advisory board", "Annual recognition"]},
+]
+
+
+@app.get("/api/rewards")
+async def get_rewards_info():
+    """Get rewards program information"""
+    return {
+        "tiers": REWARD_TIERS,
+        "points_activities": {
+            "submit_report": {"points": 50, "description": "Submit a valid incident report"},
+            "trivia_correct": {"points": 10, "description": "Answer trivia question correctly"},
+            "daily_login": {"points": 5, "description": "Daily app login streak"},
+            "chat_message": {"points": 2, "description": "Contribute to community chat"},
+            "dashcam_stream": {"points": 100, "description": "Stream dashcam footage (per hour)"},
+            "verified_report": {"points": 100, "description": "Report verified by officer"},
+            "refer_friend": {"points": 25, "description": "Refer a new user"},
+        }
+    }
+
+
+@app.get("/api/rewards/user/{user_id}")
+async def get_user_rewards(user_id: str):
+    """Get user reward status"""
+    # Mock data for demo
+    return {
+        "user_id": user_id,
+        "total_points": 450,
+        "tier": "Silver",
+        "reports_submitted": 12,
+        "verified_reports": 8,
+        "trivia_correct": 35,
+        "streaming_hours": 2,
+        "rank": 47,
+        "badge_url": "/badges/silver.png"
+    }
+
+
+# ==================== DASHCAM STREAMING ====================
+
+STREAM_REQUESTS = []
+
+
+@app.post("/api/streaming/request")
+async def request_stream_permission(
+    camera_type: str = Body(...),
+    location: str = Body(...),
+    current_user: Optional[UserResponse] = Depends(get_current_user_optional),
+):
+    """Request permission to stream dashcam/camera footage"""
+    request_id = f"STREAM-{len(STREAM_REQUESTS) + 1:04d}"
+    stream_request = {
+        "id": request_id,
+        "camera_type": camera_type,
+        "location": location,
+        "status": "approved",  # Auto-approve for demo
+        "points_rate": 100,  # points per hour
+        "quality_bonus": {
+            "720p": 1.0,
+            "1080p": 1.5,
+            "4k": 2.0,
+        },
+        "created_at": utcnow().isoformat(),
+    }
+    STREAM_REQUESTS.append(stream_request)
+    return stream_request
+
+
+@app.get("/api/streaming/requests")
+async def get_stream_requests():
+    """Get all streaming requests"""
+    return {"requests": STREAM_REQUESTS}
+
+
+# ==================== TRIP PLANNER ====================
+
+@app.get("/api/trip/route")
+async def get_trip_route(
+    origin: str = Query(..., description="Origin location"),
+    destination: str = Query(..., description="Destination location"),
+):
+    """Get trip route with safety information"""
+    # Mock route data
+    return {
+        "origin": origin,
+        "destination": destination,
+        "route": {
+            "distance_km": 45.5,
+            "estimated_time_min": 52,
+            "fuel_cost_ksh": 850,
+            "toll_cost_ksh": 300,
+        },
+        "safety_alerts": [
+            {"type": "speed_camera", "location": "Mombasa Road - 2km ahead", "speed_limit": 80},
+            {"type": "road_works", "location": "Thika Road - 5km ahead", "delay": "15 min"},
+            {"type": "accident_hotspot", "location": "Junction 23", "severity": "high"},
+        ],
+        "road_conditions": [
+            {"segment": "Origin to Highway", "condition": "good", "rating": 4.5},
+            {"segment": "Highway main", "condition": "excellent", "rating": 4.8},
+            {"segment": "Highway to Destination", "condition": "fair", "rating": 3.2},
+        ],
+        "alternative_routes": [
+            {"name": "Route A (Fastest)", "distance_km": 45.5, "time_min": 52, "safety_score": 78},
+            {"name": "Route B (Safest)", "distance_km": 52.0, "time_min": 58, "safety_score": 92},
+            {"name": "Route C (Scenic)", "distance_km": 68.0, "time_min": 75, "safety_score": 85},
+        ],
+    }
+
+
+# ==================== PARKING SPACES ====================
+
+@app.get("/api/parking/nearby")
+async def get_nearby_parking(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    radius_km: float = Query(2.0),
+):
+    """Get nearby parking spaces"""
+    import random
+    random.seed(int(lat * 1000 + lng * 1000))
+    
+    parking_spots = []
+    for i in range(5):
+        parking_spots.append({
+            "id": f"PARK-{i+1:03d}",
+            "name": f"Public Parking Zone {i+1}",
+            "location": {
+                "lat": lat + random.uniform(-0.01, 0.01),
+                "lng": lng + random.uniform(-0.01, 0.01),
+            },
+            "total_spaces": random.randint(50, 500),
+            "available_spaces": random.randint(10, 200),
+            "hourly_rate_ksh": random.randint(50, 300),
+            "type": random.choice(["street", "garage", "lot", "mall"]),
+            "features": random.sample(["covered", "security", "ev_charging", "disabled", "24h"], k=random.randint(1, 3)),
+            "distance_m": random.randint(100, 2000),
+        })
+    
+    return {"parking_spots": parking_spots, "total": len(parking_spots)}
+
+
+# ==================== CITIZEN REPORTS ENHANCED ====================
+
+@app.get("/api/citizen-reports")
+async def get_citizen_reports(
+    status: Optional[str] = Query(None),
+    limit: int = Query(50),
+):
+    """Get citizen reports"""
+    return {"reports": [], "total": 0}
+
+
+@app.post("/api/citizen-reports/submit")
+async def submit_citizen_report(
+    type: str = Body(...),
+    description: str = Body(...),
+    location: str = Body(...),
+    latitude: Optional[float] = Body(None),
+    longitude: Optional[float] = Body(None),
+    severity: str = Body("medium"),
+    anonymous: bool = Body(False),
+    first_name: Optional[str] = Body(None),
+    last_name: Optional[str] = Body(None),
+    phone_number: Optional[str] = Body(None),
+):
+    """Submit a new citizen report"""
+    report_id = f"RPT-{uuid.uuid4().hex[:8].upper()}"
+    report = {
+        "id": report_id,
+        "type": type,
+        "description": description,
+        "location": location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "severity": severity,
+        "anonymous": anonymous,
+        "status": "pending",
+        "points_earned": 50,
+        "created_at": utcnow().isoformat(),
+    }
+    return report
+
+
+# ==================== CHAT SYSTEM ====================
+
+CHAT_MESSAGES = []
+
+
+@app.get("/api/chat/{channel}")
+async def get_chat_messages(
+    channel: str,
+    limit: int = Query(50),
+):
+    """Get chat messages for a channel (citizen or responder)"""
+    messages = [m for m in CHAT_MESSAGES if m["channel"] == channel]
+    return {"messages": messages[-limit:], "channel": channel}
+
+
+@app.post("/api/chat/{channel}")
+async def send_chat_message(
+    channel: str,
+    message: str = Body(...),
+    user_name: str = Body("Anonymous"),
+):
+    """Send a message to a chat channel"""
+    msg = {
+        "id": f"msg_{uuid.uuid4().hex[:8]}",
+        "channel": channel,
+        "user_name": user_name,
+        "message": message,
+        "timestamp": utcnow().isoformat(),
+    }
+    CHAT_MESSAGES.append(msg)
+    return msg

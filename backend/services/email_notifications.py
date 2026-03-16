@@ -6,7 +6,7 @@ Email notifications for reports, alerts, and updates
 import asyncio
 import random
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 from enum import Enum
 import logging
 
@@ -31,7 +31,7 @@ class EmailType(str, Enum):
 
 class EmailService:
     """Email notification service for NTSA Road Safety"""
-    
+
     def __init__(self, provider: EmailProvider = EmailProvider.DUMMY):
         self.provider = provider
         self.sent_emails = []
@@ -41,8 +41,15 @@ class EmailService:
         self.smtp_password = ""
         self.from_email = "noreply@ntsa.go.ke"
         self.from_name = "NTSA Road Safety"
-    
-    def configure(self, smtp_host: str, smtp_port: int, smtp_user: str, smtp_password: str, from_email: str = None):
+
+    def configure(
+        self,
+        smtp_host: str,
+        smtp_port: int,
+        smtp_user: str,
+        smtp_password: str,
+        from_email: str = None,
+    ):
         """Configure SMTP settings"""
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
@@ -51,18 +58,18 @@ class EmailService:
         if from_email:
             self.from_email = from_email
         logger.info(f"Email Service configured with provider: {self.provider}")
-    
+
     async def send_email(
         self,
         to_email: str,
         subject: str,
         body: str,
         email_type: EmailType = EmailType.SYSTEM_ALERT,
-        html: bool = False
+        html: bool = False,
     ) -> dict:
         """Send email to a recipient"""
         msg_id = f"msg_{random.randint(100000, 999999)}"
-        
+
         # In production, integrate with actual email provider
         if self.provider == EmailProvider.DUMMY:
             # Simulate email sending
@@ -74,7 +81,7 @@ class EmailService:
                 "subject": subject,
                 "status": "sent",
                 "email_type": email_type.value,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         else:
             # Real provider integration would go here
@@ -85,14 +92,14 @@ class EmailService:
                 "subject": subject,
                 "status": "sent",
                 "email_type": email_type.value,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-        
+
         self.sent_emails.append(result)
         logger.info(f"Email sent to {to_email}: {subject[:50]}...")
-        
+
         return result
-    
+
     async def send_violation_notice(self, to_email: str, violation_data: dict) -> dict:
         """Send violation notice email"""
         subject = f"NTSA Violation Notice - {violation_data.get('id', 'N/A')}"
@@ -117,8 +124,10 @@ For inquiries, contact: +254-709-932-000
 
 This is an automated message from NTSA Kenya.
         """
-        return await self.send_email(to_email, subject, body, EmailType.VIOlATION_NOTICE)
-    
+        return await self.send_email(
+            to_email, subject, body, EmailType.VIOlATION_NOTICE
+        )
+
     async def send_weekly_report(self, to_email: str, report_data: dict) -> dict:
         """Send weekly report email"""
         subject = "NTSA Weekly Road Safety Report"
@@ -150,7 +159,7 @@ National Transport and Safety Authority
 Kenya
         """
         return await self.send_email(to_email, subject, body, EmailType.WEEKLY_REPORT)
-    
+
     async def send_accident_alert(self, to_email: str, accident_data: dict) -> dict:
         """Send accident alert email"""
         subject = f"NTSA Alert: Accident at {accident_data.get('location', 'Unknown Location')}"
@@ -171,7 +180,7 @@ Emergency services have been dispatched.
 This is an automated alert from NTSA Kenya.
         """
         return await self.send_email(to_email, subject, body, EmailType.ACCIDENT_ALERT)
-    
+
     async def send_dispatch_notice(self, to_email: str, dispatch_data: dict) -> dict:
         """Send dispatch notice to response team"""
         subject = f"NTSA Dispatch: {dispatch_data.get('incident_type', 'Incident')} - Priority {dispatch_data.get('priority', 'Normal')}"
@@ -190,7 +199,7 @@ Please acknowledge and proceed to the location immediately.
 NTSA Emergency Response Center
         """
         return await self.send_email(to_email, subject, body, EmailType.DISPATCH_NOTICE)
-    
+
     async def send_system_alert(self, to_email: str, alert_data: dict) -> dict:
         """Send system alert"""
         subject = f"NTSA System Alert: {alert_data.get('title', 'System Notification')}"
@@ -209,20 +218,24 @@ Please take necessary action if required.
 NTSA System
         """
         return await self.send_email(to_email, subject, body, EmailType.SYSTEM_ALERT)
-    
+
     def get_email_history(self, limit: int = 100) -> List[dict]:
         """Get email sending history"""
         return self.sent_emails[-limit:]
-    
+
     def get_statistics(self) -> dict:
         """Get email sending statistics"""
         return {
             "total_sent": len(self.sent_emails),
-            "successful": len([e for e in self.sent_emails if e.get("status") == "sent"]),
+            "successful": len(
+                [e for e in self.sent_emails if e.get("status") == "sent"]
+            ),
             "by_type": {
-                etype.value: len([e for e in self.sent_emails if e.get("email_type") == etype.value])
+                etype.value: len(
+                    [e for e in self.sent_emails if e.get("email_type") == etype.value]
+                )
                 for etype in EmailType
-            }
+            },
         }
 
 

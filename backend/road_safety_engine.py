@@ -1,190 +1,80 @@
-"""
-Kenya National Road Safety Authority (NTSA) Overwatch System
-Real-time Road Safety Monitoring, Accident Detection, and Traffic Violation Management
-Aligned with Kenya's National Transport and Safety Authority Act
-"""
+from __future__ import annotations
 
-import asyncio
-import json
-import uuid
-import hashlib
-import cv2
-import numpy as np
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
 from enum import Enum
-import logging
+from typing import List, Optional, Dict, Tuple
 import random
-import math
+import uuid
 
-def utcnow():
-    return datetime.now(timezone.utc)
 
-log_dir = 'logs'
-import os
-os.makedirs(log_dir, exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(log_dir, 'road_safety.log')),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# ==================== ROAD SAFETY ENUMS ====================
-class SeverityLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-class IncidentStatus(str, Enum):
-    REPORTED = "reported"
-    DISPATCHED = "dispatched"
-    ON_SCENE = "on_scene"
-    TREATMENT = "treatment"
-    CLEARED = "cleared"
-    INVESTIGATION = "investigation"
-    CLOSED = "closed"
-
-class RiskLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    EXTREME = "extreme"
-
-class ViolationStatus(str, Enum):
-    DETECTED = "detected"
-    CAPTURED = "captured"
-    REVIEWED = "reviewed"
-    ISSUED = "issued"
-    PAID = "paid"
-    DISPUTED = "disputed"
-    CANCELLED = "cancelled"
-
-class VehicleType(str, Enum):
-    MOTORCYCLE = "motorcycle"
-    SALOON = "saloon"
-    STATION_WAGON = "station_wagon"
-    PICKUP = "pickup"
-    LORRY = "lorry"
-    BUS = "bus"
-    MATATU = "matatu"
-    TAXI = "taxi"
-    OTHER = "other"
-
-class RoadUserType(str, Enum):
-    DRIVER = "driver"
-    PASSENGER = "passenger"
-    PEDESTRIAN = "pedestrian"
-    CYCLIST = "cyclist"
-    MOTORCYCLIST = "motorcyclist"
-
-class AccidentType(str, Enum):
-    HEAD_ON = "head_on"
+class AccidentType(Enum):
     REAR_END = "rear_end"
+    HEAD_ON = "head_on"
     SIDE_IMPACT = "side_impact"
-    ROLLOVER = "rollover"
     HIT_PEDESTRIAN = "hit_pedestrian"
+    ROLLOVER = "rollover"
     HIT_ANIMAL = "hit_animal"
     OBJECT_STRIKE = "object_strike"
     SINGLE_VEHICLE = "single_vehicle"
     MULTI_VEHICLE = "multi_vehicle"
     PARKED_VEHICLE = "parked_vehicle"
 
-class CauseType(str, Enum):
+
+class CauseType(Enum):
     SPEEDING = "speeding"
-    DRUNK_DRIVING = "drunk_driving"
-    RECKLESS_DRIVING = "reckless_driving"
-    FATIGUE = "fatigue"
-    DISTRACTION = "distraction"
+    RED_LIGHT = "red_light"
+    RECKLESS = "reckless_driving"
     OVERTAKING = "overtaking"
-    RED_LIGHT_JUMPING = "red_light_jumping"
+    DRUNK_DRIVING = "drunk_driving"
     WRONG_WAY = "wrong_way"
     ILLEGAL_PARKING = "illegal_parking"
-    OVERLOADING = "overloading"
-    POOR_ROAD_CONDITIONS = "poor_road_conditions"
-    MECHANICAL_FAILURE = "mechanical_failure"
-    WEATHER = "weather"
     USING_PHONE = "using_phone"
+    OVERLOADING = "overloading"
+    FATIGUED = "fatigued"
     OTHER = "other"
 
-# ==================== KENYA ROAD SAFETY DATA ====================
-KENYA_ROADS = [
-    {"name": "Mombasa Road (A109)", "category": "highway", "limit": 100, "coordinates": {"start": (-1.3300, 36.9800), "end": (-1.4500, 37.0500)}},
-    {"name": "Nairobi Expressway", "category": "highway", "limit": 80, "coordinates": {"start": (-1.3200, 36.8300), "end": (-1.2700, 36.9200)}},
-    {"name": "Nakuru-Eldoret Road", "category": "highway", "limit": 100, "coordinates": {"start": (-0.3031, 36.0800), "end": (0.5143, 35.2698)}},
-    {"name": "Kenyatta Avenue", "category": "urban", "limit": 50, "coordinates": {"start": (-1.2921, 36.8219), "end": (-1.2864, 36.8232)}},
-    {"name": "University Way", "category": "urban", "limit": 50, "coordinates": {"start": (-1.2864, 36.8232), "end": (-1.2831, 36.8195)}},
-    {"name": "Ngong Road", "category": "arterial", "limit": 60, "coordinates": {"start": (-1.2931, 36.8219), "end": (-1.3267, 36.7850)}},
-    {"name": "Mombasa Road Industrial", "category": "arterial", "limit": 60, "coordinates": {"start": (-1.3200, 36.8500), "end": (-1.3500, 36.9100)}},
-    {"name": "Thika Superhighway", "category": "highway", "limit": 80, "coordinates": {"start": (-1.0334, 37.0692), "end": (-1.1500, 37.2000)}},
-    {"name": "Kisumu Road", "category": "arterial", "limit": 80, "coordinates": {"start": (-0.1022, 34.7617), "end": (-0.1500, 34.8000)}},
-    {"name": "Nairobi-Garissa Road", "category": "arterial", "limit": 80, "coordinates": {"start": (-1.4500, 36.9500), "end": (-0.4536, 39.6401)}},
-]
 
-SPEED_LIMITS = {
-    "highway": 100,
-    "arterial": 80,
-    "urban": 50,
-    "residential": 30,
-    "school_zone": 20,
-    "construction": 40,
-}
+class SeverityLevel(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
-ACCIDENT_HOTSPOTS = [
-    {"name": "Mombasa Road Junction", "lat": -1.3300, "lng": 36.9800, "risk_score": 0.85, "incidents_2024": 156},
-    {"name": "Nairobi CBD Roundabout", "lat": -1.2864, "lng": 36.8232, "risk_score": 0.78, "incidents_2024": 203},
-    {"name": "Thika Road", "lat": -1.0800, "lng": 37.1000, "risk_score": 0.82, "incidents_2024": 178},
-    {"name": "Nakuru Town", "lat": -0.3031, "lng": 36.0800, "risk_score": 0.65, "incidents_2024": 98},
-    {"name": "Kisumu Roundabout", "lat": -0.1022, "lng": 34.7617, "risk_score": 0.58, "incidents_2024": 67},
-    {"name": "Mombasa-Malindi Road", "lat": -3.2000, "lng": 40.1000, "risk_score": 0.72, "incidents_2024": 89},
-    {"name": "Eldoret Town", "lat": 0.5143, "lng": 35.2698, "risk_score": 0.55, "incidents_2024": 45},
-]
 
-# ==================== DATA MODELS ====================
+class IncidentStatus(Enum):
+    REPORTED = "reported"
+    DISPATCHED = "dispatched"
+    ENROUTE = "enroute"
+    ON_SCENE = "on_scene"
+    RESOLVED = "resolved"
+
+
+class VehicleType(Enum):
+    CAR = "car"
+    TRUCK = "truck"
+    BUS = "bus"
+    MOTORCYCLE = "motorcycle"
+    MATATU = "matatu"
+    BODA_BODA = "boda_boda"
+    PSV = "psv"
+
+
+class ViolationStatus(Enum):
+    DETECTED = "detected"
+    ISSUED = "issued"
+    PAID = "paid"
+    CANCELLED = "cancelled"
+
+
 @dataclass
 class Coordinates:
     lat: float
     lng: float
-    altitude: Optional[float] = None
-    accuracy: Optional[float] = None
 
-@dataclass
-class Vehicle:
-    id: str
-    plate_number: str
-    vehicle_type: VehicleType
-    make: str
-    model: str
-    year: int
-    color: str
-    owner_name: str
-    owner_id: str
-    insurance_status: str
-    inspection_status: str
-    license_expiry: datetime
-    license_category: str
-    points: int = 12
-    violations_count: int = 0
+    def to_dict(self) -> dict:
+        return {"lat": self.lat, "lng": self.lng}
 
-@dataclass
-class Driver:
-    id: str
-    name: str
-    license_number: str
-    license_expiry: datetime
-    license_category: str
-    date_of_birth: datetime
-    address: str
-    phone: str
-    points: int = 12
-    violations_count: int = 0
-    endorsements: List[str] = field(default_factory=list)
 
 @dataclass
 class RoadAccident:
@@ -193,241 +83,435 @@ class RoadAccident:
     cause: CauseType
     location: str
     road_name: str
-    coordinates: Coordinates
     severity: SeverityLevel
-    vehicles_involved: List[str]
+    status: str
     casualties: int
     injuries: int
-    status: IncidentStatus
     reported_at: datetime
-    response_time_minutes: Optional[float] = None
-    cleared_at: Optional[datetime] = None
-    description: str = ""
-    weather_conditions: str = "clear"
-    road_conditions: str = "good"
-    traffic_flow: str = "normal"
-    evidence_images: List[str] = field(default_factory=list)
-    responding_units: List[str] = field(default_factory=list)
+    coordinates: Optional[Coordinates] = None
+    description: Optional[str] = None
+    weather: Optional[str] = None
+    road_conditions: Optional[str] = None
+    vehicles_involved: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "accident_type": self.accident_type.value,
+            "cause": self.cause.value,
+            "location": self.location,
+            "road_name": self.road_name,
+            "severity": self.severity.value,
+            "status": self.status,
+            "casualties": self.casualties,
+            "injuries": self.injuries,
+            "reported_at": self.reported_at.isoformat(),
+            "coordinates": self.coordinates.to_dict() if self.coordinates else None,
+            "description": self.description,
+            "weather": self.weather,
+            "road_conditions": self.road_conditions,
+            "vehicles_involved": self.vehicles_involved,
+        }
+
 
 @dataclass
 class TrafficViolation:
     id: str
-    violation_type: CauseType
+    violation_type: str
     plate_number: str
-    vehicle_type: VehicleType
     location: str
-    road_name: str
-    coordinates: Coordinates
-    evidence_image: str
-    camera_id: str
+    speed_detected: Optional[float]
+    speed_limit: Optional[float]
+    fine_amount: float
     status: ViolationStatus
     detected_at: datetime
-    speed_detected: Optional[float] = None
-    speed_limit: Optional[float] = None
-    speed_excess: Optional[float] = None
-    video_clip: Optional[str] = None
-    fine_amount: float = 0.0
-    penalty_points: int = 0
+    road_name: Optional[str] = None
+    coordinates: Optional[Coordinates] = None
+    camera_id: Optional[str] = None
+    evidence_image: Optional[str] = None
+    vehicle_type: Optional[str] = None
     issued_at: Optional[datetime] = None
     due_date: Optional[datetime] = None
     paid_at: Optional[datetime] = None
     officer_id: Optional[str] = None
-    notes: str = ""
+    notes: Optional[str] = None
+    penalty_points: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "violation_type": self.violation_type,
+            "plate_number": self.plate_number,
+            "location": self.location,
+            "speed_detected": self.speed_detected,
+            "speed_limit": self.speed_limit,
+            "fine_amount": self.fine_amount,
+            "status": self.status.value,
+            "detected_at": self.detected_at.isoformat(),
+            "road_name": self.road_name,
+            "coordinates": self.coordinates.to_dict() if self.coordinates else None,
+            "camera_id": self.camera_id,
+            "evidence_image": self.evidence_image,
+            "vehicle_type": self.vehicle_type,
+            "issued_at": self.issued_at.isoformat() if self.issued_at else None,
+            "due_date": self.due_date.isoformat() if self.due_date else None,
+            "paid_at": self.paid_at.isoformat() if self.paid_at else None,
+            "officer_id": self.officer_id,
+            "notes": self.notes,
+            "penalty_points": self.penalty_points,
+        }
+
 
 @dataclass
-class RoadSafetyIncident:
-    id: str
-    incident_type: str
-    title: str
-    description: str
-    location: str
-    road_name: str
-    coordinates: Coordinates
-    severity: SeverityLevel
-    status: IncidentStatus
-    risk_score: float
-    vehicles: List[str] = field(default_factory=list)
-    casualties: int = 0
-    injuries: int = 0
-    created_at: datetime = field(default_factory=utcnow)
-    updated_at: Optional[datetime] = None
-    reported_by: str = ""
-    assigned_to: Optional[str] = None
-    evidence: List[str] = field(default_factory=list)
+class Vehicle:
+    plate_number: str
+    vehicle_type: VehicleType
+    make: Optional[str] = None
+    model: Optional[str] = None
+    year: Optional[int] = None
+    color: Optional[str] = None
+    owner_name: Optional[str] = None
+    status: str = "active"
+
+    def to_dict(self) -> dict:
+        return {
+            "plate_number": self.plate_number,
+            "vehicle_type": (
+                self.vehicle_type.value
+                if isinstance(self.vehicle_type, VehicleType)
+                else self.vehicle_type
+            ),
+            "make": self.make,
+            "model": self.model,
+            "year": self.year,
+            "color": self.color,
+            "owner_name": self.owner_name,
+            "status": self.status,
+        }
+
+
+@dataclass
+class Driver:
+    license_number: str
+    name: str
+    date_of_birth: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    status: str = "active"
+    total_violations: int = 0
+    license_class: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "license_number": self.license_number,
+            "name": self.name,
+            "date_of_birth": self.date_of_birth,
+            "phone": self.phone,
+            "email": self.email,
+            "address": self.address,
+            "status": self.status,
+            "total_violations": self.total_violations,
+            "license_class": self.license_class,
+        }
+
 
 @dataclass
 class SpeedDetection:
     id: str
     camera_id: str
     plate_number: str
-    vehicle_type: VehicleType
-    speed_detected: float
-    speed_limit: float
+    speed: float
     location: str
     coordinates: Coordinates
-    image_front: str
-    image_rear: str
-    timestamp: datetime
-    confirmed: bool = False
+    detected_at: datetime
+    speed_limit: Optional[float] = None
+    violation_created: bool = False
+    violation_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "camera_id": self.camera_id,
+            "plate_number": self.plate_number,
+            "speed": self.speed,
+            "location": self.location,
+            "coordinates": self.coordinates.to_dict(),
+            "detected_at": self.detected_at.isoformat(),
+            "speed_limit": self.speed_limit,
+            "violation_created": self.violation_created,
+            "violation_id": self.violation_id,
+        }
+
 
 @dataclass
 class RoadSegment:
     id: str
     name: str
     category: str
-    speed_limit: float
-    start_coordinates: Coordinates
-    end_coordinates: Coordinates
     average_daily_traffic: int
-    accident_count_30_days: int
-    current_risk_level: RiskLevel
+    current_risk_level: str
+    speed_limit: int = 80
+    accidents_30d: int = 0
 
-@dataclass
-class TrafficFlow:
-    id: str
-    camera_id: str
-    location: str
-    vehicle_count: int
-    average_speed: float
-    congestion_level: str
-    timestamp: datetime
 
-@dataclass
-class EmergencyDispatch:
-    id: str
-    incident_id: str
-    unit_type: str
-    unit_id: str
-    dispatched_at: datetime
-    arrived_at: Optional[datetime] = None
-    status: str = "dispatched"
+ACCIDENT_HOTSPOTS = [
+    {"name": "Mombasa Road Junction", "lat": -1.33, "lng": 36.98, "risk_score": 0.85},
+    {
+        "name": "Nairobi CBD Roundabout",
+        "lat": -1.2864,
+        "lng": 36.8232,
+        "risk_score": 0.78,
+    },
+    {
+        "name": "Thika Road Superhighway",
+        "lat": -1.2107,
+        "lng": 36.8865,
+        "risk_score": 0.72,
+    },
+    {
+        "name": "Uhuru Highway Junction",
+        "lat": -1.2921,
+        "lng": 36.8155,
+        "risk_score": 0.68,
+    },
+    {"name": "Waiyaki Way", "lat": -1.2634, "lng": 36.7589, "risk_score": 0.65},
+]
 
-# ==================== ROAD SAFETY ENGINE ====================
+KENYA_ROADS = {
+    "region": "Kenya",
+    "roads": [
+        {"name": "Mombasa Road (A109)", "category": "highway", "limit": 100},
+        {"name": "Nairobi Expressway", "category": "highway", "limit": 80},
+        {"name": "Thika Road", "category": "highway", "limit": 100},
+        {"name": "Uhuru Highway", "category": "urban", "limit": 50},
+        {"name": "Waiyaki Way", "category": "highway", "limit": 80},
+    ],
+}
+
+# Fine amounts by violation type (in KES)
+FINES = {
+    "speeding": {"base": 10000, "per_km_over": 500},
+    "red_light": {"base": 15000},
+    "reckless_driving": {"base": 20000},
+    "overtaking": {"base": 10000},
+    "drunk_driving": {"base": 100000},
+    "wrong_way": {"base": 15000},
+    "illegal_parking": {"base": 5000},
+    "using_phone": {"base": 10000},
+    "overloading": {"base": 20000},
+    "fatigued": {"base": 15000},
+}
+
+PENALTY_POINTS = {
+    "speeding": 3,
+    "red_light": 5,
+    "reckless_driving": 6,
+    "overtaking": 4,
+    "drunk_driving": 10,
+    "wrong_way": 5,
+    "illegal_parking": 2,
+    "using_phone": 3,
+    "overloading": 4,
+    "fatigued": 5,
+}
+
+
 class RoadSafetyEngine:
     def __init__(self):
-        self.accidents: Dict[str, RoadAccident] = {}
-        self.violations: Dict[str, TrafficViolation] = {}
-        self.incidents: Dict[str, RoadSafetyIncident] = {}
         self.vehicles: Dict[str, Vehicle] = {}
         self.drivers: Dict[str, Driver] = {}
-        self.speed_detections: Dict[str, SpeedDetection] = {}
+        self.accidents: List[RoadAccident] = []
+        self.violations: List[TrafficViolation] = []
+        self.speed_detections: List[SpeedDetection] = []
         self.road_segments: Dict[str, RoadSegment] = {}
-        self.dispatches: Dict[str, EmergencyDispatch] = {}
-        
-        self._initialize_road_segments()
-        self._initialize_sample_data()
-        
+        self.citizen_reports: List[dict] = []
         self.stats = {
             "total_accidents_today": 0,
             "total_violations_today": 0,
             "total_casualties_today": 0,
-            "total_injuries_today": 0,
-            "avg_response_time": 0.0,
-            "fatal_accidents_today": 0,
-            "speed_violations_today": 0,
-            "dui_arrests_today": 0,
+            "avg_response_time": 8.0,
         }
-        
-    def _initialize_road_segments(self):
-        for road in KENYA_ROADS:
-            segment = RoadSegment(
-                id=f"seg_{road['name'].replace(' ', '_').lower()[:20]}",
-                name=road["name"],
-                category=road["category"],
-                speed_limit=road["limit"],
-                start_coordinates=Coordinates(*road["coordinates"]["start"]),
-                end_coordinates=Coordinates(*road["coordinates"]["end"]),
-                average_daily_traffic=random.randint(5000, 50000),
-                accident_count_30_days=random.randint(5, 50),
-                current_risk_level=RiskLevel.MEDIUM
-            )
-            self.road_segments[segment.id] = segment
-            
-    def _initialize_sample_data(self):
-        """Initialize comprehensive sample data for Kenya roads"""
-        # Kenyan vehicle registration prefixes
-        prefixes = ["KAA", "KAB", "KAC", "KAD", "KAE", "KAJ", "KAK", "KAL", "KAM", "KAN", 
-                   "KBA", "KBB", "KBC", "KBD", "KCA", "KCB", "KDA", "KDB", "KEA", "KFA"]
-        
-        makes_models = [
-            ("Toyota", "Corolla"), ("Toyota", "Camry"), ("Toyota", "Hiace"), ("Toyota", "Prado"),
-            ("Nissan", "Sentra"), ("Nissan", "X-Trail"), ("Nissan", "Navara"),
-            ("Honda", "Civic"), ("Honda", "Accord"), ("Honda", "Pilot"),
-            ("Mazda", "3"), ("Mazda", "6"), ("Mazda", "CX-5"),
-            ("Volkswagen", "Polo"), ("Volkswagen", "Golf"), ("Volkswagen", "Transporter"),
-            ("Mercedes", "C-Class"), ("Mercedes", "E-Class"), ("Mercedes", "Sprinter"),
-            ("BMW", "3 Series"), ("BMW", "5 Series"), ("BMW", "X5"),
-            ("Isuzu", "D-Max"), ("Isuzu", "Mux"), ("Isuzu", "N-Series"),
-            ("Mitsubishi", "Lancer"), ("Mitsubishi", "Pajero"), ("Mitsubishi", "Fuso"),
-            ("Hyundai", "Elantra"), ("Hyundai", "Tucson"), ("Hyundai", "Starex"),
+        self._init_road_segments()
+
+    def _init_road_segments(self):
+        segments = [
+            RoadSegment(
+                id="seg_001",
+                name="Mombasa Road (A109)",
+                category="highway",
+                average_daily_traffic=45000,
+                current_risk_level="high",
+                speed_limit=100,
+                accidents_30d=45,
+            ),
+            RoadSegment(
+                id="seg_002",
+                name="Nairobi Expressway",
+                category="highway",
+                average_daily_traffic=38000,
+                current_risk_level="medium",
+                speed_limit=80,
+                accidents_30d=28,
+            ),
+            RoadSegment(
+                id="seg_003",
+                name="Thika Road",
+                category="highway",
+                average_daily_traffic=52000,
+                current_risk_level="medium",
+                speed_limit=100,
+                accidents_30d=32,
+            ),
+            RoadSegment(
+                id="seg_004",
+                name="Uhuru Highway",
+                category="urban",
+                average_daily_traffic=30000,
+                current_risk_level="high",
+                speed_limit=50,
+                accidents_30d=22,
+            ),
+            RoadSegment(
+                id="seg_005",
+                name="Waiyaki Way",
+                category="highway",
+                average_daily_traffic=35000,
+                current_risk_level="medium",
+                speed_limit=80,
+                accidents_30d=18,
+            ),
         ]
-        
-        colors = ["White", "Black", "Silver", "Blue", "Red", "Green", "Brown", "Grey", "Gold", "Orange"]
-        vehicle_types_list = list(VehicleType)
-        
-        # Generate 100 realistic vehicles
-        for i in range(100):
-            prefix = random.choice(prefixes)
-            number = f"{random.randint(100, 999)}{random.choice('ABCDEFGHJKLMNPQRSTUVWXYZ')}"
-            plate = f"{prefix}{number}"
-            
-            make, model = random.choice(makes_models)
-            year = random.randint(2015, 2024)
-            vtype = random.choice(vehicle_types_list)
-            
-            first_names = ["John", "Mary", "James", "Grace", "David", "Faith", "Michael", "Joy", 
-                          "Daniel", "Esther", "Joseph", "Ruth", "Peter", "Susan", "Thomas", "Catherine"]
-            last_names = ["Ochieng", "Omondi", "Kimani", "Wanjiku", "Nyong'o", "Kenyatta", 
-                         "Muthoni", "Otieno", "Njoroge", "Kariuki", "Kiplagat", "Chebet"]
-            
-            owner_first = random.choice(first_names)
-            owner_last = random.choice(last_names)
-            
-            self.vehicles[plate] = Vehicle(
-                id=f"v{i+1:03d}",
-                plate_number=plate,
-                vehicle_type=vtype,
-                make=make,
-                model=model,
-                year=year,
-                color=random.choice(colors),
-                owner_name=f"{owner_first} {owner_last}",
-                owner_id=f"{random.randint(10000000, 99999999)}",
-                insurance_status=random.choice(["valid", "valid", "valid", "expired"]),
-                inspection_status=random.choice(["valid", "valid", "expired"]),
-                license_expiry=datetime(2025, random.randint(1, 12), random.randint(1, 28)),
-                license_category=random.choice(["A", "B", "C", "D", "E", "F", "G", "W"])
-            )
-        
-        # Generate 50 realistic drivers
-        first_names = ["John", "Mary", "James", "Grace", "David", "Faith", "Michael", "Joy", 
-                      "Daniel", "Esther", "Joseph", "Ruth", "Peter", "Susan", "Thomas", "Catherine",
-                      "Samuel", "Rebecca", "Paul", "Sarah", "George", "Jane", "Stephen", "Anne"]
-        last_names = ["Ochieng", "Omondi", "Kimani", "Wanjiku", "Nyong'o", "Kenyatta", 
-                     "Muthoni", "Otieno", "Njoroge", "Kariuki", "Kiplagat", "Chebet", 
-                     "Maina", "Kamau", "Mutua", "Wasike"]
-        
-        counties = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Malindi",
-                   "Kitale", "Garissa", "Nyeri", "Meru", "Migori", "Makueni", "Kakamega"]
-        
-        for i in range(50):
-            dl_number = f"DL{random.randint(100000, 999999)}"
-            first = random.choice(first_names)
-            last = random.choice(last_names)
-            
-            self.drivers[dl_number] = Driver(
-                id=f"d{i+1:03d}",
-                name=f"{first} {last}",
-                license_number=dl_number,
-                license_expiry=datetime(2025, random.randint(1, 12), random.randint(1, 28)),
-                license_category=random.choice(["A", "B", "C", "D", "E", "F", "G", "W"]),
-                date_of_birth=datetime(random.randint(1965, 2000), random.randint(1, 12), random.randint(1, 28)),
-                address=random.choice(counties),
-                phone=f"+2547{random.randint(0, 9)}{random.randint(100000, 999999)}",
-                points=random.randint(0, 14),
-                violations_count=random.randint(0, 10)
-            )
-        
+        for s in segments:
+            self.road_segments[s.id] = s
+
+    def _generate_id(self, prefix: str) -> str:
+        return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+    def get_dashboard_stats(self) -> dict:
+        roads = [
+            {
+                "name": s.name,
+                "category": s.category,
+                "limit": s.speed_limit,
+                "accidents_30d": s.accidents_30d,
+                "risk_level": s.current_risk_level,
+            }
+            for s in self.road_segments.values()
+        ]
+        trend = [
+            {
+                "hour": f"{h:02d}:00",
+                "accidents": random.randint(0, 15),
+                "violations": random.randint(5, 50),
+            }
+            for h in range(24)
+        ]
+        by_type = {}
+        for a in self.accidents:
+            t = a.accident_type.value
+            by_type[t] = by_type.get(t, 0) + 1
+        if not by_type:
+            by_type = {"rear_end": 12, "head_on": 8, "side_impact": 15, "rollover": 6}
+
+        by_cause = {}
+        for a in self.accidents:
+            c = a.cause.value
+            by_cause[c] = by_cause.get(c, 0) + 1
+        if not by_cause:
+            by_cause = {
+                "speeding": 25,
+                "red_light": 10,
+                "reckless_driving": 8,
+                "drunk_driving": 5,
+            }
+
+        by_violation_type = {}
+        for v in self.violations:
+            t = v.violation_type
+            by_violation_type[t] = by_violation_type.get(t, 0) + 1
+        if not by_violation_type:
+            by_violation_type = {
+                "speeding": 45,
+                "red_light": 20,
+                "illegal_parking": 15,
+                "using_phone": 10,
+            }
+
+        return {
+            "roads": roads,
+            "trend": trend,
+            "accidents": {
+                "by_type": by_type,
+                "by_cause": by_cause,
+            },
+            "violations": {
+                "by_type": by_violation_type,
+            },
+            "hotspots": ACCIDENT_HOTSPOTS,
+            "total_accidents": len(self.accidents),
+            "total_violations": len(self.violations),
+            "total_vehicles": len(self.vehicles),
+            "total_drivers": len(self.drivers),
+        }
+
+    def get_all_accidents(
+        self, limit: Optional[int] = None, status=None, severity=None
+    ) -> List[RoadAccident]:
+        results = list(self.accidents)
+        if status:
+            results = [a for a in results if a.status == status]
+        if severity:
+            results = [a for a in results if a.severity.value == severity]
+        if limit:
+            results = results[:limit]
+        return results
+
+    def get_all_violations(
+        self, limit: Optional[int] = None, status=None, plate_number=None
+    ) -> List[TrafficViolation]:
+        results = list(self.violations)
+        if status:
+            results = [v for v in results if v.status == status]
+        if plate_number:
+            results = [v for v in results if v.plate_number == plate_number]
+        if limit:
+            results = results[:limit]
+        return results
+
+    def get_all_vehicles(self) -> List[Vehicle]:
+        return list(self.vehicles.values())
+
+    def get_all_drivers(self) -> List[Driver]:
+        return list(self.drivers.values())
+
+    def get_incident(self, incident_id: str) -> Optional[RoadAccident]:
+        for a in self.accidents:
+            if a.id == incident_id:
+                return a
+        return None
+
+    def get_accident(self, accident_id: str) -> Optional[RoadAccident]:
+        return self.get_incident(accident_id)
+
+    def get_vehicle(self, plate_number: str) -> Optional[Vehicle]:
+        return self.vehicles.get(plate_number.upper())
+
+    def get_driver(self, license_number: str) -> Optional[Driver]:
+        return self.drivers.get(license_number.upper())
+
+    def get_violation(self, violation_id: str) -> Optional[TrafficViolation]:
+        for v in self.violations:
+            if v.id == violation_id:
+                return v
+        return None
+
+    def get_speed_detection(self, detection_id: str) -> Optional[SpeedDetection]:
+        for d in self.speed_detections:
+            if d.id == detection_id:
+                return d
+        return None
+
     def create_accident_report(
         self,
         accident_type: AccidentType,
@@ -436,35 +520,33 @@ class RoadSafetyEngine:
         road_name: str,
         coordinates: Coordinates,
         severity: SeverityLevel,
-        vehicles_involved: List[str],
-        description: str = "",
-        weather: str = "clear",
-        road_conditions: str = "good"
+        vehicles_involved: int = 0,
+        description: Optional[str] = None,
+        weather: Optional[str] = None,
+        road_conditions: Optional[str] = None,
     ) -> RoadAccident:
-        accident = RoadAccident(
-            id=f"acc_{uuid.uuid4().hex[:8]}",
+        new_id = self._generate_id("acc")
+        a = RoadAccident(
+            id=new_id,
             accident_type=accident_type,
             cause=cause,
             location=location,
             road_name=road_name,
-            coordinates=coordinates,
             severity=severity,
-            vehicles_involved=vehicles_involved,
-            casualties=random.randint(0, 5) if severity in [SeverityLevel.HIGH, SeverityLevel.CRITICAL] else 0,
-            injuries=random.randint(0, 10),
-            status=IncidentStatus.REPORTED,
-            reported_at=utcnow(),
+            status="reported",
+            casualties=0,
+            injuries=0,
+            reported_at=datetime.now(timezone.utc),
+            coordinates=coordinates,
             description=description,
-            weather_conditions=weather,
-            road_conditions=road_conditions
+            weather=weather,
+            road_conditions=road_conditions,
+            vehicles_involved=vehicles_involved,
         )
-        
-        self.accidents[accident.id] = accident
-        self._update_stats()
-        
-        logger.info(f"Accident reported: {accident.id} - {accident_type.value} at {location}")
-        return accident
-    
+        self.accidents.append(a)
+        self.stats["total_accidents_today"] += 1
+        return a
+
     def record_violation(
         self,
         violation_type: CauseType,
@@ -473,74 +555,58 @@ class RoadSafetyEngine:
         location: str,
         road_name: str,
         coordinates: Coordinates,
-        camera_id: str,
+        camera_id: Optional[str] = None,
         speed_detected: Optional[float] = None,
         speed_limit: Optional[float] = None,
-        evidence_image: str = ""
+        evidence_image: Optional[str] = None,
     ) -> TrafficViolation:
-        violation = TrafficViolation(
-            id=f"viol_{uuid.uuid4().hex[:8]}",
-            violation_type=violation_type,
-            plate_number=plate_number,
-            vehicle_type=vehicle_type,
+        vtype = (
+            violation_type.value
+            if isinstance(violation_type, CauseType)
+            else str(violation_type)
+        )
+
+        fine_info = FINES.get(vtype, {"base": 5000})
+        fine_amount = fine_info["base"]
+        if vtype == "speeding" and speed_detected and speed_limit:
+            over = max(0, speed_detected - speed_limit)
+            fine_amount += int(over * fine_info.get("per_km_over", 0))
+
+        penalty_pts = PENALTY_POINTS.get(vtype, 2)
+
+        new_id = self._generate_id("vio")
+        v = TrafficViolation(
+            id=new_id,
+            violation_type=vtype,
+            plate_number=plate_number.upper(),
             location=location,
             road_name=road_name,
-            coordinates=coordinates,
             speed_detected=speed_detected,
             speed_limit=speed_limit,
-            speed_excess=(speed_detected - speed_limit) if speed_detected and speed_limit else None,
-            evidence_image=evidence_image,
-            camera_id=camera_id,
+            fine_amount=fine_amount,
             status=ViolationStatus.DETECTED,
-            detected_at=utcnow(),
+            detected_at=datetime.now(timezone.utc),
+            coordinates=coordinates,
+            camera_id=camera_id,
+            evidence_image=evidence_image,
+            vehicle_type=(
+                vehicle_type.value
+                if isinstance(vehicle_type, VehicleType)
+                else str(vehicle_type)
+            ),
+            penalty_points=penalty_pts,
         )
-        
-        fine_info = self._calculate_fine(violation_type, speed_excess=violation.speed_excess)
-        violation.fine_amount = fine_info["amount"]
-        violation.penalty_points = fine_info["points"]
-        
-        self.violations[violation.id] = violation
-        self._update_stats()
-        
-        logger.info(f"Violation detected: {violation.id} - {violation_type.value} for {plate_number}")
-        return violation
-    
-    def _calculate_fine(self, violation_type: CauseType, speed_excess: Optional[float] = None) -> Dict:
-        fines = {
-            CauseType.SPEEDING: {"base": 3000, "per_km": 500, "max": 20000},
-            CauseType.DRUNK_DRIVING: {"base": 50000, "max": 200000},
-            CauseType.RED_LIGHT_JUMPING: {"base": 5000, "max": 10000},
-            CauseType.WRONG_WAY: {"base": 3000, "max": 8000},
-            CauseType.RECKLESS_DRIVING: {"base": 15000, "max": 100000},
-            CauseType.ILLEGAL_PARKING: {"base": 1000, "max": 5000},
-            CauseType.USING_PHONE: {"base": 3000, "max": 10000},
-            CauseType.OVERLOADING: {"base": 5000, "max": 50000},
-            CauseType.OVERTAKING: {"base": 3000, "max": 8000},
-            CauseType.FATIGUE: {"base": 2000, "max": 5000},
-        }
-        
-        points = {
-            CauseType.SPEEDING: 3,
-            CauseType.DRUNK_DRIVING: 14,
-            CauseType.RED_LIGHT_JUMPING: 6,
-            CauseType.WRONG_WAY: 4,
-            CauseType.RECKLESS_DRIVING: 12,
-            CauseType.ILLEGAL_PARKING: 2,
-            CauseType.USING_PHONE: 4,
-            CauseType.OVERLOADING: 6,
-            CauseType.OVERTAKING: 4,
-            CauseType.FATIGUE: 2,
-        }
-        
-        fine_config = fines.get(violation_type, {"base": 3000, "max": 10000})
-        
-        if violation_type == CauseType.SPEEDING and speed_excess:
-            amount = min(fine_config["base"] + speed_excess * fine_config["per_km"], fine_config["max"])
-        else:
-            amount = fine_config["base"]
-            
-        return {"amount": amount, "points": points.get(violation_type, 3)}
-    
+        self.violations.append(v)
+        self.stats["total_violations_today"] += 1
+
+        if plate_number.upper() not in self.vehicles:
+            self.vehicles[plate_number.upper()] = Vehicle(
+                plate_number=plate_number.upper(),
+                vehicle_type=vehicle_type,
+            )
+
+        return v
+
     def detect_speed(
         self,
         camera_id: str,
@@ -549,26 +615,24 @@ class RoadSafetyEngine:
         speed_detected: float,
         location: str,
         coordinates: Coordinates,
-        image_front: str = "",
-        image_rear: str = ""
+        image_front: Optional[str] = None,
+        image_rear: Optional[str] = None,
+        speed_limit: float = 80.0,
     ) -> Tuple[SpeedDetection, Optional[TrafficViolation]]:
+        det_id = self._generate_id("spd")
         detection = SpeedDetection(
-            id=f"spd_{uuid.uuid4().hex[:8]}",
+            id=det_id,
             camera_id=camera_id,
-            plate_number=plate_number,
-            vehicle_type=vehicle_type,
-            speed_detected=speed_detected,
-            speed_limit=self._get_speed_limit(location),
+            plate_number=plate_number.upper(),
+            speed=speed_detected,
             location=location,
             coordinates=coordinates,
-            image_front=image_front,
-            image_rear=image_rear,
-            timestamp=utcnow()
+            detected_at=datetime.now(timezone.utc),
+            speed_limit=speed_limit,
         )
-        
-        self.speed_detections[detection.id] = detection
-        
-        if speed_detected > detection.speed_limit:
+
+        violation = None
+        if speed_detected > speed_limit:
             violation = self.record_violation(
                 violation_type=CauseType.SPEEDING,
                 plate_number=plate_number,
@@ -578,239 +642,313 @@ class RoadSafetyEngine:
                 coordinates=coordinates,
                 camera_id=camera_id,
                 speed_detected=speed_detected,
-                speed_limit=detection.speed_limit,
-                evidence_image=image_front
+                speed_limit=speed_limit,
+                evidence_image=image_front,
             )
-            detection.confirmed = True
-            return detection, violation
-            
-        return detection, None
-    
-    def _get_speed_limit(self, location: str) -> float:
-        for segment in self.road_segments.values():
-            if segment.name.lower() in location.lower():
-                return segment.speed_limit
-        return 50.0
-    
-    def dispatch_emergency(self, incident_id: str, unit_type: str, unit_id: str) -> EmergencyDispatch:
-        dispatch = EmergencyDispatch(
-            id=f"disp_{uuid.uuid4().hex[:8]}",
-            incident_id=incident_id,
-            unit_type=unit_type,
-            unit_id=unit_id,
-            dispatched_at=utcnow()
-        )
-        self.dispatches[dispatch.id] = dispatch
-        return dispatch
-    
-    def get_incident(self, incident_id: str) -> Optional[RoadSafetyIncident]:
-        return self.incidents.get(incident_id)
-    
-    def get_accident(self, accident_id: str) -> Optional[RoadAccident]:
-        return self.accidents.get(accident_id)
-    
-    def get_violation(self, violation_id: str) -> Optional[TrafficViolation]:
-        return self.violations.get(violation_id)
-    
-    def get_vehicle(self, plate_number: str) -> Optional[Vehicle]:
-        return self.vehicles.get(plate_number)
-    
-    def get_driver(self, license_number: str) -> Optional[Driver]:
-        return self.drivers.get(license_number)
-    
-    def get_all_accidents(self, status: Optional[IncidentStatus] = None, limit: int = 100) -> List[RoadAccident]:
-        results = list(self.accidents.values())
-        if status:
-            results = [a for a in results if a.status == status]
-        results.sort(key=lambda a: a.reported_at, reverse=True)
-        return results[:limit]
-    
-    def get_all_violations(self, status: Optional[ViolationStatus] = None, plate_number: Optional[str] = None, limit: int = 100) -> List[TrafficViolation]:
-        results = list(self.violations.values())
-        if status:
-            results = [v for v in results if v.status == status]
-        if plate_number:
-            results = [v for v in results if v.plate_number == plate_number]
-        results.sort(key=lambda v: v.detected_at, reverse=True)
-        return results[:limit]
-    
-    def get_dashboard_stats(self) -> Dict:
-        return {
-            "accidents": {
-                "today": self.stats["total_accidents_today"],
-                "fatal": self.stats["fatal_accidents_today"],
-                "injuries": self.stats["total_injuries_today"],
-                "by_type": self._get_accidents_by_type(),
-                "by_cause": self._get_accidents_by_cause(),
-                "by_severity": self._get_accidents_by_severity(),
-            },
-            "violations": {
-                "today": self.stats["total_violations_today"],
-                "speed": self.stats["speed_violations_today"],
-                "dui": self.stats["dui_arrests_today"],
-                "by_type": self._get_violations_by_type(),
-                "pending": len([v for v in self.violations.values() if v.status == ViolationStatus.DETECTED]),
-                "revenue": sum(v.fine_amount for v in self.violations.values() if v.status in [ViolationStatus.ISSUED, ViolationStatus.PAID]),
-            },
-            "response": {
-                "avg_time": self.stats["avg_response_time"],
-                "active_dispatches": len([d for d in self.dispatches.values() if d.status == "dispatched"]),
-            },
-            "roads": self._get_road_stats(),
-            "trend": self._get_hourly_trend(),
-        }
-    
-    def _update_stats(self):
-        today = utcnow().date()
-        today_accidents = [a for a in self.accidents.values() if a.reported_at.date() == today]
-        
-        self.stats["total_accidents_today"] = len(today_accidents)
-        self.stats["fatal_accidents_today"] = len([a for a in today_accidents if a.severity == SeverityLevel.CRITICAL])
-        self.stats["total_casualties_today"] = sum(a.casualties for a in today_accidents)
-        self.stats["total_injuries_today"] = sum(a.injuries for a in today_accidents)
-        
-        today_violations = [v for v in self.violations.values() if v.detected_at.date() == today]
-        self.stats["total_violations_today"] = len(today_violations)
-        self.stats["speed_violations_today"] = len([v for v in today_violations if v.violation_type == CauseType.SPEEDING])
-        
-    def _get_accidents_by_type(self) -> Dict:
-        counts = {}
-        for acc in self.accidents.values():
-            t = acc.accident_type.value
-            counts[t] = counts.get(t, 0) + 1
-        return counts
-    
-    def _get_accidents_by_cause(self) -> Dict:
-        counts = {}
-        for acc in self.accidents.values():
-            c = acc.cause.value
-            counts[c] = counts.get(c, 0) + 1
-        return counts
-    
-    def _get_accidents_by_severity(self) -> Dict:
-        return {
-            s.value: len([a for a in self.accidents.values() if a.severity == s])
-            for s in SeverityLevel
-        }
-    
-    def _get_violations_by_type(self) -> Dict:
-        counts = {}
-        for v in self.violations.values():
-            t = v.violation_type.value
-            counts[t] = counts.get(t, 0) + 1
-        return counts
-    
-    def _get_road_stats(self) -> List[Dict]:
-        return [
-            {
-                "name": seg.name,
-                "category": seg.category,
-                "limit": seg.speed_limit,
-                "accidents_30d": seg.accident_count_30_days,
-                "risk_level": seg.current_risk_level.value,
-                "adt": seg.average_daily_traffic,
-            }
-            for seg in self.road_segments.values()
+            detection.violation_created = True
+            detection.violation_id = violation.id
+
+        self.speed_detections.append(detection)
+        return detection, violation
+
+    def generate_mock_data(self) -> dict:
+        now = datetime.now(timezone.utc)
+
+        vehicles_data = [
+            (
+                "KAA 123A",
+                VehicleType.CAR,
+                "Toyota",
+                "Corolla",
+                2020,
+                "White",
+                "John Kamau",
+            ),
+            (
+                "KBB 456B",
+                VehicleType.TRUCK,
+                "Isuzu",
+                "NPR",
+                2019,
+                "Blue",
+                "Peter Ochieng",
+            ),
+            (
+                "KCC 789C",
+                VehicleType.MATATU,
+                "Toyota",
+                "Hiace",
+                2018,
+                "Yellow",
+                "Mary Wanjiku",
+            ),
+            (
+                "KDD 012D",
+                VehicleType.BUS,
+                "Scania",
+                "K360",
+                2021,
+                "Green",
+                "Kenya Bus Services",
+            ),
+            (
+                "KEE 345E",
+                VehicleType.MOTORCYCLE,
+                "Honda",
+                "CB125",
+                2022,
+                "Red",
+                "James Mwangi",
+            ),
+            (
+                "KFF 678F",
+                VehicleType.CAR,
+                "Nissan",
+                "Note",
+                2020,
+                "Silver",
+                "Grace Akinyi",
+            ),
+            (
+                "KGG 901G",
+                VehicleType.BODA_BODA,
+                "TVS",
+                "HLX",
+                2021,
+                "Black",
+                "Daniel Odhiambo",
+            ),
+            (
+                "KHH 234H",
+                VehicleType.PSV,
+                "Isuzu",
+                "NQR",
+                2019,
+                "White",
+                "Super Metro Sacco",
+            ),
         ]
-    
-    def _get_hourly_trend(self) -> List[Dict]:
-        now = utcnow()
-        trend = []
-        for i in range(24):
-            hour = (now.hour - 23 + i) % 24
-            count = random.randint(0, 15)
-            trend.append({"hour": f"{hour:02d}:00", "accidents": count, "violations": count * 3})
-        return trend
-    
-    def generate_mock_data(self):
-        """Generate comprehensive realistic mock data for the system"""
+        for plate, vtype, make, model, year, color, owner in vehicles_data:
+            self.vehicles[plate] = Vehicle(
+                plate_number=plate,
+                vehicle_type=vtype,
+                make=make,
+                model=model,
+                year=year,
+                color=color,
+                owner_name=owner,
+            )
+
+        drivers_data = [
+            (
+                "DL001234",
+                "John Kamau Mwangi",
+                "1985-03-15",
+                "+254712345678",
+                "john.kamau@email.com",
+                "Nairobi",
+                "B",
+            ),
+            (
+                "DL002345",
+                "Peter Ochieng Okello",
+                "1990-07-22",
+                "+254723456789",
+                "peter.ochieng@email.com",
+                "Kisumu",
+                "C",
+            ),
+            (
+                "DL003456",
+                "Mary Wanjiku Njoroge",
+                "1988-11-10",
+                "+254734567890",
+                "mary.wanjiku@email.com",
+                "Nakuru",
+                "B",
+            ),
+            (
+                "DL004567",
+                "James Mwangi Kamau",
+                "1995-01-30",
+                "+254745678901",
+                "james.mwangi@email.com",
+                "Mombasa",
+                "A",
+            ),
+            (
+                "DL005678",
+                "Grace Akinyi Omondi",
+                "1992-09-05",
+                "+254756789012",
+                "grace.akinyi@email.com",
+                "Eldoret",
+                "B",
+            ),
+            (
+                "DL006789",
+                "Daniel Odhiambo Achieng",
+                "1987-04-18",
+                "+254767890123",
+                "daniel.odhiambo@email.com",
+                "Thika",
+                "A",
+            ),
+        ]
+        for lic, name, dob, phone, email, addr, lclass in drivers_data:
+            self.drivers[lic] = Driver(
+                license_number=lic,
+                name=name,
+                date_of_birth=dob,
+                phone=phone,
+                email=email,
+                address=addr,
+                license_class=lclass,
+            )
+
         accident_types = list(AccidentType)
         causes = list(CauseType)
         severities = list(SeverityLevel)
-        vehicle_types = list(VehicleType)
-        
-        # Generate realistic historical accidents (last 30 days)
-        now = utcnow()
-        for days_ago in range(30):
-            # Generate 0-5 accidents per day
-            num_accidents = random.randint(0, 5)
-            for _ in range(num_accidents):
-                hours_ago = random.randint(0, 23)
-                reported_time = now - timedelta(days=days_ago, hours=hours_ago)
-                
-                accident = self.create_accident_report(
-                    accident_type=random.choice(accident_types),
-                    cause=random.choice(causes),
-                    location=random.choice(ACCIDENT_HOTSPOTS)["name"],
-                    road_name=random.choice(KENYA_ROADS)["name"],
-                    coordinates=Coordinates(
-                        lat=random.uniform(-1.5, 0.5),
-                        lng=random.uniform(34.5, 40.0)
-                    ),
-                    severity=random.choice(severities),
-                    vehicles_involved=[random.choice(list(self.vehicles.keys()))],
-                    description=f"Auto-generated accident - {random.choice(['Minor collision', 'Traffic incident', 'Road hazard', 'Single vehicle accident'])}"
-                )
-                # Backdate the accident
-                accident.reported_at = reported_time
-                if accident.status in [IncidentStatus.CLEARED, IncidentStatus.CLOSED]:
-                    accident.cleared_at = reported_time + timedelta(minutes=random.randint(15, 120))
-        
-        # Generate realistic violations (last 30 days)
-        for days_ago in range(30):
-            # Generate 10-30 violations per day
-            num_violations = random.randint(10, 30)
-            for _ in range(num_violations):
-                hours_ago = random.randint(0, 23)
-                detected_time = now - timedelta(days=days_ago, hours=hours_ago)
-                
-                violation = self.record_violation(
-                    violation_type=random.choice(causes[:8]),
-                    plate_number=random.choice(list(self.vehicles.keys())),
-                    vehicle_type=random.choice(vehicle_types),
-                    location=random.choice(KENYA_ROADS)["name"],
-                    road_name=random.choice(KENYA_ROADS)["name"],
-                    coordinates=Coordinates(
-                        lat=random.uniform(-1.5, 0.5),
-                        lng=random.uniform(34.5, 40.0)
-                    ),
-                    camera_id=f"cam_{random.randint(1, 8):03d}",
-                    speed_detected=random.uniform(60, 160) if random.random() > 0.3 else None,
-                    speed_limit=random.choice([50, 60, 80, 100]),
-                    evidence_image=f"evidence_{uuid.uuid4().hex[:8]}.jpg"
-                )
-                # Backdate and set random status
-                violation.detected_at = detected_time
-                status_choice = random.random()
-                if status_choice < 0.3:
-                    violation.status = ViolationStatus.PAID
-                    violation.paid_at = detected_time + timedelta(days=random.randint(1, 15))
-                elif status_choice < 0.6:
-                    violation.status = ViolationStatus.ISSUED
-                    violation.issued_at = detected_time + timedelta(hours=random.randint(1, 12))
-                    violation.due_date = detected_time + timedelta(days=30)
-                elif status_choice < 0.8:
-                    violation.status = ViolationStatus.DETECTED
-                else:
-                    violation.status = ViolationStatus.REVIEWED
-        
-        # Generate speed detections
-        for _ in range(200):
-            self.detect_speed(
-                camera_id=f"cam_{random.randint(1, 8):03d}",
-                plate_number=random.choice(list(self.vehicles.keys())),
-                vehicle_type=random.choice(vehicle_types),
-                speed_detected=random.uniform(50, 150),
-                location=random.choice(KENYA_ROADS)["name"],
+        locations = [
+            ("Mombasa Road Junction", "Mombasa Road (A109)"),
+            ("Nairobi CBD Roundabout", "Uhuru Highway"),
+            ("Thika Road Stage", "Thika Road"),
+            ("Waiyaki Way Underpass", "Waiyaki Way"),
+            ("Langata Road Near Wilson", "Langata Road"),
+        ]
+
+        for i in range(10):
+            loc, road = random.choice(locations)
+            acc = RoadAccident(
+                id=f"acc_{i+1:03d}",
+                accident_type=random.choice(accident_types),
+                cause=random.choice(causes),
+                location=loc,
+                road_name=road,
+                severity=random.choice(severities),
+                status=random.choice(
+                    ["reported", "dispatched", "on_scene", "resolved"]
+                ),
+                casualties=random.randint(0, 3),
+                injuries=random.randint(0, 8),
+                reported_at=now - timedelta(hours=random.randint(1, 720)),
                 coordinates=Coordinates(
-                    lat=random.uniform(-1.5, 0.5),
-                    lng=random.uniform(34.5, 40.0)
-                )
+                    lat=-1.29 + random.uniform(-0.1, 0.1),
+                    lng=36.82 + random.uniform(-0.1, 0.1),
+                ),
+                vehicles_involved=random.randint(1, 4),
             )
-        
-        self._update_stats()
-        logger.info(f"Generated {len(self.accidents)} accidents and {len(self.violations)} violations")
-        logger.info(f"Total speed detections: {len(self.speed_detections)}")
+            self.accidents.append(acc)
+
+        vtypes = list(FINES.keys())
+        plates = [v[0] for v in vehicles_data]
+        for i in range(25):
+            vtype = random.choice(vtypes)
+            fine = FINES.get(vtype, {"base": 5000})["base"]
+            loc, road = random.choice(locations)
+            spd = random.uniform(60, 160) if vtype == "speeding" else None
+            lim = 80 if vtype == "speeding" else None
+
+            v = TrafficViolation(
+                id=f"vio_{i+1:03d}",
+                violation_type=vtype,
+                plate_number=random.choice(plates),
+                location=loc,
+                road_name=road,
+                speed_detected=round(spd, 1) if spd else None,
+                speed_limit=lim,
+                fine_amount=fine
+                + (int((spd - lim) * 500) if spd and lim and spd > lim else 0),
+                status=random.choice(
+                    [
+                        ViolationStatus.DETECTED,
+                        ViolationStatus.ISSUED,
+                        ViolationStatus.PAID,
+                    ]
+                ),
+                detected_at=now - timedelta(hours=random.randint(1, 720)),
+                coordinates=Coordinates(
+                    lat=-1.29 + random.uniform(-0.1, 0.1),
+                    lng=36.82 + random.uniform(-0.1, 0.1),
+                ),
+                camera_id=f"cam_{random.randint(1, 20):03d}",
+                vehicle_type="car",
+                penalty_points=PENALTY_POINTS.get(vtype, 2),
+            )
+            self.violations.append(v)
+
+        return {
+            "vehicles": len(self.vehicles),
+            "drivers": len(self.drivers),
+            "accidents": len(self.accidents),
+            "violations": len(self.violations),
+        }
+
+    def create_vehicle(
+        self,
+        plate_number: str,
+        vehicle_type: str,
+        make: Optional[str] = None,
+        model: Optional[str] = None,
+        year: Optional[int] = None,
+        color: Optional[str] = None,
+        owner_name: Optional[str] = None,
+    ) -> Vehicle:
+        vtype = (
+            VehicleType(vehicle_type)
+            if vehicle_type not in [e.value for e in VehicleType]
+            else VehicleType(vehicle_type)
+        )
+        vehicle = Vehicle(
+            plate_number=plate_number.upper(),
+            vehicle_type=vtype,
+            make=make,
+            model=model,
+            year=year,
+            color=color,
+            owner_name=owner_name,
+        )
+        self.vehicles[plate_number.upper()] = vehicle
+        return vehicle
+
+    def update_vehicle(self, plate_number: str, **kwargs) -> Optional[Vehicle]:
+        vehicle = self.vehicles.get(plate_number.upper())
+        if not vehicle:
+            return None
+        for key, value in kwargs.items():
+            if value is not None and hasattr(vehicle, key):
+                setattr(vehicle, key, value)
+        return vehicle
+
+    def delete_vehicle(self, plate_number: str) -> bool:
+        plate = plate_number.upper()
+        if plate in self.vehicles:
+            del self.vehicles[plate]
+            return True
+        return False
+
+    def create_driver(self, license_number: str, name: str, **kwargs) -> Driver:
+        driver = Driver(license_number=license_number.upper(), name=name, **kwargs)
+        self.drivers[license_number.upper()] = driver
+        return driver
+
+    def update_driver(self, license_number: str, **kwargs) -> Optional[Driver]:
+        driver = self.drivers.get(license_number.upper())
+        if not driver:
+            return None
+        for key, value in kwargs.items():
+            if value is not None and hasattr(driver, key):
+                setattr(driver, key, value)
+        return driver
+
+    def delete_driver(self, license_number: str) -> bool:
+        lic = license_number.upper()
+        if lic in self.drivers:
+            del self.drivers[lic]
+            return True
+        return False
 
 
 road_safety_engine = RoadSafetyEngine()
+
+CITIZEN_REPORTS = []

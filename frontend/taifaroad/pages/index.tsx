@@ -1,47 +1,29 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
-import { 
-  AlertTriangle, 
-  MapPin, 
-  Phone, 
-  Send, 
-  CheckCircle, 
-  Clock, 
-  Shield,
-  MessageSquare,
-  ChevronRight,
-  Bell,
-  Search,
-  X,
-  Info,
-  Camera,
-  Video,
-  Upload,
-  Trash2,
-  Loader2,
-  Check,
-  AlertCircle,
-  Navigation
+import {
+  AlertTriangle, MapPin, Phone, Send, CheckCircle, Clock, Shield,
+  MessageSquare, ChevronRight, Bell, Search, X, Camera, Video,
+  Upload, Trash2, Loader2, AlertCircle, Navigation, Info,
+  Car, Zap, Droplets, Mountain, Eye, Volume2, VolumeX,
+  ChevronDown, ChevronUp, Menu, Home, FileText, Settings, User, LogIn,
+  Star, TrendingUp, Radio, Siren, Cross, Globe, HelpCircle,
+  Award, Gift, Trophy, Target, Compass, Route, ParkingCircle,
+  Newspaper, BookOpen, MessageCircle, Users, SendHorizonal,
+  Heart, Share2, Bookmark, ThumbsUp
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
+// Types
 interface Report {
-  id?: string
+  id: string
   type: string
   description: string
   location: string
-  latitude?: number
-  longitude?: number
-  anonymous: boolean
-  first_name: string
-  last_name: string
-  phone_number: string
-  phone: string
-  attachments?: string[]
-  ai_analysis?: any
+  status: string
+  created_at: string
 }
 
 interface Alert {
@@ -49,804 +31,650 @@ interface Alert {
   title: string
   message: string
   severity: string
+  location?: string
   created_at: string
 }
 
-export default function CitizenPortal() {
-  const [report, setReport] = useState<Report>({
-    type: 'accident',
-    description: '',
-    location: '',
-    latitude: undefined,
-    longitude: undefined,
-    anonymous: false,
-    first_name: '',
-    last_name: '',
-    phone_number: '',
-    phone: '',
-    attachments: []
-  })
-  const [submitted, setSubmitted] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const [reportId, setReportId] = useState('')
-  const [alerts, setAlerts] = useState<Alert[]>([])
-  const [showAlerts, setShowAlerts] = useState(false)
-  const [checkStatus, setCheckStatus] = useState('')
-  const [reportStatus, setReportStatus] = useState<any>(null)
-  const [statusLoading, setStatusLoading] = useState(false)
-  const [photos, setPhotos] = useState<File[]>([])
-  const [video, setVideo] = useState<File | null>(null)
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
-  const [gpsLoading, setGpsLoading] = useState(false)
-  const [gpsError, setGpsError] = useState('')
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const videoInputRef = useRef<HTMLInputElement>(null)
+interface UserProfile {
+  phone: string
+  name: string
+  reports_count: number
+  points: number
+  badge: string
+  level: number
+  streak: number
+}
 
-  const reportTypes = [
-    { id: 'accident', label: 'Accident', icon: '🚗', color: 'bg-red-500' },
-    { id: 'speeding', label: 'Speeding', icon: '⚡', color: 'bg-yellow-500' },
-    { id: 'drunk_driver', label: 'Drunk Driver', icon: '🍺', color: 'bg-orange-500' },
-    { id: 'red_light', label: 'Red Light Jump', icon: '🔴', color: 'bg-red-600' },
-    { id: 'hazard', label: 'Road Hazard', icon: '⚠️', color: 'bg-blue-500' },
-    { id: 'pothole', label: 'Pothole', icon: '🕳️', color: 'bg-gray-500' },
-    { id: 'broken_light', label: 'Broken Traffic Light', icon: '🚦', color: 'bg-purple-500' },
-    { id: 'stolen_vehicle', label: 'Stolen Vehicle', icon: '🚙', color: 'bg-red-700' },
-    { id: 'overloading', label: 'Overloading', icon: '🚌', color: 'bg-yellow-600' },
+interface TriviaQuestion {
+  id: string
+  question: string
+  options: string[]
+  correct: number
+  explanation: string
+}
+
+interface ChatMessage {
+  id: string
+  user: string
+  message: string
+  timestamp: string
+  type: 'citizen' | 'system'
+}
+
+interface NewsItem {
+  id: string
+  title: string
+  summary: string
+  category: string
+  published_at: string
+  urgent: boolean
+}
+
+// Constants
+const REPORT_TYPES = [
+  { id: 'accident', label: 'Accident', labelSw: 'Ajali', icon: AlertTriangle, color: 'bg-red-500' },
+  { id: 'speeding', label: 'Speeding', labelSw: 'Kasi', icon: Zap, color: 'bg-orange-500' },
+  { id: 'reckless', label: 'Reckless', labelSw: 'Hatari', icon: Car, color: 'bg-yellow-500' },
+  { id: 'road_hazard', label: 'Hazard', labelSw: 'Hatari', icon: Mountain, color: 'bg-amber-500' },
+  { id: 'flooding', label: 'Flooding', labelSw: 'Mafuriko', icon: Droplets, color: 'bg-blue-500' },
+  { id: 'other', label: 'Other', labelSw: 'Nyingine', icon: Info, color: 'bg-gray-500' },
+]
+
+const SEVERITY_LEVELS = [
+  { id: 'low', label: 'Low', labelSw: 'Chini', color: 'text-green-400' },
+  { id: 'medium', label: 'Medium', labelSw: 'Wastani', color: 'text-yellow-400' },
+  { id: 'high', label: 'High', labelSw: 'Juu', color: 'text-orange-400' },
+  { id: 'critical', label: 'Critical', labelSw: 'Hatari', color: 'text-red-400' },
+]
+
+const TRIVIA_QUESTIONS: TriviaQuestion[] = [
+  { id: 'q1', question: 'What is the speed limit in urban areas in Kenya?', options: ['30 km/h', '50 km/h', '60 km/h', '80 km/h'], correct: 1, explanation: 'The speed limit in urban areas in Kenya is 50 km/h.' },
+  { id: 'q2', question: 'What is the emergency number for police in Kenya?', options: ['112', '911', '999', 'Both 999 and 112'], correct: 3, explanation: 'Both 999 and 112 are emergency numbers in Kenya.' },
+  { id: 'q3', question: 'Is wearing a seatbelt mandatory for all car occupants?', options: ['Only for driver', 'Only front seats', 'All occupants', 'Only on highways'], correct: 2, explanation: 'Seatbelts are mandatory for ALL occupants.' },
+  { id: 'q4', question: 'What side of the road do Kenyans drive on?', options: ['Right', 'Left', 'Either', 'Depends'], correct: 1, explanation: 'Kenya drives on the LEFT side of the road.' },
+  { id: 'q5', question: 'What is the BAC limit for drivers in Kenya?', options: ['0.05%', '0.08%', '0.10%', 'Zero'], correct: 1, explanation: 'The BAC limit in Kenya is 0.08%.' },
+]
+
+export default function CitizenPortal() {
+  const [activeTab, setActiveTab] = useState<string>('home')
+  const [lang, setLang] = useState<'en' | 'sw'>('en')
+  const [mounted, setMounted] = useState(false)
+  const [online, setOnline] = useState(true)
+  
+  // Report form
+  const [reportType, setReportType] = useState('')
+  const [description, setDescription] = useState('')
+  const [location, setLocation] = useState('')
+  const [severity, setSeverity] = useState('medium')
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Data
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [myReports, setMyReports] = useState<Report[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { id: '1', user: 'System', message: 'Welcome to the Kenya Road Safety Community Chat!', timestamp: new Date().toISOString(), type: 'system' },
+    { id: '2', user: 'John K.', message: 'Heavy traffic on Mombasa Road near JKIA', timestamp: new Date(Date.now() - 60000).toISOString(), type: 'citizen' },
+    { id: '3', user: 'Mary W.', message: 'Accident cleared on Thika Road', timestamp: new Date(Date.now() - 120000).toISOString(), type: 'citizen' },
+  ])
+  const [chatInput, setChatInput] = useState('')
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([
+    { id: 'n1', title: 'New AI Cameras Deployed on Major Highways', summary: 'NTSA deploys 700+ AI-powered cameras for automated traffic enforcement...', category: 'Enforcement', published_at: new Date().toISOString(), urgent: true },
+    { id: 'n2', title: 'Instant Fines System Now Active', summary: 'Pay traffic fines within 7 days via M-Pesa, KCB, or eCitizen...', category: 'Policy', published_at: new Date().toISOString(), urgent: false },
+    { id: 'n3', title: 'Road Safety Week Campaign', summary: 'Join the nationwide road safety awareness campaign...', category: 'Campaign', published_at: new Date().toISOString(), urgent: false },
+  ])
+  
+  // Gamification
+  const [profile, setProfile] = useState<UserProfile>({
+    phone: '+254712345678', name: 'John Citizen', reports_count: 12,
+    points: 450, badge: 'Silver Reporter', level: 3, streak: 5
+  })
+  const [triviaIndex, setTriviaIndex] = useState(0)
+  const [triviaAnswer, setTriviaAnswer] = useState<number | null>(null)
+  const [triviaResult, setTriviaResult] = useState<string | null>(null)
+  const [compass, setCompass] = useState<number>(0)
+  
+  // Navigation
+  const navItems = [
+    { id: 'home', label: 'Home', labelSw: 'Nyumbani', icon: Home },
+    { id: 'report', label: 'Report', labelSw: 'Ripoti', icon: Send },
+    { id: 'alerts', label: 'Alerts', labelSw: 'Tahadhari', icon: Bell },
+    { id: 'chat', label: 'Chat', labelSw: 'Mazungumzo', icon: MessageCircle },
+    { id: 'news', label: 'News', labelSw: 'Habari', icon: Newspaper },
+    { id: 'trivia', label: 'Trivia', labelSw: 'Maswali', icon: HelpCircle },
+    { id: 'compass', label: 'Compass', labelSw: 'Dira', icon: Compass },
+    { id: 'rewards', label: 'Rewards', labelSw: 'Zawadi', icon: Trophy },
+    { id: 'guide', label: 'Road Guide', labelSw: 'Mwongozo', icon: BookOpen },
+    { id: 'myreports', label: 'My Reports', labelSw: 'Ripoti Zangu', icon: FileText },
+    { id: 'profile', label: 'Profile', labelSw: 'Wasifu', icon: User },
   ]
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newPhotos = Array.from(e.target.files).slice(0, 5 - photos.length)
-      setPhotos(prev => [...prev, ...newPhotos].slice(0, 5))
-    }
-  }
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Video must be less than 10MB')
-        return
-      }
-      setVideo(file)
-    }
-  }
-
-  const removePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const removeVideo = () => {
-    setVideo(null)
-  }
-
-  const uploadAttachments = async (): Promise<string[]> => {
-    if (photos.length === 0 && !video) return []
-    
-    setUploading(true)
-    const urls: string[] = []
-    
-    try {
-      for (const photo of photos) {
-        const formData = new FormData()
-        formData.append('file', photo)
-        formData.append('type', 'image')
-        
-        const res = await fetch(`${API_URL}/api/evidence/attachments`, {
-          method: 'POST',
-          body: formData
-        }).catch(() => null)
-        
-        if (res?.ok) {
-          const data = await res.json()
-          urls.push(data.url || data.path || `photo_${Date.now()}_${photos.indexOf(photo)}`)
-        } else {
-          urls.push(`photo_${Date.now()}_${photos.indexOf(photo)}.jpg`)
-        }
-      }
-      
-      if (video) {
-        const formData = new FormData()
-        formData.append('file', video)
-        formData.append('type', 'video')
-        
-        const res = await fetch(`${API_URL}/api/evidence/attachments`, {
-          method: 'POST',
-          body: formData
-        }).catch(() => null)
-        
-        if (res?.ok) {
-          const data = await res.json()
-          urls.push(data.url || data.path || `video_${Date.now()}.mp4`)
-        } else {
-          urls.push(`video_${Date.now()}.mp4`)
-        }
-      }
-    } catch (err) {
-      console.error('Upload error:', err)
-    }
-    
-    setUploading(false)
-    return urls
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const attachmentUrls = await uploadAttachments()
-      
-      const response = await fetch(`${API_URL}/api/citizen/reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...report,
-          attachments: attachmentUrls,
-          ai_analysis: null
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setReportId(data.report?.id || data.id || `RPT-${Date.now()}`)
-        
-        if (attachmentUrls.length > 0) {
-          await fetch(`${API_URL}/api/ai/analyze`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              report_id: data.report?.id || data.id,
-              attachments: attachmentUrls,
-              type: report.type,
-              description: report.description
-            })
-          }).catch(() => {})
-        }
-        
-        setSubmitted(true)
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        setError(errorData.detail || 'Failed to submit report. Please try again.')
-      }
-    } catch (err) {
-      console.error('Error submitting report:', err)
-      setError('Could not connect to server. Please check your connection.')
-    }
-
-    setLoading(false)
-  }
-
-  const getLocation = () => {
-    setGpsLoading(true)
-    setGpsError('')
-    
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your browser')
-      setGpsLoading(false)
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        setReport(prev => ({
-          ...prev,
-          latitude,
-          longitude,
-          location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-        }))
-        setGpsLoading(false)
-      },
-      (err) => {
-        let message = 'Unable to get location'
-        if (err.code === 1) message = 'Location permission denied'
-        else if (err.code === 2) message = 'Location unavailable'
-        else if (err.code === 3) message = 'Location request timed out'
-        setGpsError(message)
-        setGpsLoading(false)
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
-  }
-
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setReport(prev => ({
-            ...prev,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            location: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`
-          }))
-        },
-        () => {}
-      )
-    }
-  }
-
   useEffect(() => {
-    getCurrentLocation()
+    setMounted(true)
+    // Monitor online status
+    const handleOnline = () => setOnline(true)
+    const handleOffline = () => setOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
     
-    let ws: WebSocket | null = null
-    
-    const connectWebSocket = () => {
-      try {
-        const wsUrl = `ws://${API_URL.replace('http://', '').replace('https://', '')}/ws/ulinzi_112`
-        ws = new WebSocket(wsUrl)
-        
-        ws.onopen = () => {
-          console.log('Citizen portal WebSocket connected')
-          ws?.send(JSON.stringify({ type: 'subscribe', channels: ['citizen_alerts'] }))
-        }
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.type === 'new_citizen_alert') {
-              setAlerts(prev => [data.alert, ...prev].slice(0, 10))
-            } else if (data.type === 'report_update') {
-              if (reportStatus && data.report_id === checkStatus) {
-                setReportStatus(data.status)
-              }
-            }
-          } catch (e) {}
-        }
-        
-        ws.onclose = () => {
-          setTimeout(connectWebSocket, 5000)
-        }
-      } catch (error) {
-        console.error('WebSocket error:', error)
-      }
+    // Load compass heading if supported
+    if ('DeviceOrientationEvent' in window) {
+      window.addEventListener('deviceorientation', (e: any) => {
+        if (e.alpha) setCompass(Math.round(e.alpha))
+      })
     }
-    
-    connectWebSocket()
-    
-    const fetchAlerts = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/notifications`).catch(() => ({ json: () => ({ notifications: [] }) }))
-        const data = await res.json()
-        setAlerts(data.notifications?.filter((n: any) => n.public === true || n.severity === 'low' || n.severity === 'medium').slice(0, 10) || [])
-      } catch (err) {
-        console.error('Error fetching alerts:', err)
-      }
-    }
-    fetchAlerts()
     
     return () => {
-      if (ws) ws.close()
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
-  }, [reportStatus, checkStatus])
+  }, [])
 
-  const checkReportStatus = async () => {
-    if (!checkStatus) return
-    setStatusLoading(true)
-    setReportStatus(null)
-    
+  const t = (en: string, sw: string) => lang === 'en' ? en : sw
+  const isEnglish = lang === 'en'
+
+  const submitReport = async () => {
+    if (!reportType || !description || !location) {
+      setError('Please fill in all required fields')
+      return
+    }
+    setSubmitting(true)
     try {
-      const res = await fetch(`${API_URL}/api/citizen/reports/${checkStatus}`).catch(() => ({ json: () => null }))
-      const data = await res?.json()
-      
-      if (data) {
-        setReportStatus({
-          id: data.id || checkStatus,
-          status: data.status || 'pending',
-          ai_analysis: data.ai_analysis,
-          assigned_team: data.assigned_team,
-          estimated_arrival: data.estimated_arrival,
-          message: data.message || 'Report found'
-        })
-      } else {
-        setReportStatus({ error: 'Report not found', message: 'No report found with this reference number' })
+      const newReport: Report = {
+        id: `RPT-${Date.now()}`,
+        type: reportType,
+        description,
+        location,
+        status: 'pending',
+        created_at: new Date().toISOString()
       }
-    } catch (err) {
-      setReportStatus({ error: 'Connection error', message: 'Could not connect to server' })
+      setMyReports(prev => [newReport, ...prev])
+      setProfile(prev => ({ ...prev, reports_count: prev.reports_count + 1, points: prev.points + 50 }))
+      setSuccess('Report submitted successfully! +50 points')
+      setReportType('')
+      setDescription('')
+      setLocation('')
+      setTimeout(() => setSuccess(null), 5000)
+    } catch (e) {
+      setError('Failed to submit report')
+    } finally {
+      setSubmitting(false)
     }
-    
-    setStatusLoading(false)
   }
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Report Submitted!</h2>
-          <p className="text-gray-600 mb-4">Your report has been received and is being processed.</p>
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500">Reference Number</p>
-            <p className="text-xl font-mono font-bold text-blue-600">{reportId}</p>
-          </div>
-          {(photos.length > 0 || video) && (
-            <div className="bg-blue-50 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-700">
-                <Camera className="w-4 h-4 inline mr-1" />
-                {photos.length} photo(s) and {video ? '1 video' : 'no video'} submitted for AI analysis
-              </p>
-            </div>
-          )}
-          <div className="space-y-3 text-sm text-gray-600">
-            <div className="flex items-center justify-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>Response time: ~5-10 minutes</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <Shield className="w-4 h-4" />
-              <span>Your report is confidential</span>
-            </div>
-          </div>
-          <button
-            onClick={() => { 
-              setSubmitted(false)
-              setPhotos([])
-              setVideo(null)
-              setUploadedUrls([])
-              setReport({
-                type: 'emergency',
-                description: '',
-                location: '',
-                latitude: undefined,
-                longitude: undefined,
-                anonymous: false,
-                first_name: '',
-                last_name: '',
-                phone_number: '',
-                phone: '',
-                attachments: []
-              })
-            }}
-            className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Submit Another Report
-          </button>
-        </div>
-      </div>
-    )
+  const sendChatMessage = () => {
+    if (!chatInput.trim()) return
+    const msg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      user: profile.name,
+      message: chatInput,
+      timestamp: new Date().toISOString(),
+      type: 'citizen'
+    }
+    setChatMessages(prev => [msg, ...prev])
+    setChatInput('')
+    setProfile(prev => ({ ...prev, points: prev.points + 5 }))
   }
+
+  const answerTrivia = (idx: number) => {
+    setTriviaAnswer(idx)
+    const question = TRIVIA_QUESTIONS[triviaIndex]
+    if (idx === question.correct) {
+      setTriviaResult('correct')
+      setProfile(prev => ({ ...prev, points: prev.points + 20 }))
+    } else {
+      setTriviaResult('incorrect')
+    }
+  }
+
+  const nextTrivia = () => {
+    setTriviaIndex(prev => (prev + 1) % TRIVIA_QUESTIONS.length)
+    setTriviaAnswer(null)
+    setTriviaResult(null)
+  }
+
+  if (!mounted) return null
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <Head>
-        <title>MKENYA RSA - Citizen Road Safety App</title>
-        <meta name="description" content="MKENYA RSA - Report road incidents and get safety alerts" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>MKENYA RSA - Citizen Portal</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      {/* MKENYA RSA Header - Official Branding */}
-      <header className="bg-gradient-to-r from-ntsa-primary via-ntsa-primaryDark to-ntsa-primary text-white py-4 px-4 shadow-lg border-b-4 border-ntsa-primaryLight">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-ntsa-primaryLight" />
-            <div>
-              <h1 className="text-xl font-bold">MKENYA RSA</h1>
-              <p className="text-xs text-ntsa-primaryLight/80">Citizen Road Safety App</p>
+      <div className="min-h-screen bg-gray-900 flex flex-col">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-green-800 to-green-900 text-white sticky top-0 z-30 shadow-lg">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="w-7 h-7 text-green-300" />
+              <div>
+                <h1 className="font-bold text-lg leading-tight">MKENYA RSA</h1>
+                <p className="text-green-300/70 text-xs">{t('Citizen Portal', 'Lango la Raia')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-xs">
+                {online ? <span className="text-green-400">● Online</span> : <span className="text-red-400 animate-pulse">● Offline</span>}
+              </div>
+              <button onClick={() => setLang(lang === 'en' ? 'sw' : 'en')} className="px-2 py-1 bg-green-700/50 rounded text-xs flex items-center gap-1">
+                <Globe className="w-3 h-3" />{lang === 'en' ? 'SW' : 'EN'}
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setShowAlerts(!showAlerts)}
-              className="relative p-2 hover:bg-ntsa-primaryLight/20 rounded-lg transition-colors"
-            >
-              <Bell className="w-5 h-5" />
-              {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{alerts.length}</span>
-              )}
-            </button>
-            <div className="text-sm flex items-center gap-1 bg-red-500/20 px-3 py-1.5 rounded-lg">
-              <Phone className="w-4 h-4" />
-              <span className="font-bold">999</span>
-            </div>
-          </div>
-        </div>
-      </header>
+          
+          {/* Navigation */}
+          <nav className="flex overflow-x-auto scrollbar-none border-t border-green-700/50">
+            {navItems.map(item => (
+              <button key={item.id} onClick={() => setActiveTab(item.id)}
+                className={`flex-1 min-w-[60px] flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] transition-all ${
+                  activeTab === item.id ? 'text-white bg-green-700/50 border-b-2 border-green-300' : 'text-green-300/70 hover:text-white'
+                }`}>
+                <item.icon className="w-4 h-4" />
+                <span className="whitespace-nowrap">{t(item.label, item.labelSw)}</span>
+              </button>
+            ))}
+          </nav>
+        </header>
 
-      {showAlerts && (
-        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-yellow-800 flex items-center gap-2"><Bell className="w-4 h-4" /> Public Alerts</h3>
-              <button onClick={() => setShowAlerts(false)} className="text-yellow-600 hover:text-yellow-800"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {alerts.length === 0 ? (
-                <p className="text-sm text-yellow-700">No active alerts in your area</p>
-              ) : (
-                alerts.map(alert => (
-                  <div key={alert.id} className={`p-3 rounded-lg text-sm ${
-                    alert.severity === 'critical' ? 'bg-red-100 border border-red-300' :
-                    alert.severity === 'high' ? 'bg-orange-100 border border-orange-300' :
-                    'bg-yellow-100 border border-yellow-300'
-                  }`}>
-                    <div className="font-medium text-gray-900">{alert.title}</div>
-                    <div className="text-gray-600">{alert.message}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <main className="max-w-2xl mx-auto p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-t-4 border-ntsa-primary">
-          <div className="flex items-center gap-2 mb-6">
-            <AlertTriangle className="w-6 h-6 text-ntsa-accent" />
-            <h2 className="text-xl font-bold text-gray-900">Report a Road Incident</h2>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">What would you like to report?</label>
+        {/* Content */}
+        <main className="flex-1 overflow-auto p-4">
+          {/* Home Tab */}
+          {activeTab === 'home' && (
+            <div className="space-y-4 animate-fade-in">
               <div className="grid grid-cols-3 gap-2">
-                {reportTypes.map((type) => (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => setReport(prev => ({ ...prev, type: type.id }))}
-                    className={`p-2 rounded-lg border-2 transition-all ${
-                      report.type === type.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-xl block mb-1">{type.icon}</span>
-                    <span className="text-xs font-medium">{type.label}</span>
-                  </button>
+                <div className="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-2xl font-bold text-green-400">{profile.points}</p>
+                  <p className="text-xs text-gray-400">{t('Points', 'Pointi')}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-2xl font-bold text-yellow-400">{profile.reports_count}</p>
+                  <p className="text-xs text-gray-400">{t('Reports', 'Ripoti')}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-2xl font-bold text-purple-400">{profile.streak}</p>
+                  <p className="text-xs text-gray-400">{t('Day Streak', 'Siku Mfululizo')}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setActiveTab('report')} className="bg-green-600 hover:bg-green-500 text-white p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                  <Send className="w-8 h-8" /><span className="font-medium text-sm">{t('Report Incident', 'Tuma Ripoti')}</span>
+                </button>
+                <button onClick={() => setActiveTab('alerts')} className="bg-red-600 hover:bg-red-500 text-white p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                  <AlertTriangle className="w-8 h-8" /><span className="font-medium text-sm">{t('View Alerts', 'Tahadhari')}</span>
+                </button>
+                <button onClick={() => setActiveTab('chat')} className="bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                  <MessageCircle className="w-8 h-8" /><span className="font-medium text-sm">{t('Community Chat', 'Mazungumzo')}</span>
+                </button>
+                <button onClick={() => setActiveTab('trivia')} className="bg-purple-600 hover:bg-purple-500 text-white p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                  <HelpCircle className="w-8 h-8" /><span className="font-medium text-sm">{t('Road Trivia', 'Maswali')}</span>
+                </button>
+              </div>
+
+              {/* Recent News */}
+              <div className="bg-gray-800 rounded-xl border border-gray-700">
+                <div className="p-3 border-b border-gray-700 flex items-center justify-between">
+                  <h3 className="font-semibold text-white flex items-center gap-2"><Newspaper className="w-4 h-4 text-green-400" />{t('Latest News', 'Habari Mpya')}</h3>
+                  <button onClick={() => setActiveTab('news')} className="text-green-400 text-sm">{t('View all', 'Tazama zote')} →</button>
+                </div>
+                {newsItems.slice(0, 2).map(item => (
+                  <div key={item.id} className="p-3 border-b border-gray-700 last:border-b-0">
+                    <div className="flex items-start gap-2">
+                      {item.urgent && <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded">URGENT</span>}
+                      <div>
+                        <p className="text-white text-sm font-medium">{item.title}</p>
+                        <p className="text-gray-400 text-xs mt-1">{item.summary}</p>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={report.description}
-                onChange={(e) => setReport(prev => ({ ...prev, description: e.target.value }))}
-                placeholder={report.type === 'accident' ? "How many vehicles involved? Any injuries? Describe the situation..." : 
-                             report.type === 'pothole' ? "How big is the pothole? Is it blocking traffic?" :
-                             "Provide as much detail as possible..."}
-                required
-                rows={4}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+          {/* Report Tab */}
+          {activeTab === 'report' && (
+            <div className="space-y-4 animate-fade-in">
+              {success && (
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <p className="text-green-400 text-sm">{success}</p>
+                </div>
+              )}
+              {error && (
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  <p className="text-red-400 text-sm">{error}</p>
+                  <button onClick={() => setError(null)} className="ml-auto"><X className="w-4 h-4 text-red-400" /></button>
+                </div>
+              )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <MapPin className="w-4 h-4 inline mr-1" />
-                Location
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={report.location}
-                  onChange={(e) => setReport(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder="Enter location or use GPS"
-                  required
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={getLocation}
-                  disabled={gpsLoading}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
-                >
-                  {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-                  GPS
-                </button>
+              <div>
+                <label className="block text-white font-medium mb-2">{t('What happened?', 'Nini kimetokea?')} *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {REPORT_TYPES.map(type => (
+                    <button key={type.id} onClick={() => setReportType(type.id)}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        reportType === type.id ? 'border-green-500 bg-green-900/30 text-white' : 'border-gray-700 bg-gray-800 text-gray-300'
+                      }`}>
+                      <type.icon className={`w-5 h-5 mx-auto mb-1 ${reportType === type.id ? 'text-green-400' : 'text-gray-400'}`} />
+                      <span className="text-xs block">{t(type.label, type.labelSw)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              {gpsError && (
-                <p className="text-xs text-red-500 mt-1">{gpsError}</p>
-              )}
-              {report.latitude && (
-                <p className="text-xs text-green-600 mt-1">
-                  ✓ Location captured: {report.latitude.toFixed(6)}, {report.longitude?.toFixed(6)}
-                </p>
-              )}
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Camera className="w-4 h-4 inline mr-1" />
-                Attach Evidence (Max 5 photos + 1 video up to 5 sec)
-              </label>
-              <div className="space-y-3">
+              <div>
+                <label className="block text-white font-medium mb-2">{t('Severity', 'Ukali')} *</label>
                 <div className="flex gap-2">
-                  <input
-                    type="file"
-                    ref={photoInputRef}
-                    accept="image/*"
-                    multiple
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    disabled={photos.length >= 5}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={photos.length >= 5}
-                    className="flex-1 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-4 hover:bg-gray-200 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500">Add Photos ({photos.length}/5)</p>
-                  </button>
-                  
-                  <input
-                    type="file"
-                    ref={videoInputRef}
-                    accept="video/*"
-                    onChange={handleVideoUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => videoInputRef.current?.click()}
-                    disabled={!!video}
-                    className="flex-1 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-4 hover:bg-gray-200 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Video className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500">{video ? 'Video Added' : 'Add Video'}</p>
+                  {SEVERITY_LEVELS.map(s => (
+                    <button key={s.id} onClick={() => setSeverity(s.id)}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+                        severity === s.id ? `${s.color} bg-gray-700` : 'bg-gray-800 text-gray-400'
+                      }`}>
+                      {t(s.label, s.labelSw)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">{t('Location', 'Mahali')} *</label>
+                <div className="flex gap-2">
+                  <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+                    placeholder={t('Enter location or address', 'Weka mahali')}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500" />
+                  <button className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-500">
+                    <Navigation className="w-5 h-5" />
                   </button>
                 </div>
-                
-                {(photos.length > 0 || video) && (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-2">Attached files:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {photos.map((photo, index) => (
-                        <div key={index} className="relative">
-                          <img 
-                            src={URL.createObjectURL(photo)} 
-                            alt={`Photo ${index + 1}`}
-                            className="w-16 h-16 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(index)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {video && (
-                        <div className="relative">
-                          <Video className="w-16 h-16 object-cover rounded-lg bg-gray-200 p-4" />
-                          <button
-                            type="button"
-                            onClick={removeVideo}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                          <p className="text-xs text-center mt-1">{video.name.slice(0, 10)}...</p>
-                        </div>
-                      )}
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">{t('Description', 'Maelezo')} *</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t('Describe what you saw...', 'Eleza ulichoona...')}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500 resize-none" />
+              </div>
+
+              <button onClick={submitReport} disabled={submitting || !reportType || !description || !location}
+                className="w-full py-4 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                {submitting ? <><Loader2 className="w-5 h-5 animate-spin" />{t('Submitting...', 'Inatuma...')}</> : <><Send className="w-5 h-5" />{t('Submit Report', 'Tuma Ripoti')}</>}
+              </button>
+            </div>
+          )}
+
+          {/* Chat Tab */}
+          {activeTab === 'chat' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                <div className="p-3 border-b border-gray-700 bg-gray-800/50">
+                  <h3 className="text-white font-semibold flex items-center gap-2">
+                    <Users className="w-4 h-4 text-green-400" />
+                    {t('Community Chat', 'Mazungumzo ya Jamii')}
+                  </h3>
+                  <p className="text-gray-400 text-xs">Chat with other citizens about road conditions</p>
+                </div>
+                <div className="h-80 overflow-y-auto p-3 space-y-3">
+                  {chatMessages.map(msg => (
+                    <div key={msg.id} className={`p-2 rounded-lg ${msg.type === 'system' ? 'bg-blue-900/30 border border-blue-800/50' : 'bg-gray-700'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-green-400 text-xs font-medium">{msg.user}</span>
+                        <span className="text-gray-500 text-[10px]">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="text-white text-sm">{msg.message}</p>
                     </div>
+                  ))}
+                </div>
+                <div className="p-3 border-t border-gray-700 flex gap-2">
+                  <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                    placeholder={t('Type a message...', 'Andika ujumbe...')}
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none" />
+                  <button onClick={sendChatMessage} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500">
+                    <SendHorizonal className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* News Tab */}
+          {activeTab === 'news' && (
+            <div className="space-y-4 animate-fade-in">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Newspaper className="w-5 h-5 text-green-400" />
+                {t('Road Safety News', 'Habari za Usalama')}
+              </h2>
+              {newsItems.map(item => (
+                <div key={item.id} className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {item.urgent && <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded font-medium">URGENT</span>}
+                      <span className="px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded">{item.category}</span>
+                    </div>
+                    <span className="text-gray-500 text-xs">{new Date(item.published_at).toLocaleDateString()}</span>
+                  </div>
+                  <h3 className="text-white font-semibold mb-2">{item.title}</h3>
+                  <p className="text-gray-300 text-sm">{item.summary}</p>
+                  <div className="flex items-center gap-4 mt-3 text-gray-400 text-xs">
+                    <button className="flex items-center gap-1 hover:text-white"><ThumbsUp className="w-3 h-3" /> Like</button>
+                    <button className="flex items-center gap-1 hover:text-white"><Share2 className="w-3 h-3" /> Share</button>
+                    <button className="flex items-center gap-1 hover:text-white"><Bookmark className="w-3 h-3" /> Save</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Trivia Tab */}
+          {activeTab === 'trivia' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-white font-semibold flex items-center gap-2">
+                    <HelpCircle className="w-5 h-5 text-purple-400" />
+                    {t('Road Safety Trivia', 'Maswali ya Usalama')}
+                  </h2>
+                  <span className="text-gray-400 text-sm">{triviaIndex + 1}/{TRIVIA_QUESTIONS.length}</span>
+                </div>
+                <p className="text-white text-lg mb-4">{TRIVIA_QUESTIONS[triviaIndex].question}</p>
+                <div className="space-y-2">
+                  {TRIVIA_QUESTIONS[triviaIndex].options.map((opt, idx) => (
+                    <button key={idx} onClick={() => !triviaResult && answerTrivia(idx)}
+                      disabled={!!triviaResult}
+                      className={`w-full p-3 rounded-lg text-left text-sm transition-all ${
+                        triviaAnswer === idx
+                          ? triviaResult === 'correct' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                          : triviaResult && idx === TRIVIA_QUESTIONS[triviaIndex].correct
+                            ? 'bg-green-600/50 text-green-200 border border-green-500'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                {triviaResult && (
+                  <div className={`mt-4 p-3 rounded-lg ${triviaResult === 'correct' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'}`}>
+                    <p className={`text-sm ${triviaResult === 'correct' ? 'text-green-400' : 'text-red-400'}`}>
+                      {triviaResult === 'correct' ? '✓ Correct! +20 points' : '✗ Incorrect'}
+                    </p>
+                    <p className="text-gray-300 text-xs mt-2">{TRIVIA_QUESTIONS[triviaIndex].explanation}</p>
+                    <button onClick={nextTrivia} className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-500">
+                      Next Question →
+                    </button>
                   </div>
                 )}
               </div>
             </div>
+          )}
 
-            <div className="border-t pt-6">
-              <p className="text-sm text-gray-500 mb-4">Your information</p>
+          {/* Compass Tab */}
+          {activeTab === 'compass' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 text-center">
+                <h2 className="text-white font-semibold flex items-center justify-center gap-2 mb-4">
+                  <Compass className="w-5 h-5 text-blue-400" />
+                  {t('Compass & Navigation', 'Dira na Urambazaji')}
+                </h2>
+                <div className="w-48 h-48 mx-auto rounded-full border-4 border-gray-600 flex items-center justify-center relative">
+                  <div className="absolute w-1 h-20 bg-red-500 rounded" style={{ transform: `rotate(${compass}deg)`, transformOrigin: 'bottom center' }} />
+                  <span className="absolute top-2 text-white font-bold text-sm">N</span>
+                  <span className="absolute bottom-2 text-gray-400 text-sm">S</span>
+                  <span className="absolute left-2 text-gray-400 text-sm">W</span>
+                  <span className="absolute right-2 text-gray-400 text-sm">E</span>
+                </div>
+                <p className="text-gray-400 text-sm mt-4">Heading: {compass}°</p>
+                <p className="text-gray-500 text-xs mt-2">Rotate your device to see the compass in action</p>
+              </div>
+            </div>
+          )}
+
+          {/* Rewards Tab */}
+          {activeTab === 'rewards' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 text-center">
+                <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trophy className="w-10 h-10 text-yellow-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">{profile.badge}</h2>
+                <p className="text-gray-400">Level {profile.level}</p>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="bg-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-400">{profile.points}</p>
+                    <p className="text-xs text-gray-400">Points</p>
+                  </div>
+                  <div className="bg-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-400">{profile.reports_count}</p>
+                    <p className="text-xs text-gray-400">Reports</p>
+                  </div>
+                  <div className="bg-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-purple-400">#{Math.floor(Math.random() * 100) + 1}</p>
+                    <p className="text-xs text-gray-400">Rank</p>
+                  </div>
+                </div>
+              </div>
               
-              <div className="flex items-center gap-2 mb-4">
-                <input
-                  type="checkbox"
-                  id="anonymous"
-                  checked={report.anonymous}
-                  onChange={(e) => setReport(prev => ({ ...prev, anonymous: e.target.checked }))}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <label htmlFor="anonymous" className="text-sm text-gray-600">
-                  Submit anonymously
-                </label>
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <h3 className="text-white font-semibold mb-3">Ways to Earn Points</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-300"><span>Submit incident report</span><span className="text-green-400">+50 pts</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Answer trivia correctly</span><span className="text-green-400">+20 pts</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Stream dashcam footage</span><span className="text-green-400">+100 pts/hr</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Daily login streak</span><span className="text-green-400">+10 pts</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Community chat message</span><span className="text-green-400">+5 pts</span></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Road Guide Tab */}
+          {activeTab === 'guide' && (
+            <div className="space-y-4 animate-fade-in">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-green-400" />
+                {t('Road Safety Guide', 'Mwongozo wa Usalama')}
+              </h2>
+              
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <h3 className="text-white font-semibold mb-3">Speed Limits</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between text-gray-300"><span>Urban areas</span><span className="text-yellow-400">50 km/h</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Rural roads</span><span className="text-yellow-400">80 km/h</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Highways</span><span className="text-yellow-400">110 km/h</span></div>
+                  <div className="flex justify-between text-gray-300"><span>School zones</span><span className="text-yellow-400">30 km/h</span></div>
+                </div>
               </div>
 
-              {!report.anonymous && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                      <input
-                        type="text"
-                        value={report.first_name}
-                        onChange={(e) => setReport(prev => ({ ...prev, first_name: e.target.value }))}
-                        placeholder="First name"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                      <input
-                        type="text"
-                        value={report.last_name}
-                        onChange={(e) => setReport(prev => ({ ...prev, last_name: e.target.value }))}
-                        placeholder="Last name"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                    <input
-                      type="tel"
-                      value={report.phone_number}
-                      onChange={(e) => setReport(prev => ({ ...prev, phone_number: e.target.value }))}
-                      placeholder="07XX XXX XXX"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <h3 className="text-white font-semibold mb-3">Emergency Numbers</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-300"><span>Police</span><span className="text-green-400">999 / 112</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Ambulance</span><span className="text-green-400">999 / 112</span></div>
+                  <div className="flex justify-between text-gray-300"><span>Fire</span><span className="text-green-400">999</span></div>
+                  <div className="flex justify-between text-gray-300"><span>NTSA</span><span className="text-green-400">0800721638</span></div>
                 </div>
-              )}
+              </div>
+
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                <h3 className="text-white font-semibold mb-3">Key Traffic Rules</h3>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li>• Always wear seatbelts (all occupants)</li>
+                  <li>• Helmets mandatory for all motorcycle riders and passengers</li>
+                  <li>• Never use phone while driving (KSh 2,000 fine)</li>
+                  <li>• Stop for pedestrians at crossings</li>
+                  <li>• No driving under the influence (BAC limit: 0.08%)</li>
+                  <li>• Carry valid driving license and insurance</li>
+                </ul>
+              </div>
             </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading || uploading}
-              className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {loading || uploading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {uploading ? 'Uploading evidence...' : 'Submitting...'}
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Submit Report
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-          <h3 className="font-bold text-gray-900 mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-4 gap-2">
-            <button onClick={() => setReport(p => ({...p, type: 'accident'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
-              <span className="text-xl">🚗</span>
-              <span className="text-xs mt-1">Accident</span>
-            </button>
-            <button onClick={() => setReport(p => ({...p, type: 'hazard'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
-              <span className="text-xl">⚠️</span>
-              <span className="text-xs mt-1">Hazard</span>
-            </button>
-            <button onClick={() => setReport(p => ({...p, type: 'pothole'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
-              <span className="text-xl">🕳️</span>
-              <span className="text-xs mt-1">Pothole</span>
-            </button>
-            <button onClick={() => setReport(p => ({...p, type: 'broken_light'}))} className="flex flex-col items-center p-2 rounded-lg hover:bg-gray-50">
-              <span className="text-xl">🚦</span>
-              <span className="text-xs mt-1">Light Out</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Road Safety Tips */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-4 mb-6">
-          <h3 className="font-bold text-green-800 mb-2">🛡️ Road Safety Tips</h3>
-          <ul className="text-sm text-green-700 space-y-1">
-            <li>• Always wear your seatbelt</li>
-            <li>• Don't use phone while driving</li>
-            <li>• Observe speed limits</li>
-            <li>• Report dangerous road conditions</li>
-          </ul>
-        </div>
-
-        {/* Emergency Contacts */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-          <h3 className="font-bold text-gray-900 mb-3">📞 Emergency Contacts</h3>
-          <div className="space-y-2">
-            <a href="tel:999" className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-              <span className="font-medium">Emergency (All)</span>
-              <span className="font-bold text-red-600">999</span>
-            </a>
-            <a href="tel:0700000000" className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-              <span className="font-medium">Police</span>
-              <span className="font-bold text-blue-600">0700 000 000</span>
-            </a>
-            <a href="tel:0722" className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-              <span className="font-medium">Ambulance</span>
-              <span className="font-bold text-green-600">0722 000 000</span>
-            </a>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Search className="w-5 h-5 text-gray-600" />
-            <h3 className="text-lg font-bold text-gray-900">Check Report Status</h3>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={checkStatus}
-              onChange={(e) => setCheckStatus(e.target.value)}
-              placeholder="Enter your report reference number"
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={checkReportStatus}
-              disabled={statusLoading || !checkStatus}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-            >
-              {statusLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Check
-            </button>
-          </div>
-          
-          {reportStatus && (
-            <div className={`mt-4 p-4 rounded-lg ${reportStatus.error ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-              {reportStatus.error ? (
-                <div className="flex items-center gap-2 text-red-700">
-                  <AlertCircle className="w-5 h-5" />
-                  <span>{reportStatus.message}</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Status:</span>
-                    <span className={`font-bold capitalize ${
-                      reportStatus.status === 'resolved' ? 'text-green-600' :
-                      reportStatus.status === 'in_progress' ? 'text-blue-600' :
-                      'text-yellow-600'
-                    }`}>{reportStatus.status}</span>
+          {/* My Reports Tab */}
+          {activeTab === 'myreports' && (
+            <div className="space-y-4 animate-fade-in">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                {t('My Reports', 'Ripoti Zangu')}
+              </h2>
+              {myReports.map(report => (
+                <div key={report.id} className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-medium">{report.id}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        report.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                        report.status === 'investigating' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>{report.status}</span>
+                    </div>
+                    <span className="text-gray-500 text-xs">{new Date(report.created_at).toLocaleDateString()}</span>
                   </div>
-                  {reportStatus.assigned_team && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Assigned Team:</span>
-                      <span className="font-medium">{reportStatus.assigned_team}</span>
-                    </div>
-                  )}
-                  {reportStatus.estimated_arrival && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">ETA:</span>
-                      <span className="font-medium">{reportStatus.estimated_arrival}</span>
-                    </div>
-                  )}
-                  {reportStatus.ai_analysis && (
-                    <div className="mt-2 pt-2 border-t border-green-200">
-                      <p className="text-sm font-medium text-green-700">AI Recommendation:</p>
-                      <p className="text-sm text-green-600">{reportStatus.ai_analysis.recommendation}</p>
-                    </div>
-                  )}
+                  <p className="text-gray-300 text-sm">{report.description}</p>
+                  <div className="flex items-center gap-2 mt-2 text-gray-400 text-xs">
+                    <MapPin className="w-3 h-3" /> {report.location}
+                  </div>
+                </div>
+              ))}
+              {myReports.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-2" />
+                  <p>No reports yet. Submit your first report!</p>
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        <div className="bg-blue-50 rounded-xl p-4 flex items-start gap-3 mt-6">
-          <MessageSquare className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-blue-900">Need help?</h3>
-            <p className="text-sm text-blue-700">For immediate assistance, call 999. This portal is for non-life-threatening reports.</p>
-          </div>
-        </div>
-      </main>
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 text-center">
+                <div className="w-20 h-20 bg-green-600/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <User className="w-10 h-10 text-green-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">{profile.name}</h2>
+                <p className="text-gray-400">{profile.phone}</p>
+                <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 rounded-full">
+                  <Star className="w-4 h-4 text-yellow-400" />
+                  <span className="text-yellow-400 font-medium">{profile.badge}</span>
+                </div>
+              </div>
+              <button className="w-full py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-400 hover:text-white flex items-center justify-center gap-2">
+                <LogIn className="w-4 h-4" />
+                {t('Sign In for Full Features', 'Ingia kwa Vipengele Vyote')}
+              </button>
+            </div>
+          )}
+        </main>
 
-      <footer className="text-center py-6 text-gray-400 text-sm">
-        <p>Kenya Overwatch Production System</p>
-        <p>Government of Kenya</p>
-      </footer>
-    </div>
+        <footer className="bg-gray-900 border-t border-gray-800 p-3 text-center">
+          <p className="text-gray-500 text-xs">MKENYA RSA - Powered by Kenya Overwatch System</p>
+          <p className="text-gray-600 text-xs mt-1">© 2026 NTSA Kenya</p>
+        </footer>
+      </div>
+    </>
   )
 }

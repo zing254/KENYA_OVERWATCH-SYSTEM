@@ -4,12 +4,11 @@ Real-time alerts and notifications management
 """
 
 import asyncio
-import hashlib
 import logging
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from ..enums import AlertType, AlertSeverity, AlertStatus, NotificationChannel
@@ -20,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Alert:
     """Alert entity"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:12])
     alert_type: AlertType = AlertType.INCIDENT
     severity: AlertSeverity = AlertSeverity.MEDIUM
@@ -38,19 +38,19 @@ class Alert:
     resolved_by: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     related_alerts: List[str] = field(default_factory=list)
-    
+
     def acknowledge(self, user_id: str):
         """Acknowledge the alert"""
         self.status = AlertStatus.ACKNOWLEDGED
         self.acknowledged_at = datetime.now()
         self.acknowledged_by = user_id
-    
+
     def resolve(self, user_id: str):
         """Resolve the alert"""
         self.status = AlertStatus.RESOLVED
         self.resolved_at = datetime.now()
         self.resolved_by = user_id
-    
+
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
@@ -65,7 +65,9 @@ class Alert:
             "camera_id": self.camera_id,
             "incident_id": self.incident_id,
             "created_at": self.created_at.isoformat(),
-            "acknowledged_at": self.acknowledged_at.isoformat() if self.acknowledged_at else None,
+            "acknowledged_at": (
+                self.acknowledged_at.isoformat() if self.acknowledged_at else None
+            ),
             "acknowledged_by": self.acknowledged_by,
             "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
             "resolved_by": self.resolved_by,
@@ -77,6 +79,7 @@ class Alert:
 @dataclass
 class Notification:
     """Notification entity"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:12])
     channel: NotificationChannel = NotificationChannel.PUSH
     recipient: str = ""
@@ -88,7 +91,7 @@ class Notification:
     delivered_at: Optional[datetime] = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
@@ -99,7 +102,9 @@ class Notification:
             "alert_id": self.alert_id,
             "status": self.status,
             "sent_at": self.sent_at.isoformat() if self.sent_at else None,
-            "delivered_at": self.delivered_at.isoformat() if self.delivered_at else None,
+            "delivered_at": (
+                self.delivered_at.isoformat() if self.delivered_at else None
+            ),
             "error": self.error,
             "metadata": self.metadata,
         }
@@ -107,7 +112,7 @@ class Notification:
 
 class AlertRule:
     """Alert rule for automated alerting"""
-    
+
     def __init__(
         self,
         name: str,
@@ -122,12 +127,12 @@ class AlertRule:
         self.severity = severity
         self.message_template = message_template
         self.enabled = True
-    
+
     def evaluate(self, data: Dict) -> Optional[Alert]:
         """Evaluate the rule and create alert if condition is met"""
         if not self.enabled:
             return None
-        
+
         if self.condition(data):
             message = self.message_template.format(**data)
             return Alert(
@@ -138,13 +143,13 @@ class AlertRule:
                 source="rule_engine",
                 metadata=data,
             )
-        
+
         return None
 
 
 class AlertManager:
     """Main alert management system"""
-    
+
     def __init__(self):
         self.alerts: Dict[str, Alert] = {}
         self.notification_history: deque = deque(maxlen=1000)
@@ -155,7 +160,7 @@ class AlertManager:
             "resolved": [],
         }
         self._initialize_default_rules()
-    
+
     def _initialize_default_rules(self):
         """Initialize default alert rules"""
         self.alert_rules = [
@@ -188,7 +193,7 @@ class AlertManager:
                 message_template="Suspicious vehicle detected: {plate_number}",
             ),
         ]
-    
+
     def create_alert(
         self,
         alert_type: AlertType,
@@ -215,18 +220,18 @@ class AlertManager:
             location=location,
             metadata=metadata or {},
         )
-        
+
         self.alerts[alert.id] = alert
         self._notify_subscribers("new", alert)
-        
+
         logger.info(f"Alert created: {alert.id} - {title}")
-        
+
         return alert
-    
+
     def get_alert(self, alert_id: str) -> Optional[Alert]:
         """Get alert by ID"""
         return self.alerts.get(alert_id)
-    
+
     def get_alerts(
         self,
         status: Optional[AlertStatus] = None,
@@ -236,18 +241,18 @@ class AlertManager:
     ) -> List[Alert]:
         """Get alerts with filters"""
         results = list(self.alerts.values())
-        
+
         if status:
             results = [a for a in results if a.status == status]
         if severity:
             results = [a for a in results if a.severity == severity]
         if alert_type:
             results = [a for a in results if a.alert_type == alert_type]
-        
+
         results.sort(key=lambda a: a.created_at, reverse=True)
-        
+
         return results[:limit]
-    
+
     def acknowledge_alert(self, alert_id: str, user_id: str) -> Optional[Alert]:
         """Acknowledge an alert"""
         alert = self.alerts.get(alert_id)
@@ -255,7 +260,7 @@ class AlertManager:
             alert.acknowledge(user_id)
             self._notify_subscribers("acknowledged", alert)
         return alert
-    
+
     def resolve_alert(self, alert_id: str, user_id: str) -> Optional[Alert]:
         """Resolve an alert"""
         alert = self.alerts.get(alert_id)
@@ -263,25 +268,25 @@ class AlertManager:
             alert.resolve(user_id)
             self._notify_subscribers("resolved", alert)
         return alert
-    
+
     def evaluate_rules(self, data: Dict) -> List[Alert]:
         """Evaluate all rules and create alerts"""
         created_alerts = []
-        
+
         for rule in self.alert_rules:
             alert = rule.evaluate(data)
             if alert:
                 self.alerts[alert.id] = alert
                 created_alerts.append(alert)
                 self._notify_subscribers("new", alert)
-        
+
         return created_alerts
-    
+
     def subscribe(self, event: str, callback: Callable[[Alert], None]):
         """Subscribe to alert events"""
         if event in self.subscribers:
             self.subscribers[event].append(callback)
-    
+
     def _notify_subscribers(self, event: str, alert: Alert):
         """Notify subscribers of alert event"""
         if event in self.subscribers:
@@ -290,23 +295,23 @@ class AlertManager:
                     callback(alert)
                 except Exception as e:
                     logger.error(f"Subscriber callback error: {e}")
-    
+
     def get_stats(self) -> Dict:
         """Get alert statistics"""
         total = len(self.alerts)
         by_status = {}
         by_severity = {}
         by_type = {}
-        
+
         for alert in self.alerts.values():
             status = alert.status.value
             severity = alert.severity.value
             alert_type = alert.alert_type.value
-            
+
             by_status[status] = by_status.get(status, 0) + 1
             by_severity[severity] = by_severity.get(severity, 0) + 1
             by_type[alert_type] = by_type.get(alert_type, 0) + 1
-        
+
         return {
             "total": total,
             "by_status": by_status,
@@ -318,11 +323,11 @@ class AlertManager:
 
 class NotificationService:
     """Notification delivery service"""
-    
+
     def __init__(self, alert_manager: AlertManager):
         self.alert_manager = alert_manager
         self.notification_history: deque = deque(maxlen=1000)
-    
+
     async def send_notification(
         self,
         channel: NotificationChannel,
@@ -339,7 +344,7 @@ class NotificationService:
             message=message,
             alert_id=alert_id,
         )
-        
+
         try:
             if channel == NotificationChannel.EMAIL:
                 await self._send_email(recipient, title, message)
@@ -349,39 +354,39 @@ class NotificationService:
                 await self._send_push(recipient, title, message)
             elif channel == NotificationChannel.WEBHOOK:
                 await self._send_webhook(recipient, title, message)
-            
+
             notification.status = "sent"
             notification.sent_at = datetime.now()
-            
+
         except Exception as e:
             notification.status = "failed"
             notification.error = str(e)
             logger.error(f"Notification failed: {e}")
-        
+
         self.notification_history.append(notification)
-        
+
         return notification
-    
+
     async def _send_email(self, recipient: str, title: str, message: str):
         """Send email notification"""
         logger.info(f"Sending email to {recipient}: {title}")
         await asyncio.sleep(0.1)
-    
+
     async def _send_sms(self, recipient: str, message: str):
         """Send SMS notification"""
         logger.info(f"Sending SMS to {recipient}: {message[:50]}")
         await asyncio.sleep(0.1)
-    
+
     async def _send_push(self, recipient: str, title: str, message: str):
         """Send push notification"""
         logger.info(f"Sending push to {recipient}: {title}")
         await asyncio.sleep(0.1)
-    
+
     async def _send_webhook(self, url: str, title: str, message: str):
         """Send webhook notification"""
         logger.info(f"Sending webhook to {url}: {title}")
         await asyncio.sleep(0.1)
-    
+
     def get_notification_history(self, limit: int = 100) -> List[Notification]:
         """Get notification history"""
         return list(self.notification_history)[-limit:]

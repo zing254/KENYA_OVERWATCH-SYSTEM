@@ -85,7 +85,7 @@ class TrafficService:
         self._generate_traffic_data()
         self._generate_incidents()
         self._generate_roads()
-    
+
     def _generate_traffic_data(self):
         roads = [
             ("Nairobi-Mombasa Highway", "Nairobi"),
@@ -104,60 +104,113 @@ class TrafficService:
             ("Nairobi-Garissa Road", "Machakos"),
             ("Nairobi-Garissa Road", "Kitui"),
         ]
-        
+
         for road, county in roads:
             for hour in range(24):
                 is_rush_hour = (7 <= hour <= 9) or (16 <= hour <= 19)
                 is_weekend = datetime.now().weekday() >= 5
-                
+
                 if is_rush_hour:
-                    base_congestion = random.choice([CongestionLevel.HEAVY, CongestionLevel.MODERATE, CongestionLevel.SEVERE])
+                    base_congestion = random.choice(
+                        [
+                            CongestionLevel.HEAVY,
+                            CongestionLevel.MODERATE,
+                            CongestionLevel.SEVERE,
+                        ]
+                    )
                     base_speed = random.uniform(20, 50)
                 elif is_weekend and 10 <= hour <= 16:
-                    base_congestion = random.choice([CongestionLevel.MODERATE, CongestionLevel.LIGHT])
+                    base_congestion = random.choice(
+                        [CongestionLevel.MODERATE, CongestionLevel.LIGHT]
+                    )
                     base_speed = random.uniform(50, 70)
                 else:
-                    base_congestion = random.choice([CongestionLevel.FREE, CongestionLevel.LIGHT])
+                    base_congestion = random.choice(
+                        [CongestionLevel.FREE, CongestionLevel.LIGHT]
+                    )
                     base_speed = random.uniform(60, 100)
-                
-                self.traffic_data.append(TrafficData(
-                    road_name=road,
-                    county=county,
-                    segment=f"{road} - Segment {random.randint(1, 5)}",
-                    congestion_level=base_congestion,
-                    speed_kmh=round(base_speed, 1),
-                    avg_speed_kmh=round(base_speed * random.uniform(0.9, 1.1), 1),
-                    travel_time_min=random.uniform(5, 60),
-                    delay_min=max(0, random.uniform(0, 30) if base_congestion != CongestionLevel.FREE else 0),
-                    updated_at=datetime.now(timezone.utc)
-                ))
-    
+
+                self.traffic_data.append(
+                    TrafficData(
+                        road_name=road,
+                        county=county,
+                        segment=f"{road} - Segment {random.randint(1, 5)}",
+                        congestion_level=base_congestion,
+                        speed_kmh=round(base_speed, 1),
+                        avg_speed_kmh=round(base_speed * random.uniform(0.9, 1.1), 1),
+                        travel_time_min=random.uniform(5, 60),
+                        delay_min=max(
+                            0,
+                            (
+                                random.uniform(0, 30)
+                                if base_congestion != CongestionLevel.FREE
+                                else 0
+                            ),
+                        ),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+
     def _generate_incidents(self):
         incident_types = [
-            (IncidentType.ACCIDENT, IncidentSeverity.MAJOR, ["Mombasa Road", "Thika Road", "Ngong Road"]),
-            (IncidentType.VEHICLE_BREAKDOWN, IncidentSeverity.MINOR, ["Thika Road", "Nairobi-Nakuru Highway"]),
-            (IncidentType.ROAD_WORK, IncidentSeverity.MODERATE, ["Nairobi-Nakuru Highway", "Mombasa-Malindi Road"]),
-            (IncidentType.TRAFFIC, IncidentSeverity.MODERATE, ["Kenyatta Avenue", "Mombasa Road"])
+            (
+                IncidentType.ACCIDENT,
+                IncidentSeverity.MAJOR,
+                ["Mombasa Road", "Thika Road", "Ngong Road"],
+            ),
+            (
+                IncidentType.VEHICLE_BREAKDOWN,
+                IncidentSeverity.MINOR,
+                ["Thika Road", "Nairobi-Nakuru Highway"],
+            ),
+            (
+                IncidentType.ROAD_WORK,
+                IncidentSeverity.MODERATE,
+                ["Nairobi-Nakuru Highway", "Mombasa-Malindi Road"],
+            ),
+            (
+                IncidentType.TRAFFIC,
+                IncidentSeverity.MODERATE,
+                ["Kenyatta Avenue", "Mombasa Road"],
+            ),
         ]
-        
+
         for i, (inc_type, severity, roads) in enumerate(incident_types):
             for road in roads[:2]:
-                county = "Nairobi" if road in ["Thika Road", "Ngong Road", "Kenyatta Avenue", "Mombasa Road"] else "Mombasa"
-                
-                self.incidents.append(TrafficIncident(
-                    incident_id=f"INC-{1000 + i}",
-                    incident_type=inc_type,
-                    severity=severity,
-                    road_name=road,
-                    county=county,
-                    location={"lat": random.uniform(-1.5, 0), "lon": random.uniform(36.5, 40)},
-                    description=f"{inc_type.value} reported on {road}",
-                    reported_at=datetime.now(timezone.utc) - timedelta(hours=random.randint(0, 6)),
-                    cleared_at=None if random.random() > 0.5 else datetime.now(timezone.utc) + timedelta(hours=random.randint(1, 3)),
-                    lanes_affected=random.randint(1, 3),
-                    alternative_routes=[f"Alternative Route {j+1}" for j in range(2)]
-                ))
-    
+                county = (
+                    "Nairobi"
+                    if road
+                    in ["Thika Road", "Ngong Road", "Kenyatta Avenue", "Mombasa Road"]
+                    else "Mombasa"
+                )
+
+                self.incidents.append(
+                    TrafficIncident(
+                        incident_id=f"INC-{1000 + i}",
+                        incident_type=inc_type,
+                        severity=severity,
+                        road_name=road,
+                        county=county,
+                        location={
+                            "lat": random.uniform(-1.5, 0),
+                            "lon": random.uniform(36.5, 40),
+                        },
+                        description=f"{inc_type.value} reported on {road}",
+                        reported_at=datetime.now(timezone.utc)
+                        - timedelta(hours=random.randint(0, 6)),
+                        cleared_at=(
+                            None
+                            if random.random() > 0.5
+                            else datetime.now(timezone.utc)
+                            + timedelta(hours=random.randint(1, 3))
+                        ),
+                        lanes_affected=random.randint(1, 3),
+                        alternative_routes=[
+                            f"Alternative Route {j+1}" for j in range(2)
+                        ],
+                    )
+                )
+
     def _generate_roads(self):
         road_list = [
             ("Nairobi-Mombasa Highway", "Nairobi", "Highway", 120, 4, 45000),
@@ -171,44 +224,78 @@ class TrafficService:
             ("Eldoret-Webuye Road", "Uasin Gishu", "Primary", 80, 2, 12000),
             ("Nairobi-Narok Road", "Kajiado", "Highway", 100, 2, 18000),
         ]
-        
+
         for i, (name, county, category, speed, lanes, traffic) in enumerate(road_list):
-            self.roads.append(RoadSegment(
-                road_id=f"ROAD-{i+1:03d}",
-                road_name=name,
-                county=county,
-                category=category,
-                start_point=f"Start of {name}",
-                end_point=f"End of {name}",
-                length_km=random.uniform(10, 80),
-                speed_limit_kmh=speed,
-                lanes=lanes,
-                avg_daily_traffic=traffic,
-                congestion_index=random.uniform(0.3, 0.9)
-            ))
-    
-    def get_current_traffic(self, road: Optional[str] = None, county: Optional[str] = None) -> Dict:
+            self.roads.append(
+                RoadSegment(
+                    road_id=f"ROAD-{i+1:03d}",
+                    road_name=name,
+                    county=county,
+                    category=category,
+                    start_point=f"Start of {name}",
+                    end_point=f"End of {name}",
+                    length_km=random.uniform(10, 80),
+                    speed_limit_kmh=speed,
+                    lanes=lanes,
+                    avg_daily_traffic=traffic,
+                    congestion_index=random.uniform(0.3, 0.9),
+                )
+            )
+
+    def get_current_traffic(
+        self, road: Optional[str] = None, county: Optional[str] = None
+    ) -> Dict:
         data = self.traffic_data
-        
+
         if road:
             data = [t for t in data if road.lower() in t.road_name.lower()]
         if county:
             data = [t for t in data if t.county == county]
-        
+
         latest = {}
         for t in data:
             key = f"{t.road_name}_{t.segment}"
             if key not in latest or t.updated_at > latest[key].updated_at:
                 latest[key] = t
-        
+
         return {
             "roads_monitored": len(latest),
             "congestion_summary": {
-                "free_flow": len([t for t in latest.values() if t.congestion_level == CongestionLevel.FREE]),
-                "light": len([t for t in latest.values() if t.congestion_level == CongestionLevel.LIGHT]),
-                "moderate": len([t for t in latest.values() if t.congestion_level == CongestionLevel.MODERATE]),
-                "heavy": len([t for t in latest.values() if t.congestion_level == CongestionLevel.HEAVY]),
-                "severe": len([t for t in latest.values() if t.congestion_level == CongestionLevel.SEVERE])
+                "free_flow": len(
+                    [
+                        t
+                        for t in latest.values()
+                        if t.congestion_level == CongestionLevel.FREE
+                    ]
+                ),
+                "light": len(
+                    [
+                        t
+                        for t in latest.values()
+                        if t.congestion_level == CongestionLevel.LIGHT
+                    ]
+                ),
+                "moderate": len(
+                    [
+                        t
+                        for t in latest.values()
+                        if t.congestion_level == CongestionLevel.MODERATE
+                    ]
+                ),
+                "heavy": len(
+                    [
+                        t
+                        for t in latest.values()
+                        if t.congestion_level == CongestionLevel.HEAVY
+                    ]
+                ),
+                "severe": len(
+                    [
+                        t
+                        for t in latest.values()
+                        if t.congestion_level == CongestionLevel.SEVERE
+                    ]
+                ),
             },
             "traffic": [
                 {
@@ -219,23 +306,25 @@ class TrafficService:
                     "speed_kmh": t.speed_kmh,
                     "travel_time_min": t.travel_time_min,
                     "delay_min": t.delay_min,
-                    "updated_at": t.updated_at.isoformat()
+                    "updated_at": t.updated_at.isoformat(),
                 }
                 for t in latest.values()
-            ]
+            ],
         }
-    
-    def get_incidents(self, county: Optional[str] = None, severity: Optional[str] = None) -> Dict:
+
+    def get_incidents(
+        self, county: Optional[str] = None, severity: Optional[str] = None
+    ) -> Dict:
         incidents = self.incidents
-        
+
         if county:
             incidents = [i for i in incidents if i.county == county]
         if severity:
             incidents = [i for i in incidents if i.severity.value == severity]
-        
+
         active = [i for i in incidents if i.cleared_at is None]
         cleared = [i for i in incidents if i.cleared_at is not None]
-        
+
         return {
             "total_incidents": len(incidents),
             "active_incidents": len(active),
@@ -252,39 +341,41 @@ class TrafficService:
                     "reported_at": i.reported_at.isoformat(),
                     "cleared_at": i.cleared_at.isoformat() if i.cleared_at else None,
                     "lanes_affected": i.lanes_affected,
-                    "status": "active" if i.cleared_at is None else "cleared"
+                    "status": "active" if i.cleared_at is None else "cleared",
                 }
                 for i in incidents
-            ]
+            ],
         }
-    
+
     def get_congestion_heatmap(self) -> Dict:
         heatmap = []
-        
+
         for road, county in set((t.road_name, t.county) for t in self.traffic_data):
             road_data = [t for t in self.traffic_data if t.road_name == road]
-            
+
             hourly_avg = {}
             for t in road_data:
                 hour = t.updated_at.hour
                 if hour not in hourly_avg:
                     hourly_avg[hour] = []
                 hourly_avg[hour].append(t.delay_min)
-            
-            heatmap.append({
-                "road_name": road,
-                "county": county,
-                "hourly_delays": {
-                    str(h): round(sum(dels) / len(dels), 1) if dels else 0
-                    for h, dels in hourly_avg.items()
+
+            heatmap.append(
+                {
+                    "road_name": road,
+                    "county": county,
+                    "hourly_delays": {
+                        str(h): round(sum(dels) / len(dels), 1) if dels else 0
+                        for h, dels in hourly_avg.items()
+                    },
                 }
-            })
-        
+            )
+
         return {
             "heatmap": heatmap,
-            "generated_at": datetime.now(timezone.utc).isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
-    
+
     def get_road_statistics(self) -> Dict:
         return {
             "total_roads": len(self.roads),
@@ -298,10 +389,12 @@ class TrafficService:
                     "speed_limit_kmh": r.speed_limit_kmh,
                     "lanes": r.lanes,
                     "avg_daily_traffic": r.avg_daily_traffic,
-                    "congestion_index": round(r.congestion_index, 2)
+                    "congestion_index": round(r.congestion_index, 2),
                 }
-                for r in sorted(self.roads, key=lambda x: x.avg_daily_traffic, reverse=True)
-            ]
+                for r in sorted(
+                    self.roads, key=lambda x: x.avg_daily_traffic, reverse=True
+                )
+            ],
         }
 
 

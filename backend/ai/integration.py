@@ -4,39 +4,42 @@ Provides unified AI interface for the system
 """
 
 from typing import Any, Dict, Optional
-import numpy as np
 from datetime import datetime, timezone
 
 
 class KenyaOverwatchAI:
     """Main AI integration class"""
-    
+
     def __init__(self):
         self.models_loaded = True
         self.version = "1.0.0"
-        
+
     def process_frame(self, frame_data: bytes) -> Dict[str, Any]:
         """Process a video frame"""
         return {
             "detections": [],
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "processing_time_ms": 0
+            "processing_time_ms": 0,
         }
-    
+
     def analyze_image(self, image_data: bytes) -> Dict[str, Any]:
         """Analyze an image"""
         return {
             "objects": [],
             "anpr_results": [],
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get AI system status"""
         return {
             "available": self.models_loaded,
             "version": self.version,
-            "models": ["vehicle_classifier", "license_plate_detector", "vehicle_detector"]
+            "models": [
+                "vehicle_classifier",
+                "license_plate_detector",
+                "vehicle_detector",
+            ],
         }
 
 

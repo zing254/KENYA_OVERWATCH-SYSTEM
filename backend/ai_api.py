@@ -3,10 +3,10 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-from ai.detection import ObjectDetector, DetectionConfig
+from ai.detection import ObjectDetector
 from ai.anpr import ANPRCamera, LicensePlateRecognizer
-from ai.tracking import VehicleTracker, TrackingConfig
-from ai.behavior_analysis import BehaviorAnalyzer, BehaviorConfig
+from ai.tracking import VehicleTracker
+from ai.behavior_analysis import BehaviorAnalyzer
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI Services"])
 
@@ -65,18 +65,15 @@ async def ai_health():
             "detector": "loaded",
             "anpr": "loaded",
             "tracker": "loaded",
-            "behavior": "loaded"
-        }
+            "behavior": "loaded",
+        },
     }
 
 
 @router.post("/detect", response_model=DetectionResponse)
 async def detect_objects(request: DetectionRequest):
     try:
-        return DetectionResponse(
-            detections=[],
-            timestamp=datetime.now()
-        )
+        return DetectionResponse(detections=[], timestamp=datetime.now())
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -85,11 +82,7 @@ async def detect_objects(request: DetectionRequest):
 async def recognize_plate(request: ANPRRequest):
     try:
         plate = anpr_recognizer._generate_kenyan_plate()
-        return ANPRResponse(
-            plate=plate,
-            confidence=0.85,
-            camera_id=request.camera_id
-        )
+        return ANPRResponse(plate=plate, confidence=0.85, camera_id=request.camera_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -99,13 +92,16 @@ async def track_objects(request: TrackingRequest):
     try:
         tracks = tracker.update(request.detections, datetime.now().timestamp())
         return TrackingResponse(
-            tracks=[{
-                "track_id": t.track_id,
-                "class_name": t.class_name,
-                "bbox": t.bbox,
-                "velocity": t.velocity
-            } for t in tracks],
-            timestamp=datetime.now()
+            tracks=[
+                {
+                    "track_id": t.track_id,
+                    "class_name": t.class_name,
+                    "bbox": t.bbox,
+                    "velocity": t.velocity,
+                }
+                for t in tracks
+            ],
+            timestamp=datetime.now(),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -114,7 +110,5 @@ async def track_objects(request: TrackingRequest):
 @router.post("/behavior", response_model=BehaviorResponse)
 async def analyze_behavior(request: BehaviorRequest):
     return BehaviorResponse(
-        behavior_type="normal",
-        severity=0.0,
-        description="No violations detected"
+        behavior_type="normal", severity=0.0, description="No violations detected"
     )

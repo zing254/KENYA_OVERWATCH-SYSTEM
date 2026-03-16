@@ -5,7 +5,7 @@ import {
   Play, Pause, Rewind, FastForward, Volume2, VolumeX, Maximize, ZoomIn, ZoomOut, 
   Settings, SkipBack, SkipForward, RotateCcw, Eye, AlertTriangle, Bookmark, Grid,
   Camera, Video, Disc, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Circle, Square, Clock, Download, Trash2, Phone
+  Circle, Square, Clock, Download, Trash2, Phone, Webcam, MonitorUp, SwitchCamera
 } from 'lucide-react'
 
 interface Detection {
@@ -20,9 +20,11 @@ interface Detection {
 interface CameraFeedProps {
   cameraId: string
   cameraName: string
-  cameraType?: 'fixed' | 'ptz' | 'mobile-test' | 'speed' | 'traffic'
+  cameraType?: 'fixed' | 'ptz' | 'mobile-test' | 'speed' | 'traffic' | 'webcam'
   onClose?: () => void
 }
+
+type VideoSource = 'simulated' | 'webcam'
 
 export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed', onClose }: CameraFeedProps) {
   const [isPlaying, setIsPlaying] = useState(true)
@@ -45,10 +47,106 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [currentTimestamp, setCurrentTimestamp] = useState<string>('')
   const [streamQuality, setStreamQuality] = useState<'480p' | '720p' | '1080p' | '4k'>('720p')
+  
+  // Webcam support
+  const [videoSource, setVideoSource] = useState<VideoSource>('simulated')
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
+  const [webcamError, setWebcamError] = useState<string | null>(null)
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([])
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('')
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const recordingInterval = useRef<NodeJS.Timeout | null>(null)
+
+  // Get available cameras
+  useEffect(() => {
+    const getCameras = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const cameras = devices.filter(d => d.kind === 'videoinput')
+        setAvailableCameras(cameras)
+        if (cameras.length > 0 && !selectedCameraId) {
+          setSelectedCameraId(cameras[0].deviceId)
+        }
+      } catch (err) {
+        console.error('Error enumerating cameras:', err)
+      }
+    }
+    getCameras()
+  }, [])
+
+  // Start webcam
+  const startWebcam = useCallback(async (deviceId?: string) => {
+    try {
+      setWebcamError(null)
+      // Stop existing stream
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop())
+      }
+      
+      const constraints: MediaStreamConstraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' },
+        audio: false
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      setWebcamStream(stream)
+      setVideoSource('webcam')
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+    } catch (err: any) {
+      console.error('Webcam error:', err)
+      setWebcamError(err.message || 'Failed to access webcam')
+      setVideoSource('simulated')
+    }
+  }, [webcamStream])
+
+  // Stop webcam
+  const stopWebcam = useCallback(() => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop())
+      setWebcamStream(null)
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setVideoSource('simulated')
+  }, [webcamStream])
+
+  // Switch camera
+  const switchCamera = useCallback(async () => {
+    if (availableCameras.length < 2) return
+    const currentIndex = availableCameras.findIndex(c => c.deviceId === selectedCameraId)
+    const nextIndex = (currentIndex + 1) % availableCameras.length
+    const nextCamera = availableCameras[nextIndex]
+    setSelectedCameraId(nextCamera.deviceId)
+    if (videoSource === 'webcam') {
+      await startWebcam(nextCamera.deviceId)
+    }
+  }, [availableCameras, selectedCameraId, videoSource, startWebcam])
+
+  // Toggle between simulated and webcam
+  const toggleVideoSource = useCallback(async () => {
+    if (videoSource === 'simulated') {
+      await startWebcam(selectedCameraId)
+    } else {
+      stopWebcam()
+    }
+  }, [videoSource, selectedCameraId, startWebcam, stopWebcam])
+
+  // Cleanup webcam on unmount
+  useEffect(() => {
+    return () => {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [webcamStream])
 
   useEffect(() => {
     setCurrentTimestamp(new Date().toLocaleString())
@@ -73,7 +171,7 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
   }, [isRecording])
 
   useEffect(() => {
-    if (!showDetections || !isPlaying) return
+    if (!showDetections || !isPlaying || videoSource === 'webcam') return
     const interval = setInterval(() => {
       const types = ['person', 'vehicle', 'licensePlate']
       const type = types[Math.floor(Math.random() * types.length)]
@@ -93,7 +191,7 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
       setDetections(prev => [...prev.slice(-10), newDetection])
     }, 2000)
     return () => clearInterval(interval)
-  }, [showDetections, isPlaying])
+  }, [showDetections, isPlaying, videoSource])
 
   const togglePlay = () => setIsPlaying(!isPlaying)
   const toggleMute = () => setIsMuted(!isMuted)
@@ -124,22 +222,36 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
     setPlaybackSpeed(1);
     setIsPlaying(true);
   }
-  const toggleFullscreen = () => setIsFullscreen(!isFullscreen)
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }
   const addBookmark = () => setBookmarks(prev => [...prev, currentTime].sort((a, b) => a - b))
 
   const handleScreenshot = () => {
+    if (videoSource === 'webcam' && videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current
+      const video = videoRef.current
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      const dataUrl = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.download = `screenshot_${cameraId}_${Date.now()}.png`
+      link.href = dataUrl
+      link.click()
+    }
     const screenshot = `screenshot_${cameraId}_${Date.now()}.png`
     setScreenshots(prev => [...prev, screenshot])
-    console.log('Screenshot captured:', screenshot)
   }
 
   const toggleRecording = () => {
     setIsRecording(!isRecording)
-    if (!isRecording) {
-      console.log('Recording started')
-    } else {
-      console.log('Recording stopped')
-    }
   }
 
   const handlePTZMove = (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -165,7 +277,7 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
   }
 
   return (
-    <div className={`bg-gray-900 rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+    <div ref={containerRef} className={`bg-gray-900 rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       <div 
         className="relative bg-black"
         style={{ 
@@ -173,12 +285,46 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
           transformOrigin: `${ptzPosition.x}% ${ptzPosition.y}%`
         }}
       >
-        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative">
-          <div className="text-center">
-            <Eye className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500">Live Camera Feed</p>
-            <p className="text-sm text-gray-600 mt-2">{cameraName}</p>
-          </div>
+        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative overflow-hidden">
+          {videoSource === 'webcam' ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <>
+              <div className="text-center">
+                <Eye className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-500">Simulated Camera Feed</p>
+                <p className="text-sm text-gray-600 mt-2">{cameraName}</p>
+                <p className="text-xs text-gray-700 mt-1">Click webcam button to use real camera</p>
+              </div>
+              
+              {showDetections && detections.map(det => (
+                <div key={det.id} className="absolute border-2 rounded animate-fade-in" style={{
+                  left: `${det.bbox?.x || 50}%`, top: `${det.bbox?.y || 50}%`,
+                  width: `${det.bbox?.w || 20}%`, height: `${det.bbox?.h || 30}%`,
+                  borderColor: det.type === 'person' ? '#22c55e' : det.type === 'vehicle' ? '#3b82f6' : '#eab308',
+                  boxShadow: det.type === 'licensePlate' ? '0 0 10px #eab308' : 'none'
+                }}>
+                  <div className="absolute -top-6 left-0 bg-black/80 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1">
+                    {det.type === 'licensePlate' && <span className="text-yellow-400 font-mono">{det.plate}</span>}
+                    {det.type !== 'licensePlate' && <span>{det.type}</span>}
+                    <span className="opacity-70">{Math.round(det.confidence * 100)}%</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {webcamError && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs px-3 py-1 rounded-full">
+              Webcam Error: {webcamError}
+            </div>
+          )}
           
           {cameraType === 'mobile-test' && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2">
@@ -186,26 +332,18 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
               MOBILE-TEST
             </div>
           )}
-          
-          {showDetections && detections.map(det => (
-            <div key={det.id} className="absolute border-2 rounded animate-fade-in" style={{
-              left: `${det.bbox?.x || 50}%`, top: `${det.bbox?.y || 50}%`,
-              width: `${det.bbox?.w || 20}%`, height: `${det.bbox?.h || 30}%`,
-              borderColor: det.type === 'person' ? '#22c55e' : det.type === 'vehicle' ? '#3b82f6' : '#eab308',
-              boxShadow: det.type === 'licensePlate' ? '0 0 10px #eab308' : 'none'
-            }}>
-              <div className="absolute -top-6 left-0 bg-black/80 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1">
-                {det.type === 'licensePlate' && <span className="text-yellow-400 font-mono">{det.plate}</span>}
-                {det.type !== 'licensePlate' && <span>{det.type}</span>}
-                <span className="opacity-70">{Math.round(det.confidence * 100)}%</span>
-              </div>
+
+          {videoSource === 'webcam' && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-green-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2">
+              <Webcam className="w-3 h-3" />
+              LIVE WEBCAM
             </div>
-          ))}
+          )}
         </div>
 
         <div className="absolute top-4 left-4 flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-          <span className="text-white text-sm font-medium">LIVE</span>
+          <div className={`w-3 h-3 rounded-full ${videoSource === 'webcam' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+          <span className="text-white text-sm font-medium">{videoSource === 'webcam' ? 'LIVE' : 'SIM'}</span>
           {isRecording && (
             <div className="flex items-center gap-1 bg-red-600 px-2 py-0.5 rounded">
               <Disc className="w-3 h-3 animate-spin text-white" />
@@ -233,47 +371,73 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
         )}
       </div>
 
-      <div className="bg-gray-800 px-4 py-2">
-        <div className="relative h-8 mb-2">
-          <div className="absolute inset-x-0 h-2 bg-gray-700 rounded-full cursor-pointer" onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            handleSeek(((e.clientX - rect.left) / rect.width) * duration)
-          }}>
-            <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${(currentTime / duration) * 100}%` }} />
-            {bookmarks.map(bm => (
-              <div key={bm} className="absolute top-0 w-1 h-full bg-yellow-500" style={{ left: `${(bm / duration) * 100}%` }} />
-            ))}
+      {/* Timeline bar - only for simulated */}
+      {videoSource === 'simulated' && (
+        <div className="bg-gray-800 px-4 py-2">
+          <div className="relative h-8 mb-2">
+            <div className="absolute inset-x-0 h-2 bg-gray-700 rounded-full cursor-pointer" onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              handleSeek(((e.clientX - rect.left) / rect.width) * duration)
+            }}>
+              <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${(currentTime / duration) * 100}%` }} />
+              {bookmarks.map(bm => (
+                <div key={bm} className="absolute top-0 w-1 h-full bg-yellow-500" style={{ left: `${(bm / duration) * 100}%` }} />
+              ))}
+            </div>
+            <div className="absolute -bottom-4 left-0 text-xs text-gray-500">{formatTime(currentTime)}</div>
+            <div className="absolute -bottom-4 right-0 text-xs text-gray-500">{formatTime(duration)}</div>
           </div>
-          <div className="absolute -bottom-4 left-0 text-xs text-gray-500">{formatTime(currentTime)}</div>
-          <div className="absolute -bottom-4 right-0 text-xs text-gray-500">{formatTime(duration)}</div>
         </div>
-      </div>
+      )}
 
-      <div className="bg-gray-800 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gray-800 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <button onClick={handleSkipBack} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Skip back 30s">
-            <SkipBack className="w-5 h-5" />
+          {/* Webcam toggle */}
+          <button 
+            onClick={toggleVideoSource} 
+            className={`p-2 rounded ${videoSource === 'webcam' ? 'text-green-400 bg-green-400/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`} 
+            title={videoSource === 'webcam' ? 'Switch to Simulated' : 'Switch to Webcam'}
+          >
+            {videoSource === 'webcam' ? <MonitorUp className="w-5 h-5" /> : <Webcam className="w-5 h-5" />}
           </button>
-          <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Rewind">
-            <Rewind className="w-5 h-5" />
-          </button>
-          <button onClick={togglePlay} className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-transform hover:scale-105">
-            {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-          </button>
-          <button onClick={handleFastForward} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Fast forward">
-            <FastForward className="w-5 h-5" />
-          </button>
-          <button onClick={handleSkipForward} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Skip forward 30s">
-            <SkipForward className="w-5 h-5" />
-          </button>
-          <span className="px-3 py-1 text-sm text-gray-400 bg-gray-700 rounded">{playbackSpeed}x</span>
+          
+          {/* Camera switcher for webcam */}
+          {videoSource === 'webcam' && availableCameras.length > 1 && (
+            <button onClick={switchCamera} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Switch Camera">
+              <SwitchCamera className="w-5 h-5" />
+            </button>
+          )}
+
+          {videoSource === 'simulated' && (
+            <>
+              <button onClick={handleSkipBack} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Skip back 30s">
+                <SkipBack className="w-5 h-5" />
+              </button>
+              <button onClick={handleRewind} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Rewind">
+                <Rewind className="w-5 h-5" />
+              </button>
+              <button onClick={togglePlay} className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-transform hover:scale-105">
+                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+              </button>
+              <button onClick={handleFastForward} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Fast forward">
+                <FastForward className="w-5 h-5" />
+              </button>
+              <button onClick={handleSkipForward} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Skip forward 30s">
+                <SkipForward className="w-5 h-5" />
+              </button>
+              <span className="px-3 py-1 text-sm text-gray-400 bg-gray-700 rounded">{playbackSpeed}x</span>
+            </>
+          )}
+          
           <button onClick={toggleMute} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded">
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
           <input type="range" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="w-20 accent-blue-600" />
         </div>
 
-        <div className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</div>
+        {videoSource === 'simulated' && (
+          <div className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</div>
+        )}
 
         <div className="flex items-center gap-2">
           <button onClick={handleScreenshot} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Screenshot">
@@ -295,12 +459,14 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
           <button onClick={handleZoomIn} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Zoom in">
             <ZoomIn className="w-5 h-5" />
           </button>
-          <button onClick={handleReset} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Reset to Real-Time">
+          <button onClick={handleReset} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Reset">
             <RotateCcw className="w-5 h-5" />
           </button>
-          <button onClick={() => setShowDetections(!showDetections)} className={`p-2 rounded ${showDetections ? 'text-green-400 bg-gray-700' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`} title="Toggle detections">
-            <AlertTriangle className="w-5 h-5" />
-          </button>
+          {videoSource === 'simulated' && (
+            <button onClick={() => setShowDetections(!showDetections)} className={`p-2 rounded ${showDetections ? 'text-green-400 bg-gray-700' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`} title="Toggle detections">
+              <AlertTriangle className="w-5 h-5" />
+            </button>
+          )}
           <button onClick={addBookmark} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded" title="Add bookmark">
             <Bookmark className="w-5 h-5" />
           </button>
@@ -323,6 +489,31 @@ export default function CameraFeed({ cameraId, cameraName, cameraType = 'fixed',
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Camera selector dropdown */}
+      {availableCameras.length > 0 && (
+        <div className="bg-gray-800 px-4 py-2 border-t border-gray-700">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400">Camera:</span>
+            <select
+              value={selectedCameraId}
+              onChange={(e) => {
+                setSelectedCameraId(e.target.value)
+                if (videoSource === 'webcam') {
+                  startWebcam(e.target.value)
+                }
+              }}
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-xs flex-1"
+            >
+              {availableCameras.map((cam, i) => (
+                <option key={cam.deviceId} value={cam.deviceId}>
+                  {cam.label || `Camera ${i + 1}`}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

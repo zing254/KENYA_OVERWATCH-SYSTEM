@@ -115,3 +115,6 @@ class DeploymentManager:
     def get_deployment_logs(self, deployment_id: str) -> List[str]:
         deployment = self.deployments.get(deployment_id)
         return deployment.logs if deployment else []
+
+
+deployment_manager = DeploymentManager()

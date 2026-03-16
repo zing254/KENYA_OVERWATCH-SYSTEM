@@ -4,7 +4,7 @@ Contains metadata for all 47 Kenyan counties for road safety monitoring
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 from enum import Enum
 
 
@@ -47,7 +47,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Mombasa-Nairobi Highway", "Malindi Road", "Likoni Ferry Road"],
         road_density_km=850,
         urban_centers=["Mombasa", "Kisauni", "Nyali", "Likoni"],
-        risk_factors=["High traffic congestion", "Flooding in low areas", "Port traffic"]
+        risk_factors=[
+            "High traffic congestion",
+            "Flooding in low areas",
+            "Port traffic",
+        ],
     ),
     County(
         code="002",
@@ -61,7 +65,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Mombasa-Tanga Road", "Diani Beach Road"],
         road_density_km=120,
         urban_centers=["Kwale", "Diani", "Msambweni", "Kinango"],
-        risk_factors=["Rural roads", "Seasonal flooding", "Limited road maintenance"]
+        risk_factors=["Rural roads", "Seasonal flooding", "Limited road maintenance"],
     ),
     County(
         code="003",
@@ -75,7 +79,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Mombasa-Malindi Highway", "Kilifi-Wetu Road"],
         road_density_km=180,
         urban_centers=["Kilifi", "Malindi", "Watamu", "Kaloleni"],
-        risk_factors=["Tourist traffic", "Flood-prone areas", "Coastal erosion"]
+        risk_factors=["Tourist traffic", "Flood-prone areas", "Coastal erosion"],
     ),
     County(
         code="004",
@@ -89,7 +93,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Garissa-Hola Road", "Tana River Bridge approach"],
         road_density_km=45,
         urban_centers=["Hola", "Garsen", "Madogo"],
-        risk_factors=["Flooding along Tana River", "Bridge vulnerability", "Limited emergency access"]
+        risk_factors=[
+            "Flooding along Tana River",
+            "Bridge vulnerability",
+            "Limited emergency access",
+        ],
     ),
     County(
         code="005",
@@ -103,7 +111,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Lamu-Malka Mari Road", "Faza-Lamu Road"],
         road_density_km=60,
         urban_centers=["Lamu", "Faza", "Kizingo"],
-        risk_factors=["Island connectivity", "Flooding", "Limited road infrastructure"]
+        risk_factors=["Island connectivity", "Flooding", "Limited road infrastructure"],
     ),
     County(
         code="006",
@@ -117,7 +125,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Mombasa Highway", "Voi-Taveta Road"],
         road_density_km=95,
         urban_centers=["Voi", "Mwatate", "Taveta", "Wundanyi"],
-        risk_factors=["Hilly terrain", "Landslide prone", "Wildlife crossing"]
+        risk_factors=["Hilly terrain", "Landslide prone", "Wildlife crossing"],
     ),
     County(
         code="007",
@@ -131,7 +139,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Garissa-Nairobi Road", "Garissa-Moyale Highway"],
         road_density_km=85,
         urban_centers=["Garissa", "Dadaab", "Fafi"],
-        risk_factors=["Desert conditions", "Flooding during rains", "Livestock on roads"]
+        risk_factors=[
+            "Desert conditions",
+            "Flooding during rains",
+            "Livestock on roads",
+        ],
     ),
     County(
         code="008",
@@ -145,7 +157,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Wajir-Moyale Road", "Wajir-Garissa Road"],
         road_density_km=50,
         urban_centers=["Wajir", "Eldas", "Wajir South"],
-        risk_factors=["Drought conditions", "Limited road network", "Remote area"]
+        risk_factors=["Drought conditions", "Limited road network", "Remote area"],
     ),
     County(
         code="009",
@@ -159,7 +171,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Mandera-Wajir Road", "Ethiopia border road"],
         road_density_km=40,
         urban_centers=["Mandera", "Mandera East", "Mandera West"],
-        risk_factors=["Border security concerns", "Limited infrastructure", "Remote location"]
+        risk_factors=[
+            "Border security concerns",
+            "Limited infrastructure",
+            "Remote location",
+        ],
     ),
     County(
         code="010",
@@ -173,7 +189,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Marsabit-Isiolo Road", "Marsabit-Turbi Road"],
         road_density_km=35,
         urban_centers=["Marsabit", "Moyale", "Loiyangalani"],
-        risk_factors=["Desert terrain", "Livestock crossings", "Limited emergency services"]
+        risk_factors=[
+            "Desert terrain",
+            "Livestock crossings",
+            "Limited emergency services",
+        ],
     ),
     County(
         code="011",
@@ -187,7 +207,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Isiolo-Marsabit Road", "Isiolo-Meru Road"],
         road_density_km=75,
         urban_centers=["Isiolo", "Merti", "Garba Tula"],
-        risk_factors=["Pastoralist movements", "Wildlife corridors", "Drought prone"]
+        risk_factors=["Pastoralist movements", "Wildlife corridors", "Drought prone"],
     ),
     County(
         code="012",
@@ -201,7 +221,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Meru-Nairobi Road", "Meru-Mikindji Road"],
         road_density_km=420,
         urban_centers=["Meru", "Maua", "Timau", "Kianjai"],
-        risk_factors=["Mountain roads", "Rainy season hazards", "High vehicle volume"]
+        risk_factors=["Mountain roads", "Rainy season hazards", "High vehicle volume"],
     ),
     County(
         code="013",
@@ -215,7 +235,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Chuka-Meru Road", "Chuka-Embu Road"],
         road_density_km=180,
         urban_centers=["Chuka", "Marimanti", "Nkubu"],
-        risk_factors=["Hilly terrain", "Landslide prone", "Narrow roads"]
+        risk_factors=["Hilly terrain", "Landslide prone", "Narrow roads"],
     ),
     County(
         code="014",
@@ -229,7 +249,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Embu-Meru Road", "Embu-Nairobi Road"],
         road_density_km=350,
         urban_centers=["Embu", "Runyenjes", "Kibirigwi"],
-        risk_factors=["Mountain roads", "Agricultural traffic", "Rainy season"]
+        risk_factors=["Mountain roads", "Agricultural traffic", "Rainy season"],
     ),
     County(
         code="015",
@@ -243,7 +263,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kitui-Nairobi Road", "Kitui-Mwingi Road"],
         road_density_km=120,
         urban_centers=["Kitui", "Mwingi", "Kisasi", "Mutomo"],
-        risk_factors=["Semi-arid terrain", "Dust storms", "Limited road maintenance"]
+        risk_factors=["Semi-arid terrain", "Dust storms", "Limited road maintenance"],
     ),
     County(
         code="016",
@@ -257,7 +277,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Mombasa Highway", "Machakos-Nairobi Road"],
         road_density_km=380,
         urban_centers=["Machakos", "Mlolongo", "Athi River", "Kangundo"],
-        risk_factors=["High speed accidents", "Growing urbanization", "Cargo truck traffic"]
+        risk_factors=[
+            "High speed accidents",
+            "Growing urbanization",
+            "Cargo truck traffic",
+        ],
     ),
     County(
         code="017",
@@ -271,7 +295,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Mombasa Highway", "Makueni-Wote Road"],
         road_density_km=200,
         urban_centers=["Wote", "Kibwezi", "Makindu", "Kilungu"],
-        risk_factors=["Dusty roads", "Flooding in valleys", "Long distance travel"]
+        risk_factors=["Dusty roads", "Flooding in valleys", "Long distance travel"],
     ),
     County(
         code="018",
@@ -285,7 +309,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nakuru-Ol Kalou Road", "Ol Kalou-Kinangop Road"],
         road_density_km=220,
         urban_centers=["Ol Kalou", "Kinangop", "Ndarwa", "Mairo Inya"],
-        risk_factors=["High altitude", "Fog conditions", "Steep terrain"]
+        risk_factors=["High altitude", "Fog conditions", "Steep terrain"],
     ),
     County(
         code="019",
@@ -299,7 +323,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Nyeri Highway", "Nyeri-Marsabit Road"],
         road_density_km=520,
         urban_centers=["Nyeri", "Othaya", "Mukurweini", "Kiganjo"],
-        risk_factors=["Mountain roads", "Fog and mist", "Curved mountain passes"]
+        risk_factors=["Mountain roads", "Fog and mist", "Curved mountain passes"],
     ),
     County(
         code="020",
@@ -313,7 +337,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Nyeri Highway", "Kutus-Kerugoya Road"],
         road_density_km=680,
         urban_centers=["Kutus", "Kerugoya", "Wanguru", "Kimbimbi"],
-        risk_factors=["Agricultural traffic", "Narrow rural roads", "Pedestrian crossings"]
+        risk_factors=[
+            "Agricultural traffic",
+            "Narrow rural roads",
+            "Pedestrian crossings",
+        ],
     ),
     County(
         code="021",
@@ -327,7 +355,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Nakuru Highway", "Murang'a-Kiambu Road"],
         road_density_km=450,
         urban_centers=["Murang'a", "Kangema", "Mathioya", "Kiharu"],
-        risk_factors=["Hilly terrain", "Narrow roads", "Agricultural vehicles"]
+        risk_factors=["Hilly terrain", "Narrow roads", "Agricultural vehicles"],
     ),
     County(
         code="022",
@@ -341,7 +369,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Thika Highway", "Kiambu-Ruiru Road"],
         road_density_km=920,
         urban_centers=["Kiambu", "Ruiru", "Thika", "Limuru", "Githunguri"],
-        risk_factors=["Urban congestion", "High pedestrian activity", "Rapid urbanization"]
+        risk_factors=[
+            "Urban congestion",
+            "High pedestrian activity",
+            "Rapid urbanization",
+        ],
     ),
     County(
         code="023",
@@ -355,7 +387,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Lodwar-Kitale Road", "Lodwar-Kakuma Road"],
         road_density_km=30,
         urban_centers=["Lodwar", "Kakuma", "Lokichar", "Loiya"],
-        risk_factors=["Remote area", "Flooding during rains", "Limited emergency access"]
+        risk_factors=[
+            "Remote area",
+            "Flooding during rains",
+            "Limited emergency access",
+        ],
     ),
     County(
         code="024",
@@ -369,7 +405,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kapenguria-Kitale Road", "West Pokot-Marsabit Road"],
         road_density_km=110,
         urban_centers=["Kapenguria", "Kacheliba", "Sigor", "Chepareria"],
-        risk_factors=["Mountain terrain", "Landslides", "Cattle crossing"]
+        risk_factors=["Mountain terrain", "Landslides", "Cattle crossing"],
     ),
     County(
         code="025",
@@ -383,7 +419,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Maralal-Isiolo Road", "Samburu-Marsabit Road"],
         road_density_km=45,
         urban_centers=["Maralal", "Wamba", "Archer's Post"],
-        risk_factors=["Wildlife crossings", "Remote roads", "Pastoralist movements"]
+        risk_factors=["Wildlife crossings", "Remote roads", "Pastoralist movements"],
     ),
     County(
         code="026",
@@ -397,7 +433,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kitale-Eldoret Road", "Kitale-Webuye Road"],
         road_density_km=580,
         urban_centers=["Kitale", "Kachemi", "Saboti", "Namasoli"],
-        risk_factors=["High cargo traffic", "Agricultural vehicles", "Rainy season hazards"]
+        risk_factors=[
+            "High cargo traffic",
+            "Agricultural vehicles",
+            "Rainy season hazards",
+        ],
     ),
     County(
         code="027",
@@ -411,7 +451,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Eldoret Highway", "Eldoret-Kakamega Road"],
         road_density_km=650,
         urban_centers=["Eldoret", "Kapsabet", "Wareng", "Moiben"],
-        risk_factors=["High speed accidents", "Long distance trucks", "Growing urban traffic"]
+        risk_factors=[
+            "High speed accidents",
+            "Long distance trucks",
+            "Growing urban traffic",
+        ],
     ),
     County(
         code="028",
@@ -425,7 +469,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Iten-Eldoret Road", "Marakwet Hills Road"],
         road_density_km=180,
         urban_centers=["Iten", "Kapsowar", "Keiyo", "Kimwarer"],
-        risk_factors=["Mountain terrain", "Steep roads", "Limited visibility"]
+        risk_factors=["Mountain terrain", "Steep roads", "Limited visibility"],
     ),
     County(
         code="029",
@@ -439,7 +483,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kapsabet-Eldoret Road", "Nandi Hills-Kisumu Road"],
         road_density_km=320,
         urban_centers=["Kapsabet", "Nandi Hills", "Kilibwoni", "Mosoriot"],
-        risk_factors=["Tea estate traffic", "Narrow roads", "Rainy conditions"]
+        risk_factors=["Tea estate traffic", "Narrow roads", "Rainy conditions"],
     ),
     County(
         code="030",
@@ -453,7 +497,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kabarnet-Eldoret Road", "Baringo-Mogotio Road"],
         road_density_km=90,
         urban_centers=["Kabarnet", "Mogotio", "Eldama Ravine", "Tiaty"],
-        risk_factors=["Rough terrain", "Limited road network", "Flooding in low areas"]
+        risk_factors=["Rough terrain", "Limited road network", "Flooding in low areas"],
     ),
     County(
         code="031",
@@ -467,7 +511,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nanyuki-Isiolo Road", "Rumuruti-Nakuru Road"],
         road_density_km=160,
         urban_centers=["Rumuruti", "Nanyuki", "Mukogodo", "Ol Moran"],
-        risk_factors=["Wildlife crossings", "Ranch roads", "Tourist traffic"]
+        risk_factors=["Wildlife crossings", "Ranch roads", "Tourist traffic"],
     ),
     County(
         code="032",
@@ -481,7 +525,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Nakuru Highway", "Nakuru-Eldoret Highway"],
         road_density_km=720,
         urban_centers=["Nakuru", "Naivasha", "Molo", "Gilgil", "Nyahururu"],
-        risk_factors=["High traffic volume", "Growing urbanization", "Industrial traffic"]
+        risk_factors=[
+            "High traffic volume",
+            "Growing urbanization",
+            "Industrial traffic",
+        ],
     ),
     County(
         code="033",
@@ -495,7 +543,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Narok Highway", "Narok-Mara Road"],
         road_density_km=200,
         urban_centers=["Narok", "Mara", "Kilgoris", "Ololulunga"],
-        risk_factors=["Wildlife crossings", "Tourist vehicles", "Long distance travel"]
+        risk_factors=["Wildlife crossings", "Tourist vehicles", "Long distance travel"],
     ),
     County(
         code="034",
@@ -509,7 +557,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Mombasa Highway", "Kajiado-Namanga Road"],
         road_density_km=140,
         urban_centers=["Kajiado", "Kitengela", "Magadi", "Isinya"],
-        risk_factors=["Livestock crossings", "Wildlife corridors", "Rapid development"]
+        risk_factors=["Livestock crossings", "Wildlife corridors", "Rapid development"],
     ),
     County(
         code="035",
@@ -523,7 +571,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nairobi-Eldoret Highway", "Kericho-Kisumu Road"],
         road_density_km=620,
         urban_centers=["Kericho", "Litein", "Kapkatet", "Sondu"],
-        risk_factors=["Tea estate traffic", "Fog conditions", "Steep terrain"]
+        risk_factors=["Tea estate traffic", "Fog conditions", "Steep terrain"],
     ),
     County(
         code="036",
@@ -537,7 +585,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Bomet-Narok Road", "Bomet-Kericho Road"],
         road_density_km=380,
         urban_centers=["Bomet", "Sotik", "Longisa", "Chebunyo"],
-        risk_factors=["Agricultural traffic", "Hilly terrain", "Narrow roads"]
+        risk_factors=["Agricultural traffic", "Hilly terrain", "Narrow roads"],
     ),
     County(
         code="037",
@@ -551,7 +599,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kakamega-Kisumu Road", "Kakamega-Webuye Road"],
         road_density_km=720,
         urban_centers=["Kakamega", "Mumias", "Lurambi", "Malava"],
-        risk_factors=["High population density", "Agricultural traffic", "Growing urbanization"]
+        risk_factors=[
+            "High population density",
+            "Agricultural traffic",
+            "Growing urbanization",
+        ],
     ),
     County(
         code="038",
@@ -565,7 +617,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Vihiga-Kakamega Road", "Vihiga-Kisumu Road"],
         road_density_km=850,
         urban_centers=["Vihiga", "Mbale", "Luanda", "Emuhaya"],
-        risk_factors=["Dense population", "Narrow roads", "High pedestrian activity"]
+        risk_factors=["Dense population", "Narrow roads", "High pedestrian activity"],
     ),
     County(
         code="039",
@@ -579,7 +631,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Bungoma-Webuye Road", "Bungoma-Mumias Road"],
         road_density_km=680,
         urban_centers=["Bungoma", "Webuye", "Kimilili", "Mukhumuli"],
-        risk_factors=["Border traffic", "Cargo trucks", "High accident rate"]
+        risk_factors=["Border traffic", "Cargo trucks", "High accident rate"],
     ),
     County(
         code="040",
@@ -593,7 +645,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Busia-Kisumu Road", "Busia-Malaba Road"],
         road_density_km=520,
         urban_centers=["Busia", "Malaba", "Nambale", "Butula"],
-        risk_factors=["Border crossing", "Cargo traffic", "Pedestrian crossings"]
+        risk_factors=["Border crossing", "Cargo traffic", "Pedestrian crossings"],
     ),
     County(
         code="041",
@@ -607,7 +659,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Siaya-Ukwala Road", "Siaya-Bondo Road"],
         road_density_km=380,
         urban_centers=["Siaya", "Bondo", "Ukwala", "Rarieda"],
-        risk_factors=["Rural roads", "Flood prone areas", "Limited road maintenance"]
+        risk_factors=["Rural roads", "Flood prone areas", "Limited road maintenance"],
     ),
     County(
         code="042",
@@ -621,7 +673,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kisumu-Nairobi Road", "Kisumu-Busia Road"],
         road_density_km=820,
         urban_centers=["Kisumu", "Kisian", "Maseno", "Ahero"],
-        risk_factors=["Urban traffic", "Lake shore roads", "Growing city"]
+        risk_factors=["Urban traffic", "Lake shore roads", "Growing city"],
     ),
     County(
         code="043",
@@ -635,7 +687,11 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Homa Bay-Rongo Road", "Homa Bay-Mbita Road"],
         road_density_km=280,
         urban_centers=["Homa Bay", "Mbita", "Rongo", "Kendi"],
-        risk_factors=["Lake shore flooding", "Fishing traffic", "Limited road infrastructure"]
+        risk_factors=[
+            "Lake shore flooding",
+            "Fishing traffic",
+            "Limited road infrastructure",
+        ],
     ),
     County(
         code="044",
@@ -649,7 +705,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Migori-Nairobi Road", "Migori-Isebania Road"],
         road_density_km=320,
         urban_centers=["Migori", "Rongo", "Awendo", "Nyatike"],
-        risk_factors=["Border traffic", "Mining area traffic", "Rural roads"]
+        risk_factors=["Border traffic", "Mining area traffic", "Rural roads"],
     ),
     County(
         code="045",
@@ -663,7 +719,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Kisii-Keroka Road", "Kisii-Nyamira Road"],
         road_density_km=720,
         urban_centers=["Kisii", "Keroka", "Nyamira", "Ogembo"],
-        risk_factors=["Hilly terrain", "Dense population", "Growing traffic"]
+        risk_factors=["Hilly terrain", "Dense population", "Growing traffic"],
     ),
     County(
         code="046",
@@ -677,7 +733,7 @@ KENYA_COUNTIES: List[County] = [
         major_roads=["Nyamira-Kisii Road", "Nyamira-Mogogosi Road"],
         road_density_km=680,
         urban_centers=["Nyamira", "Keroka", "Mogogosi", "Ekerenyo"],
-        risk_factors=["Tea estate traffic", "Hilly terrain", "Agricultural vehicles"]
+        risk_factors=["Tea estate traffic", "Hilly terrain", "Agricultural vehicles"],
     ),
     County(
         code="047",
@@ -688,10 +744,20 @@ KENYA_COUNTIES: List[County] = [
         area_sq_km=696,
         latitude=-1.2921,
         longitude=36.8219,
-        major_roads=["Nairobi-Mombasa Highway", "Thika Road", "Ngong Road", "Kenyatta Avenue"],
+        major_roads=[
+            "Nairobi-Mombasa Highway",
+            "Thika Road",
+            "Ngong Road",
+            "Kenyatta Avenue",
+        ],
         road_density_km=2800,
         urban_centers=["Nairobi", "Kasarani", "Ruaraka", "Embakasi"],
-        risk_factors=["Highest traffic congestion", "High pedestrian accidents", "Growing urbanization", "Expressway incidents"]
+        risk_factors=[
+            "Highest traffic congestion",
+            "High pedestrian accidents",
+            "Growing urbanization",
+            "Expressway incidents",
+        ],
     ),
 ]
 
@@ -717,8 +783,7 @@ def get_counties_by_region(region: CountyRegion) -> List[County]:
 
 
 COUNTY_REGION_MAP: Dict[CountyRegion, List[str]] = {
-    region: [c.name for c in get_counties_by_region(region)]
-    for region in CountyRegion
+    region: [c.name for c in get_counties_by_region(region)] for region in CountyRegion
 }
 
 
@@ -727,7 +792,7 @@ def get_regions() -> List[Dict[str, "Any"]]:
         {
             "name": region.value,
             "counties": COUNTY_REGION_MAP[region],
-            "county_count": len(COUNTY_REGION_MAP[region])
+            "county_count": len(COUNTY_REGION_MAP[region]),
         }
         for region in CountyRegion
     ]

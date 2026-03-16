@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { AlertTriangle, AlertCircle, MapPin, Car, Activity, Shield, FileText, Settings, Radio, Map, BarChart3, Zap, Users, TrendingUp, DollarSign, Clock, MapPinned, Camera, Eye, Bell, Loader2, Send } from 'lucide-react'
+import KenyanFlagBar from './KenyanFlagBar'
 import toast from 'react-hot-toast'
 
 const KENYA_OVERWATCH_COLORS = {
@@ -129,7 +130,7 @@ const causeData = [
   { name: 'Other', value: 35 },
 ]
 
-export default function RoadSafetyDashboard() {
+const RoadSafetyDashboard: React.FC = () => {
   const [accidents, setAccidents] = useState<Accident[]>([])
   const [violations, setViolations] = useState<Violation[]>([])
   const [citizenReports, setCitizenReports] = useState<CitizenReport[]>([])
@@ -316,6 +317,7 @@ export default function RoadSafetyDashboard() {
 
   const renderDashboard = () => (
     <div className="space-y-6">
+      <KenyanFlagBar />
       {/* Stats Grid - NTSA Theme */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-red-500/30 rounded-xl p-5 shadow-lg">
@@ -867,3 +869,4 @@ export default function RoadSafetyDashboard() {
     </div>
   )
 }
+export default React.memo(RoadSafetyDashboard)

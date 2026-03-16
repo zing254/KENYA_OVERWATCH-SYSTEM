@@ -1,0 +1,163 @@
+# Kenya Overwatch - Production Docker Compose
+# Optimized for free tier hosting (Oracle Cloud, Railway, Render)
+
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kenya-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://kenya_user:${DB_PASSWORD:-kenya_pass_2024}@postgres:5432/kenya_overwatch
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-kenya-overwatch-secret-key-change-in-production}
+      - OW_DEV_NO_AUTH=0
+      - OVERWATCH_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kenya-net
+
+  # Control Center Dashboard
+  control-center:
+    build:
+      context: ./frontend/control_center
+      dockerfile: Dockerfile
+    container_name: kenya-control-center
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8001
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kenya-net
+
+  # Citizen Portal
+  citizen-portal:
+    build:
+      context: ./frontend/taifaroad
+      dockerfile: Dockerfile
+    container_name: kenya-citizen
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8001
+      - NODE_ENV=production
+      - PORT=3002
+    depends_on:
+      - backend
+    networks:
+      - kenya-net
+
+  # Responder App
+  responder-app:
+    build:
+      context: ./frontend/taifa_guard
+      dockerfile: Dockerfile
+    container_name: kenya-responder
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8001
+      - NODE_ENV=production
+      - PORT=3001
+    depends_on:
+      - backend
+    networks:
+      - kenya-net
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: kenya-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=kenya_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-kenya_pass_2024}
+      - POSTGRES_DB=kenya_overwatch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kenya_user -d kenya_overwatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kenya-net
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kenya-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kenya-net
+
+  # Nginx Reverse Proxy (optional, for SSL)
+  nginx:
+    image: nginx:alpine
+    container_name: kenya-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - control-center
+    networks:
+      - kenya-net
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  kenya-net:
+    driver: bridge
+    name: kenya-network

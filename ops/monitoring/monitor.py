@@ -153,3 +153,6 @@ class MonitoringService:
             "active_alerts": len(active_alerts),
             "timestamp": latest.timestamp.isoformat()
         }
+
+
+monitor = MonitoringService()

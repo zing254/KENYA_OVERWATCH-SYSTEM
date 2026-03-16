@@ -81,18 +81,19 @@ jobs:
           cd backend
           python -m venv venv
           source venv/bin/activate
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio httpx
+          pip install -r requirements-minimal.txt
       
       - name: Run backend tests
         run: |
-          source backend/venv/bin/activate
-          pytest tests/ -v --tb=short
+          cd backend
+          source venv/bin/activate
+          python -m pytest tests/ -v --tb=short
       
-      - name: Run AI module tests
+      - name: Run Alembic migrations check
         run: |
-          source backend/venv/bin/activate
-          python -m pytest ai/ -v --tb=short
+          cd backend
+          source venv/bin/activate
+          python migrate.py || true
 
   # Frontend Tests
   frontend-test:

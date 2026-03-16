@@ -1,11 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
-from backend.notifications_sounds import (
-    Notification, 
-    SoundAlert, 
-    NotificationManager,
-    notification_manager
-)
+from backend.notifications_sounds import Notification, SoundAlert, NotificationManager
 from datetime import datetime
 
 
@@ -17,7 +11,7 @@ class TestNotifications:
             message="This is a test notification",
             notification_type="alert",
             severity="high",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
         assert notification.notification_id == "test_001"
         assert notification.title == "Test Alert"
@@ -25,10 +19,7 @@ class TestNotifications:
 
     def test_sound_alert_creation(self):
         sound = SoundAlert(
-            alert_id="sound_001",
-            sound_type="emergency",
-            volume=0.8,
-            repeat=False
+            alert_id="sound_001", sound_type="emergency", volume=0.8, repeat=False
         )
         assert sound.alert_id == "sound_001"
         assert sound.sound_type == "emergency"
@@ -53,7 +44,7 @@ class TestNotifications:
             message="Test message",
             notification_type="alert",
             severity="medium",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
         manager.notifications["test_user"] = [notification]
         notifications = manager.get_user_notifications("test_user")
@@ -69,7 +60,7 @@ class TestNotifications:
             notification_type="alert",
             severity="medium",
             timestamp=datetime.now().isoformat(),
-            read=False
+            read=False,
         )
         manager.notifications["test_user"] = [notification]
         manager.mark_as_read("test_user", "test_003")
@@ -85,7 +76,7 @@ class TestNotifications:
                 notification_type="alert",
                 severity="medium",
                 timestamp=datetime.now().isoformat(),
-                read=False
+                read=False,
             )
             for i in range(3)
         ]
@@ -103,7 +94,7 @@ class TestNotifications:
                 notification_type="alert",
                 severity="medium",
                 timestamp=datetime.now().isoformat(),
-                read=True
+                read=True,
             ),
             Notification(
                 notification_id="test_002",
@@ -112,8 +103,8 @@ class TestNotifications:
                 notification_type="alert",
                 severity="medium",
                 timestamp=datetime.now().isoformat(),
-                read=False
-            )
+                read=False,
+            ),
         ]
         manager.notifications["test_user"] = notifications
         unread = manager.get_user_notifications("test_user", unread_only=True)
@@ -129,10 +120,10 @@ class TestNotifications:
                 message=f"Test message {i}",
                 notification_type="alert",
                 severity="medium",
-                timestamp=datetime.now().isoformat()
+                timestamp=datetime.now().isoformat(),
             )
             manager.notifications["test_user"] = [notification]
-        
+
         assert len(manager.notifications["test_user"]) <= 100
 
     def test_emergency_alert_creation(self):
@@ -143,7 +134,7 @@ class TestNotifications:
             message="Critical incident reported",
             notification_type="emergency",
             severity="critical",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
         assert notification.notification_type == "emergency"
         assert notification.severity == "critical"
@@ -152,23 +143,23 @@ class TestNotifications:
 class TestSoundTypes:
     def test_sound_types_defined(self):
         sound_types = [
-            "emergency", "alert", "warning", "notification",
-            "incident", "dispatch", "road_sign", "speed_camera"
+            "emergency",
+            "alert",
+            "warning",
+            "notification",
+            "incident",
+            "dispatch",
+            "road_sign",
+            "speed_camera",
         ]
         for sound_type in sound_types:
             sound = SoundAlert(
-                alert_id=f"test_{sound_type}",
-                sound_type=sound_type,
-                volume=1.0
+                alert_id=f"test_{sound_type}", sound_type=sound_type, volume=1.0
             )
             assert sound.sound_type == sound_type
 
     def test_volume_range(self):
-        sound = SoundAlert(
-            alert_id="test_vol",
-            sound_type="alert",
-            volume=0.5
-        )
+        sound = SoundAlert(alert_id="test_vol", sound_type="alert", volume=0.5)
         assert 0 <= sound.volume <= 1.0
 
 

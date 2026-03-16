@@ -4,23 +4,32 @@ Generates printable HTML reports that can be saved as PDF
 """
 
 import random
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import datetime
 
 from ..county_data import KENYA_COUNTIES
 from ..services.county_analytics import county_analytics
 
 
-def generate_html_report(county_name: str, report_type: str = "comprehensive", period: str = "month") -> str:
+def generate_html_report(
+    county_name: str, report_type: str = "comprehensive", period: str = "month"
+) -> str:
     stats = county_analytics.get_county_stats(county_name, period)
-    
+
     county = next((c for c in KENYA_COUNTIES if c.name == county_name), None)
     if not county:
         return "<h1>County not found</h1>"
-    
-    risk_level = "HIGH" if stats.risk_score >= 60 else "MEDIUM" if stats.risk_score >= 40 else "LOW"
-    risk_color = "#dc2626" if risk_level == "HIGH" else "#ea580c" if risk_level == "MEDIUM" else "#16a34a"
-    
+
+    risk_level = (
+        "HIGH"
+        if stats.risk_score >= 60
+        else "MEDIUM" if stats.risk_score >= 40 else "LOW"
+    )
+    risk_color = (
+        "#dc2626"
+        if risk_level == "HIGH"
+        else "#ea580c" if risk_level == "MEDIUM" else "#16a34a"
+    )
+
     html = f"""
 <!DOCTYPE html>
 <html>
@@ -101,10 +110,10 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
         <table>
             <tr><th>Incident Type</th><th>Count</th></tr>
 """
-    
+
     for incident_type, count in stats.incident_types.items():
         html += f"            <tr><td>{incident_type}</td><td>{count}</td></tr>\n"
-    
+
     html += """
         </table>
     </div>
@@ -114,12 +123,12 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
         <table>
             <tr><th>Severity</th><th>Count</th><th>Percentage</th></tr>
 """
-    
+
     total = sum(stats.severity_breakdown.values())
     for severity, count in stats.severity_breakdown.items():
         pct = (count / total * 100) if total > 0 else 0
         html += f"            <tr><td>{severity}</td><td>{count}</td><td>{pct:.1f}%</td></tr>\n"
-    
+
     html += """
         </table>
     </div>
@@ -129,10 +138,10 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
         <table>
             <tr><th>Road Name</th><th>Accidents</th><th>Risk Level</th></tr>
 """
-    
+
     for road in stats.top_roads:
         html += f"            <tr><td>{road['name']}</td><td>{road['accidents']}</td><td>{road['risk_level'].upper()}</td></tr>\n"
-    
+
     html += """
         </table>
     </div>
@@ -141,10 +150,10 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
         <h2>Major Roads in County</h2>
         <ul>
 """
-    
+
     for road in county.major_roads:
         html += f"            <li>{road}</li>\n"
-    
+
     html += """
         </ul>
     </div>
@@ -153,10 +162,10 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
         <h2>Risk Factors</h2>
         <ul>
 """
-    
+
     for factor in county.risk_factors:
         html += f"            <li>{factor}</li>\n"
-    
+
     html += f"""
         </ul>
     </div>
@@ -174,12 +183,12 @@ def generate_html_report(county_name: str, report_type: str = "comprehensive", p
 def generate_all_counties_html_report(period: str = "month") -> str:
     all_counties = county_analytics.get_all_counties_summary(period)
     regions = county_analytics.get_region_summary()
-    
+
     total_accidents = sum(c["total_accidents"] for c in all_counties)
     total_violations = sum(c["total_violations"] for c in all_counties)
     total_fatalities = sum(c["fatalities"] for c in all_counties)
     avg_risk = sum(c["risk_score"] for c in all_counties) / len(all_counties)
-    
+
     html = f"""
 <!DOCTYPE html>
 <html>
@@ -257,11 +266,15 @@ def generate_all_counties_html_report(period: str = "month") -> str:
         <table>
             <tr><th>Rank</th><th>County</th><th>Region</th><th>Accidents</th><th>Fatalities</th><th>Risk Score</th><th>Trend</th></tr>
 """
-    
+
     for i, c in enumerate(all_counties[:20], 1):
-        risk_class = "high-risk" if c["risk_score"] >= 60 else "medium-risk" if c["risk_score"] >= 40 else "low-risk"
+        risk_class = (
+            "high-risk"
+            if c["risk_score"] >= 60
+            else "medium-risk" if c["risk_score"] >= 40 else "low-risk"
+        )
         html += f"            <tr><td>{i}</td><td>{c['name']}</td><td>{c['region']}</td><td>{c['total_accidents']}</td><td>{c['fatalities']}</td><td class='{risk_class}'>{c['risk_score']}</td><td>{c['trend']}</td></tr>\n"
-    
+
     html += """
         </table>
     </div>
@@ -271,10 +284,10 @@ def generate_all_counties_html_report(period: str = "month") -> str:
         <table>
             <tr><th>Region</th><th>Counties</th><th>Total Accidents</th><th>Total Fatalities</th><th>Avg Risk</th></tr>
 """
-    
+
     for r in regions:
         html += f"            <tr><td>{r['region']}</td><td>{r['county_count']}</td><td>{r['total_accidents']}</td><td>{r['total_fatalities']}</td><td>{r['risk_score']:.1f}</td></tr>\n"
-    
+
     html += f"""
         </table>
     </div>

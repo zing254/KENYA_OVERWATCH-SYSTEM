@@ -3,7 +3,7 @@ Service Integration Routes
 Integrates new microservices with the main API
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -12,31 +12,27 @@ from .incident_service import (
     IncidentType,
     SeverityLevel,
     IncidentStatus,
-    Coordinates as IncidentCoordinates
+    Coordinates as IncidentCoordinates,
 )
 from .dispatch.dispatch_coordinator import (
     dispatch_coordinator,
     ResponderType,
     ResponderStatus,
-    DispatchStatus
 )
 from .analytics.predictive_engine import predictive_analytics
 from .location.location_service import location_service
-from .ingestion.rtsp_client import (
-    camera_ingestion_service,
-    CameraConfig
-)
+from .ingestion.rtsp_client import camera_ingestion_service, CameraConfig
 from .notification_service import notification_service
 from .routing_service import routing_service
 from .iot_sensors import mqtt_sensor_service
 from .webrtc_gateway import webrtc_gateway
-from .ai.behavior_analysis import BehaviorAnalyzer, get_or_create_calibration
-
+from .ai.behavior_analysis import get_or_create_calibration
 
 router = APIRouter(prefix="/api/v1/services", tags=["services"])
 
 
 # ==================== INCIDENT MODELS ====================
+
 
 class CoordinatesInput(BaseModel):
     lat: float
@@ -66,55 +62,43 @@ class IncidentStatusUpdate(BaseModel):
 
 # ==================== INCIDENT ENDPOINTS ====================
 
+
 @router.get("/incidents")
 async def list_incidents(
     status: Optional[str] = None,
     incident_type: Optional[str] = None,
     severity: Optional[str] = None,
     county: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
 ):
     """List all incidents with optional filters"""
     status_enum = IncidentStatus(status) if status else None
     type_enum = IncidentType(incident_type) if incident_type else None
     severity_enum = SeverityLevel(severity) if severity else None
-    
+
     incidents = incident_service.get_incidents(
         status=status_enum,
         incident_type=type_enum,
         severity=severity_enum,
         county=county,
-        limit=limit
+        limit=limit,
     )
-    
-    return {
-        "total": len(incidents),
-        "incidents": [i.to_dict() for i in incidents]
-    }
+
+    return {"total": len(incidents), "incidents": [i.to_dict() for i in incidents]}
 
 
 @router.get("/incidents/active")
 async def get_active_incidents():
     """Get all active (non-resolved) incidents"""
     incidents = incident_service.get_active_incidents()
-    return {
-        "total": len(incidents),
-        "incidents": [i.to_dict() for i in incidents]
-    }
+    return {"total": len(incidents), "incidents": [i.to_dict() for i in incidents]}
 
 
 @router.get("/incidents/nearby")
-async def get_incidents_nearby(
-    lat: float,
-    lng: float,
-    radius_km: float = 5.0
-):
+async def get_incidents_nearby(lat: float, lng: float, radius_km: float = 5.0):
     """Get incidents within radius of a location"""
     incidents = incident_service.get_incidents_by_location(lat, lng, radius_km)
-    return {
-        "total": len(incidents),
-        "incidents": [i.to_dict() for i in incidents]
-    }
+    return {"total": len(incidents), "incidents": [i.to_dict() for i in incidents]}
 
 
 @router.get("/incidents/{incident_id}")
@@ -136,17 +120,21 @@ async def create_incident(data: IncidentCreateInput):
                 lat=data.location.lat,
                 lng=data.location.lng,
                 altitude=data.location.altitude,
-                accuracy=data.location.accuracy
+                accuracy=data.location.accuracy,
             ),
             address=data.address,
             road_name=data.road_name,
             county=data.county,
             description=data.description,
-            severity_modifier=SeverityLevel(data.severity_modifier) if data.severity_modifier else None,
+            severity_modifier=(
+                SeverityLevel(data.severity_modifier)
+                if data.severity_modifier
+                else None
+            ),
             camera_id=data.camera_id,
             detected_by=data.detected_by,
             ai_confidence=data.ai_confidence,
-            evidence_urls=data.evidence_urls
+            evidence_urls=data.evidence_urls,
         )
         return incident.to_dict()
     except Exception as e:
@@ -160,7 +148,7 @@ async def update_incident_status(incident_id: str, data: IncidentStatusUpdate):
         incident = incident_service.update_status(
             incident_id=incident_id,
             new_status=IncidentStatus(data.status),
-            notes=data.notes
+            notes=data.notes,
         )
         if not incident:
             raise HTTPException(status_code=404, detail="Incident not found")
@@ -175,11 +163,12 @@ async def get_dispatch_requirements(incident_id: str):
     incident = incident_service.get_incident(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
-    
+
     return incident_service.get_dispatch_requirements(incident.type)
 
 
 # ==================== RESPONDER MODELS ====================
+
 
 class ResponderCreateInput(BaseModel):
     id: str
@@ -206,23 +195,20 @@ class DispatchCreateInput(BaseModel):
 
 # ==================== RESPONDER ENDPOINTS ====================
 
+
 @router.get("/responders")
 async def list_responders(
-    responder_type: Optional[str] = None,
-    status: Optional[str] = None
+    responder_type: Optional[str] = None, status: Optional[str] = None
 ):
     """List all responders"""
     responders = list(dispatch_coordinator.responders.values())
-    
+
     if responder_type:
         responders = [r for r in responders if r.type.value == responder_type]
     if status:
         responders = [r for r in responders if r.status.value == status]
-    
-    return {
-        "total": len(responders),
-        "responders": [r.to_dict() for r in responders]
-    }
+
+    return {"total": len(responders), "responders": [r.to_dict() for r in responders]}
 
 
 @router.get("/responders/available")
@@ -230,11 +216,8 @@ async def get_available_responders(responder_type: Optional[str] = None):
     """Get available responders"""
     type_enum = ResponderType(responder_type) if responder_type else None
     responders = dispatch_coordinator.get_available_responders(type_enum)
-    
-    return {
-        "total": len(responders),
-        "responders": [r.to_dict() for r in responders]
-    }
+
+    return {"total": len(responders), "responders": [r.to_dict() for r in responders]}
 
 
 @router.get("/responders/{responder_id}")
@@ -250,7 +233,7 @@ async def get_responder(responder_id: str):
 async def register_responder(data: ResponderCreateInput):
     """Register a new responder"""
     from services.dispatch.dispatch_coordinator import Responder
-    
+
     responder = Responder(
         id=data.id,
         name=data.name,
@@ -260,20 +243,20 @@ async def register_responder(data: ResponderCreateInput):
         latitude=data.latitude,
         longitude=data.longitude,
         station=data.station,
-        fcm_token=data.fcm_token
+        fcm_token=data.fcm_token,
     )
-    
+
     dispatch_coordinator.register_responder(responder)
     return responder.to_dict()
 
 
 @router.patch("/responders/{responder_id}/base-location")
-async def update_responder_base_location(responder_id: str, data: ResponderLocationUpdate):
+async def update_responder_base_location(
+    responder_id: str, data: ResponderLocationUpdate
+):
     """Update responder's base/home location"""
     success = dispatch_coordinator.update_responder_location(
-        responder_id=responder_id,
-        latitude=data.latitude,
-        longitude=data.longitude
+        responder_id=responder_id, latitude=data.latitude, longitude=data.longitude
     )
     if not success:
         raise HTTPException(status_code=404, detail="Responder not found")
@@ -285,8 +268,7 @@ async def update_responder_status(responder_id: str, status: str):
     """Update responder status"""
     try:
         success = dispatch_coordinator.update_responder_status(
-            responder_id=responder_id,
-            status=ResponderStatus(status)
+            responder_id=responder_id, status=ResponderStatus(status)
         )
         if not success:
             raise HTTPException(status_code=404, detail="Responder not found")
@@ -297,21 +279,22 @@ async def update_responder_status(responder_id: str, status: str):
 
 # ==================== DISPATCH ENDPOINTS ====================
 
+
 @router.post("/dispatch", status_code=201)
 async def create_dispatch(data: DispatchCreateInput):
     """Dispatch responders to an incident"""
     required = [ResponderType(t) for t in data.required_types]
-    optional = [ResponderType(t) for t in data.optional_types] if data.optional_types else None
-    
-    dispatches = dispatch_coordinator.dispatch_responders(
-        incident_id=data.incident_id,
-        required_types=required,
-        optional_types=optional
+    optional = (
+        [ResponderType(t) for t in data.optional_types] if data.optional_types else None
     )
-    
+
+    dispatches = dispatch_coordinator.dispatch_responders(
+        incident_id=data.incident_id, required_types=required, optional_types=optional
+    )
+
     return {
         "incident_id": data.incident_id,
-        "dispatches": {k: v.to_dict() for k, v in dispatches.items()}
+        "dispatches": {k: v.to_dict() for k, v in dispatches.items()},
     }
 
 
@@ -319,10 +302,7 @@ async def create_dispatch(data: DispatchCreateInput):
 async def get_incident_dispatches(incident_id: str):
     """Get all dispatches for an incident"""
     dispatches = dispatch_coordinator.get_dispatches_for_incident(incident_id)
-    return {
-        "total": len(dispatches),
-        "dispatches": [d.to_dict() for d in dispatches]
-    }
+    return {"total": len(dispatches), "dispatches": [d.to_dict() for d in dispatches]}
 
 
 @router.patch("/dispatch/{dispatch_id}/acknowledge")
@@ -363,13 +343,12 @@ async def resolve_dispatch(dispatch_id: str):
 
 # ==================== PREDICTIVE ANALYTICS ENDPOINTS ====================
 
+
 @router.get("/analytics/predictions")
-async def get_hotspot_predictions(
-    grid_size_km: float = 1.0
-):
+async def get_hotspot_predictions(grid_size_km: float = 1.0):
     """Get predicted accident hotspots"""
     predictions = predictive_analytics.predict_hotspots(grid_size_km=grid_size_km)
-    
+
     return {
         "total": len(predictions),
         "predictions": [
@@ -380,10 +359,10 @@ async def get_hotspot_predictions(
                 "risk_score": round(p.risk_score, 2),
                 "predicted_accidents": p.predicted_accidents,
                 "factors": {k: round(v, 2) for k, v in p.factors.items()},
-                "prediction_date": p.prediction_date.isoformat()
+                "prediction_date": p.prediction_date.isoformat(),
             }
             for p in predictions
-        ]
+        ],
     }
 
 
@@ -411,6 +390,7 @@ async def train_model():
 
 # ==================== LOCATION SERVICE MODELS ====================
 
+
 class LocationUpdateInput(BaseModel):
     latitude: float
     longitude: float
@@ -420,6 +400,7 @@ class LocationUpdateInput(BaseModel):
 
 
 # ==================== LOCATION SERVICE ENDPOINTS ====================
+
 
 @router.get("/locations")
 async def get_all_locations():
@@ -435,10 +416,10 @@ async def get_all_locations():
                 "accuracy": loc.accuracy,
                 "speed": loc.speed,
                 "heading": loc.heading,
-                "timestamp": loc.timestamp.isoformat()
+                "timestamp": loc.timestamp.isoformat(),
             }
             for loc in locations
-        ]
+        ],
     }
 
 
@@ -455,7 +436,7 @@ async def get_responder_location(responder_id: str):
         "accuracy": location.accuracy,
         "speed": location.speed,
         "heading": location.heading,
-        "timestamp": location.timestamp.isoformat()
+        "timestamp": location.timestamp.isoformat(),
     }
 
 
@@ -468,7 +449,7 @@ async def update_responder_gps_location(responder_id: str, data: LocationUpdateI
         longitude=data.longitude,
         accuracy=data.accuracy,
         speed=data.speed,
-        heading=data.heading
+        heading=data.heading,
     )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update location")
@@ -476,20 +457,14 @@ async def update_responder_gps_location(responder_id: str, data: LocationUpdateI
 
 
 @router.get("/locations/nearby")
-async def get_nearby_responders(
-    lat: float,
-    lng: float,
-    radius_km: float = 10.0
-):
+async def get_nearby_responders(lat: float, lng: float, radius_km: float = 10.0):
     """Get responders within radius"""
     responders = location_service.get_responders_in_radius(lat, lng, radius_km)
-    return {
-        "total": len(responders),
-        "responders": responders
-    }
+    return {"total": len(responders), "responders": responders}
 
 
 # ==================== CAMERA MANAGEMENT MODELS ====================
+
 
 class CameraConfigInput(BaseModel):
     id: str
@@ -507,14 +482,12 @@ class CameraConfigInput(BaseModel):
 
 # ==================== CAMERA MANAGEMENT ENDPOINTS ====================
 
+
 @router.get("/cameras")
 async def list_cameras():
     """List all cameras with their status"""
     cameras = camera_ingestion_service.get_all_status()
-    return {
-        "total": len(cameras),
-        "cameras": cameras
-    }
+    return {"total": len(cameras), "cameras": cameras}
 
 
 @router.get("/cameras/{camera_id}")
@@ -539,7 +512,7 @@ async def register_camera(data: CameraConfigInput):
         road_name=data.road_name,
         county=data.county,
         fps=data.fps,
-        enabled=data.enabled
+        enabled=data.enabled,
     )
     camera_ingestion_service.register_camera(config)
     return {"message": "Camera registered", "camera_id": data.id}
@@ -584,6 +557,7 @@ async def stop_all_cameras():
 
 # ==================== NOTIFICATION MODELS ====================
 
+
 class NotificationInput(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -600,6 +574,7 @@ class TemplateNotificationInput(BaseModel):
 
 
 # ==================== NOTIFICATION ENDPOINTS ====================
+
 
 @router.get("/notifications/templates")
 async def get_notification_templates():
@@ -624,7 +599,7 @@ async def send_notification(data: NotificationInput):
         email=data.email,
         sms=data.sms_message,
         subject=data.email_subject,
-        email_body=data.email_body
+        email_body=data.email_body,
     )
     return result
 
@@ -635,22 +610,19 @@ async def send_template_notification(data: TemplateNotificationInput):
     template_name = data.template
     if template_name not in notification_service.templates:
         raise HTTPException(status_code=404, detail="Template not found")
-    
-    template_data = data.extra if hasattr(data, 'extra') else {}
-    
+
+    template_data = data.extra if hasattr(data, "extra") else {}
+
     formatted = notification_service.format_message(
-        template_name,
-        phone=data.phone,
-        email=data.email,
-        **template_data
+        template_name, phone=data.phone, email=data.email, **template_data
     )
-    
+
     result = await notification_service.send(
         phone=data.phone,
         email=data.email,
-        sms=formatted.get('sms'),
-        email_body=formatted.get('email'),
-        subject=formatted.get('subject')
+        sms=formatted.get("sms"),
+        email_body=formatted.get("email"),
+        subject=formatted.get("subject"),
     )
     return result
 
@@ -670,6 +642,7 @@ async def get_notification_stats():
 
 # ==================== ROUTING & ETA MODELS ====================
 
+
 class ETARequest(BaseModel):
     responder_lat: float
     responder_lng: float
@@ -685,17 +658,14 @@ class MultipleETARequest(BaseModel):
 
 # ==================== ROUTING & ETA ENDPOINTS ====================
 
+
 @router.get("/routing/eta")
 async def calculate_eta(
-    responder_lat: float,
-    responder_lng: float,
-    incident_lat: float,
-    incident_lng: float
+    responder_lat: float, responder_lng: float, incident_lat: float, incident_lng: float
 ):
     """Calculate ETA from responder to incident"""
     return await routing_service.calculate_eta(
-        responder_lat, responder_lng,
-        incident_lat, incident_lng
+        responder_lat, responder_lng, incident_lat, incident_lng
     )
 
 
@@ -703,13 +673,12 @@ async def calculate_eta(
 async def calculate_multiple_etas(data: MultipleETARequest):
     """Calculate ETAs for multiple responders"""
     return await routing_service.get_multiple_etas(
-        data.responders,
-        data.incident_lat,
-        data.incident_lng
+        data.responders, data.incident_lat, data.incident_lng
     )
 
 
 # ==================== IOT SENSORS MODELS ====================
+
 
 class SensorConfigInput(BaseModel):
     sensor_id: str
@@ -723,11 +692,9 @@ class SensorConfigInput(BaseModel):
 
 # ==================== IOT SENSORS ENDPOINTS ====================
 
+
 @router.get("/sensors")
-async def list_sensors(
-    sensor_type: Optional[str] = None,
-    enabled_only: bool = False
-):
+async def list_sensors(sensor_type: Optional[str] = None, enabled_only: bool = False):
     """List all registered sensors"""
     sensors = mqtt_sensor_service.get_sensors(sensor_type, enabled_only)
     return {"total": len(sensors), "sensors": sensors}
@@ -737,13 +704,14 @@ async def list_sensors(
 async def register_sensor(data: SensorConfigInput):
     """Register a new sensor"""
     from services.iot_sensors import SensorConfig
+
     config = SensorConfig(
         sensor_id=data.sensor_id,
         sensor_type=data.sensor_type,
         location={"lat": data.latitude, "lng": data.longitude},
         road_name=data.road_name,
         county=data.county,
-        alert_thresholds=data.alert_thresholds or {}
+        alert_thresholds=data.alert_thresholds or {},
     )
     mqtt_sensor_service.register_sensor(config)
     return {"message": "Sensor registered", "sensor_id": data.sensor_id}
@@ -764,16 +732,14 @@ async def get_sensor_readings(sensor_id: str, limit: int = 100):
 
 
 @router.get("/sensors/readings")
-async def get_all_readings(
-    sensor_type: Optional[str] = None,
-    limit: int = 100
-):
+async def get_all_readings(sensor_type: Optional[str] = None, limit: int = 100):
     """Get all sensor readings"""
     readings = mqtt_sensor_service.get_readings(sensor_type=sensor_type, limit=limit)
     return {"total": len(readings), "readings": readings}
 
 
 # ==================== WEBRTC GATEWAY MODELS ====================
+
 
 class StreamCreateInput(BaseModel):
     user_id: str
@@ -783,13 +749,12 @@ class StreamCreateInput(BaseModel):
 
 # ==================== WEBRTC GATEWAY ENDPOINTS ====================
 
+
 @router.post("/webrtc/stream")
 async def create_stream(data: StreamCreateInput):
     """Create a new citizen stream"""
     return await webrtc_gateway.create_stream(
-        user_id=data.user_id,
-        latitude=data.latitude,
-        longitude=data.longitude
+        user_id=data.user_id, latitude=data.latitude, longitude=data.longitude
     )
 
 
@@ -826,6 +791,7 @@ async def get_stream(stream_id: str):
 
 # ==================== BEHAVIOR ANALYSIS MODELS ====================
 
+
 class CameraCalibrationInput(BaseModel):
     camera_id: str
     road_name: str = ""
@@ -839,10 +805,12 @@ class CameraCalibrationInput(BaseModel):
 
 # ==================== BEHAVIOR ANALYSIS ENDPOINTS ====================
 
+
 @router.post("/ai/calibration")
 async def create_calibration(data: CameraCalibrationInput):
     """Create camera calibration for speed estimation"""
     from services.ai.behavior_analysis import CameraCalibration
+
     calibration = CameraCalibration(
         camera_id=data.camera_id,
         road_name=data.road_name,
@@ -851,7 +819,7 @@ async def create_calibration(data: CameraCalibrationInput):
         lng=data.longitude,
         mounting_height=data.mounting_height,
         lane_width=data.lane_width,
-        orientation=data.orientation
+        orientation=data.orientation,
     )
     get_or_create_calibration(data.camera_id)
     return {"message": "Calibration created", "camera_id": data.camera_id}
@@ -861,6 +829,7 @@ async def create_calibration(data: CameraCalibrationInput):
 async def get_calibration(camera_id: str):
     """Get camera calibration"""
     from services.ai.behavior_analysis import CAMERA_CALIBRATIONS
+
     if camera_id not in CAMERA_CALIBRATIONS:
         raise HTTPException(status_code=404, detail="Calibration not found")
     cal = CAMERA_CALIBRATIONS[camera_id]
@@ -872,7 +841,7 @@ async def get_calibration(camera_id: str):
         "longitude": cal.lng,
         "mounting_height": cal.mounting_height,
         "lane_width": cal.lane_width,
-        "orientation": cal.orientation
+        "orientation": cal.orientation,
     }
 
 
@@ -880,14 +849,15 @@ async def get_calibration(camera_id: str):
 async def list_calibrations():
     """List all camera calibrations"""
     from services.ai.behavior_analysis import CAMERA_CALIBRATIONS
+
     return {
         "total": len(CAMERA_CALIBRATIONS),
         "calibrations": [
             {
                 "camera_id": cal.camera_id,
                 "road_name": cal.road_name,
-                "speed_limit": cal.speed_limit
+                "speed_limit": cal.speed_limit,
             }
             for cal in CAMERA_CALIBRATIONS.values()
-        ]
+        ],
     }

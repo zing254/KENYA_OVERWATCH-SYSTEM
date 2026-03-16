@@ -3,19 +3,19 @@ Kenya Overwatch Offence Engine
 Traffic violation and offence management
 """
 
-import hashlib
 import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class OffenceType(Enum):
     """Traffic offence types"""
+
     SPEEDING = "speeding"
     RED_LIGHT = "red_light"
     STOP_SIGN = "stop_sign"
@@ -33,6 +33,7 @@ class OffenceType(Enum):
 
 class OffenceStatus(Enum):
     """Offence status"""
+
     DETECTED = "detected"
     REVIEWED = "reviewed"
     ISSUED = "issued"
@@ -44,6 +45,7 @@ class OffenceStatus(Enum):
 @dataclass
 class Offence:
     """Offence record"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:12])
     offence_type: OffenceType = OffenceType.SPEEDING
     status: OffenceStatus = OffenceStatus.DETECTED
@@ -61,7 +63,7 @@ class Offence:
     paid_at: Optional[datetime] = None
     officer_id: Optional[str] = None
     notes: str = ""
-    
+
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
@@ -86,7 +88,7 @@ class Offence:
 
 class OffenceEngine:
     """Traffic offence management engine"""
-    
+
     def __init__(self):
         self.offences: Dict[str, Offence] = {}
         self.fine_schedule = self._initialize_fine_schedule()
@@ -96,7 +98,7 @@ class OffenceEngine:
             "total_paid": 0,
             "total_disputed": 0,
         }
-    
+
     def _initialize_fine_schedule(self) -> Dict[OffenceType, Dict]:
         """Initialize fine schedule"""
         return {
@@ -114,7 +116,7 @@ class OffenceEngine:
             OffenceType.OVERLOADING: {"base": 5000, "max": 50000},
             OffenceType.NO_HELMET: {"base": 1000, "max": 3000},
         }
-    
+
     def detect_offence(
         self,
         offence_type: OffenceType,
@@ -137,24 +139,29 @@ class OffenceEngine:
             limit=limit,
             evidence_image=evidence_image,
         )
-        
+
         fine_info = self.fine_schedule.get(offence_type, {"base": 3000, "max": 10000})
-        
+
         if offence_type == OffenceType.SPEEDING and speed and limit:
             excess = speed - limit
-            offence.fine_amount = min(fine_info["base"] + excess * fine_info.get("per_km", 0), fine_info["max"])
+            offence.fine_amount = min(
+                fine_info["base"] + excess * fine_info.get("per_km", 0),
+                fine_info["max"],
+            )
         else:
             offence.fine_amount = fine_info["base"]
-        
+
         offence.points = self._get_point_value(offence_type)
-        
+
         self.offences[offence.id] = offence
         self.stats["total_detected"] += 1
-        
-        logger.info(f"Offence detected: {offence.id} - {offence_type.value} for {plate_number}")
-        
+
+        logger.info(
+            f"Offence detected: {offence.id} - {offence_type.value} for {plate_number}"
+        )
+
         return offence
-    
+
     def _get_point_value(self, offence_type: OffenceType) -> int:
         """Get point value for offence"""
         points = {
@@ -173,13 +180,15 @@ class OffenceEngine:
             OffenceType.NO_HELMET: 2,
         }
         return points.get(offence_type, 3)
-    
-    def review_offence(self, offence_id: str, officer_id: str, approved: bool, notes: str = "") -> Optional[Offence]:
+
+    def review_offence(
+        self, offence_id: str, officer_id: str, approved: bool, notes: str = ""
+    ) -> Optional[Offence]:
         """Review an offence"""
         offence = self.offences.get(offence_id)
         if not offence:
             return None
-        
+
         if approved:
             offence.status = OffenceStatus.ISSUED
             offence.issued_at = datetime.now()
@@ -187,39 +196,39 @@ class OffenceEngine:
             self.stats["total_issued"] += 1
         else:
             offence.status = OffenceStatus.CANCELLED
-        
+
         offence.notes = notes
-        
+
         return offence
-    
+
     def record_payment(self, offence_id: str) -> Optional[Offence]:
         """Record payment for offence"""
         offence = self.offences.get(offence_id)
         if not offence:
             return None
-        
+
         offence.status = OffenceStatus.PAID
         offence.paid_at = datetime.now()
         self.stats["total_paid"] += 1
-        
+
         return offence
-    
+
     def dispute_offence(self, offence_id: str, reason: str) -> Optional[Offence]:
         """Dispute an offence"""
         offence = self.offences.get(offence_id)
         if not offence:
             return None
-        
+
         offence.status = OffenceStatus.DISPUTED
         offence.notes += f"\\nDispute: {reason}"
         self.stats["total_disputed"] += 1
-        
+
         return offence
-    
+
     def get_offence(self, offence_id: str) -> Optional[Offence]:
         """Get offence by ID"""
         return self.offences.get(offence_id)
-    
+
     def get_offences(
         self,
         status: Optional[OffenceStatus] = None,
@@ -228,33 +237,39 @@ class OffenceEngine:
     ) -> List[Offence]:
         """Get offences with filters"""
         results = list(self.offences.values())
-        
+
         if status:
             results = [o for o in results if o.status == status]
         if plate_number:
             results = [o for o in results if o.plate_number == plate_number]
-        
+
         results.sort(key=lambda o: o.detected_at, reverse=True)
-        
+
         return results[:limit]
-    
+
     def get_stats(self) -> Dict:
         """Get offence statistics"""
         return {
             **self.stats,
             "total_offences": len(self.offences),
-            "pending_review": len([o for o in self.offences.values() if o.status == OffenceStatus.DETECTED]),
+            "pending_review": len(
+                [
+                    o
+                    for o in self.offences.values()
+                    if o.status == OffenceStatus.DETECTED
+                ]
+            ),
             "by_type": self._get_by_type(),
             "by_status": self._get_by_status(),
         }
-    
+
     def _get_by_type(self) -> Dict:
         by_type = {}
         for offence in self.offences.values():
             ot = offence.offence_type.value
             by_type[ot] = by_type.get(ot, 0) + 1
         return by_type
-    
+
     def _get_by_status(self) -> Dict:
         by_status = {}
         for offence in self.offences.values():

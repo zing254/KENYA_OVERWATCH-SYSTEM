@@ -39,14 +39,14 @@ class Permission:
     def to_dict(self) -> dict:
         return {
             "resource": self.resource.value,
-            "actions": [a.value for a in self.actions]
+            "actions": [a.value for a in self.actions],
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Permission":
         return cls(
             resource=ResourceType(data["resource"]),
-            actions={Action(a) for a in data["actions"]}
+            actions={Action(a) for a in data["actions"]},
         )
 
 
@@ -72,14 +72,18 @@ class Role:
             "description": self.description,
             "permissions": [p.to_dict() for p in self.permissions],
             "is_system_role": self.is_system_role,
-            "created_at": self.created_at.isoformat()
+            "created_at": self.created_at.isoformat(),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Role":
         data = data.copy()
-        data["permissions"] = [Permission.from_dict(p) for p in data.get("permissions", [])]
-        data["created_at"] = datetime.fromisoformat(data.get("created_at", datetime.now().isoformat()))
+        data["permissions"] = [
+            Permission.from_dict(p) for p in data.get("permissions", [])
+        ]
+        data["created_at"] = datetime.fromisoformat(
+            data.get("created_at", datetime.now().isoformat())
+        )
         return cls(**data)
 
 
@@ -120,14 +124,18 @@ class User:
             "created_at": self.created_at.isoformat(),
             "last_login": self.last_login.isoformat() if self.last_login else None,
             "failed_login_attempts": self.failed_login_attempts,
-            "locked_until": self.locked_until.isoformat() if self.locked_until else None
+            "locked_until": (
+                self.locked_until.isoformat() if self.locked_until else None
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "User":
         data = data.copy()
         data["status"] = UserStatus(data.get("status", "active"))
-        data["created_at"] = datetime.fromisoformat(data.get("created_at", datetime.now().isoformat()))
+        data["created_at"] = datetime.fromisoformat(
+            data.get("created_at", datetime.now().isoformat())
+        )
         if data.get("last_login"):
             data["last_login"] = datetime.fromisoformat(data["last_login"])
         if data.get("locked_until"):
@@ -143,14 +151,32 @@ class IAMManager:
             "description": "Full system access",
             "is_system_role": True,
             "permissions": [
-                {"resource": "incident", "actions": ["create", "read", "update", "delete"]},
-                {"resource": "camera", "actions": ["create", "read", "update", "delete"]},
-                {"resource": "report", "actions": ["create", "read", "update", "delete"]},
+                {
+                    "resource": "incident",
+                    "actions": ["create", "read", "update", "delete"],
+                },
+                {
+                    "resource": "camera",
+                    "actions": ["create", "read", "update", "delete"],
+                },
+                {
+                    "resource": "report",
+                    "actions": ["create", "read", "update", "delete"],
+                },
                 {"resource": "user", "actions": ["create", "read", "update", "delete"]},
-                {"resource": "dispatch", "actions": ["create", "read", "update", "delete"]},
-                {"resource": "analytics", "actions": ["create", "read", "update", "delete"]},
-                {"resource": "admin", "actions": ["create", "read", "update", "delete"]},
-            ]
+                {
+                    "resource": "dispatch",
+                    "actions": ["create", "read", "update", "delete"],
+                },
+                {
+                    "resource": "analytics",
+                    "actions": ["create", "read", "update", "delete"],
+                },
+                {
+                    "resource": "admin",
+                    "actions": ["create", "read", "update", "delete"],
+                },
+            ],
         },
         "dispatcher": {
             "role_id": "dispatcher",
@@ -163,7 +189,7 @@ class IAMManager:
                 {"resource": "report", "actions": ["create", "read"]},
                 {"resource": "dispatch", "actions": ["create", "read", "update"]},
                 {"resource": "analytics", "actions": ["read"]},
-            ]
+            ],
         },
         "officer": {
             "role_id": "officer",
@@ -175,7 +201,7 @@ class IAMManager:
                 {"resource": "camera", "actions": ["read"]},
                 {"resource": "report", "actions": ["create", "read"]},
                 {"resource": "dispatch", "actions": ["read", "update"]},
-            ]
+            ],
         },
         "viewer": {
             "role_id": "viewer",
@@ -187,8 +213,8 @@ class IAMManager:
                 {"resource": "camera", "actions": ["read"]},
                 {"resource": "report", "actions": ["read"]},
                 {"resource": "analytics", "actions": ["read"]},
-            ]
-        }
+            ],
+        },
     }
 
     def __init__(self, storage_path: str = "data/iam"):
@@ -243,28 +269,30 @@ class IAMManager:
         with open(users_file, "w") as f:
             json.dump(data, f, indent=2)
 
-    def create_user(self, username: str, email: str, password_hash: str, role_id: str, **kwargs) -> User:
+    def create_user(
+        self, username: str, email: str, password_hash: str, role_id: str, **kwargs
+    ) -> User:
         if any(u.username == username for u in self.users.values()):
             raise ValueError(f"Username {username} already exists")
-        
+
         if any(u.email == email for u in self.users.values()):
             raise ValueError(f"Email {email} already exists")
-        
+
         if role_id not in self.roles:
             raise ValueError(f"Role {role_id} does not exist")
-        
+
         user = User(
             user_id=str(uuid.uuid4()),
             username=username,
             email=email,
             password_hash=password_hash,
             role_id=role_id,
-            **kwargs
+            **kwargs,
         )
-        
+
         self.users[user.user_id] = user
         self._save_users()
-        
+
         return user
 
     def get_user(self, user_id: str) -> Optional[User]:
@@ -279,12 +307,12 @@ class IAMManager:
     def update_user(self, user_id: str, **kwargs) -> Optional[User]:
         if user_id not in self.users:
             return None
-        
+
         user = self.users[user_id]
         for key, value in kwargs.items():
             if hasattr(user, key):
                 setattr(user, key, value)
-        
+
         self._save_users()
         return user
 
@@ -295,19 +323,18 @@ class IAMManager:
             return True
         return False
 
-    def create_role(self, name: str, description: str, permissions: List[Permission]) -> Role:
+    def create_role(
+        self, name: str, description: str, permissions: List[Permission]
+    ) -> Role:
         role_id = name.lower().replace(" ", "_")
-        
+
         role = Role(
-            role_id=role_id,
-            name=name,
-            description=description,
-            permissions=permissions
+            role_id=role_id, name=name, description=description, permissions=permissions
         )
-        
+
         self.roles[role_id] = role
         self._save_roles()
-        
+
         return role
 
     def get_role(self, role_id: str) -> Optional[Role]:
@@ -316,18 +343,20 @@ class IAMManager:
     def assign_role(self, user_id: str, role_id: str) -> bool:
         if user_id not in self.users or role_id not in self.roles:
             return False
-        
+
         self.users[user_id].role_id = role_id
         self._save_users()
         return True
 
-    def check_permission(self, user_id: str, resource: ResourceType, action: Action) -> bool:
+    def check_permission(
+        self, user_id: str, resource: ResourceType, action: Action
+    ) -> bool:
         user = self.get_user(user_id)
         if not user or user.status != UserStatus.ACTIVE:
             return False
-        
+
         role = self.get_role(user.role_id)
         if not role:
             return False
-        
+
         return role.has_permission(resource, action)

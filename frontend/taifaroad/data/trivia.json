@@ -1,0 +1,72 @@
+[
+  {
+    "id": "q1",
+    "question": "What is the speed limit in urban areas in Kenya?",
+    "options": ["30 km/h", "50 km/h", "60 km/h", "80 km/h"],
+    "correct": 1,
+    "explanation": "The speed limit in urban areas in Kenya is 50 km/h as per the Traffic Act."
+  },
+  {
+    "id": "q2",
+    "question": "What is the emergency number for police in Kenya?",
+    "options": ["112", "911", "999", "Both 999 and 112"],
+    "correct": 3,
+    "explanation": "Both 999 and 112 are emergency numbers in Kenya for police, ambulance, and fire services."
+  },
+  {
+    "id": "q3",
+    "question": "Is wearing a seatbelt mandatory for all car occupants in Kenya?",
+    "options": ["Only for driver", "Only front seats", "All occupants", "Only on highways"],
+    "correct": 2,
+    "explanation": "Seatbelts are mandatory for ALL occupants in a vehicle in Kenya."
+  },
+  {
+    "id": "q4",
+    "question": "What side of the road do Kenyans drive on?",
+    "options": ["Right", "Left", "Either", "Depends on the road"],
+    "correct": 1,
+    "explanation": "Kenya drives on the LEFT side of the road, with the steering wheel on the right."
+  },
+  {
+    "id": "q5",
+    "question": "What is the fine for using a mobile phone while driving?",
+    "options": ["KSh 1,000", "KSh 2,000", "KSh 5,000", "KSh 10,000"],
+    "correct": 1,
+    "explanation": "Using a mobile phone while driving carries a fine of KSh 2,000 under the instant fines system."
+  },
+  {
+    "id": "q6",
+    "question": "How many demerit points lead to license suspension?",
+    "options": ["10 points", "15 points", "20 points", "25 points"],
+    "correct": 2,
+    "explanation": "20 demerit points on a driving record leads to license suspension under the NTSA system."
+  },
+  {
+    "id": "q7",
+    "question": "What is the Blood Alcohol Concentration (BAC) limit for drivers in Kenya?",
+    "options": ["0.05%", "0.08%", "0.10%", "Zero tolerance"],
+    "correct": 1,
+    "explanation": "The BAC limit in Kenya is 0.08% (0.35 mg per liter of breath)."
+  },
+  {
+    "id": "q8",
+    "question": "What should you do immediately after a traffic accident?",
+    "options": ["Drive away", "Stop and call police", "Move the vehicle", "Argue with the other driver"],
+    "correct": 1,
+    "explanation": "You must stop immediately and call emergency services. Leaving the scene is a criminal offence."
+  },
+  {
+    "id": "q9",
+    "question": "What is the speed limit on Kenyan highways for private vehicles?",
+    "options": ["80 km/h", "100 km/h", "110 km/h", "120 km/h"],
+    "correct": 2,
+    "explanation": "The speed limit on highways is 110 km/h for private motor vehicles."
+  },
+  {
+    "id": "q10",
+    "question": "Is wearing a helmet mandatory for motorcycle passengers in Kenya?",
+    "options": ["Only for the rider", "Only on highways", "Yes, for all", "No, it's optional"],
+    "correct": 2,
+    "explanation": "Helmets are mandatory for BOTH the rider and passenger on motorcycles."
+  }
+]

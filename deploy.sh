@@ -89,6 +89,11 @@ build_and_push_images() {
     
     cd ../..
     log_success "Images built and pushed successfully"
+    # Run migrations if Alembic is configured
+    if [ -f backend/migrate.py ]; then
+        log_info "Running Alembic migrations (backend/migrate.py) ..."
+        python backend/migrate.py || true
+    fi
 }
 
 # ==================== CREATE KUBERNETES RESOURCES ====================

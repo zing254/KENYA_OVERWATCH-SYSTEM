@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Layout from '@/components/Layout'
 import RoadSafetyDashboard from '@/components/RoadSafetyDashboard'
+import KenyaHero from '@/components/KenyaHero'
 import useAuthStore from '@/store/auth'
 
 export default function Home() {
@@ -31,6 +32,7 @@ export default function Home() {
 
   return (
     <Layout title="KENYA OVERWATCH SYSTEM - Command Center">
+      <KenyaHero />
       <RoadSafetyDashboard />
     </Layout>
   )

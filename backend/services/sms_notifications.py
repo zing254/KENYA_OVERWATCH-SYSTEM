@@ -6,7 +6,7 @@ Integrates with various SMS gateways for sending alerts and notifications
 import asyncio
 import random
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 from enum import Enum
 import logging
 
@@ -30,22 +30,24 @@ class MessageType(str, Enum):
 
 class SMSService:
     """SMS notification service for NTSA Road Safety"""
-    
+
     def __init__(self, provider: SMSProvider = SMSProvider.DUMMY):
         self.provider = provider
         self.sent_messages = []
         self.api_key = ""
         self.username = ""
         self.sender_id = "NTSA"
-        
+
     def configure(self, api_key: str, username: str, sender_id: str = "NTSA"):
         """Configure SMS provider credentials"""
         self.api_key = api_key
         self.username = username
         self.sender_id = sender_id
         logger.info(f"SMS Service configured with provider: {self.provider}")
-    
-    async def send_sms(self, phone: str, message: str, message_type: MessageType = MessageType.ALERT) -> dict:
+
+    async def send_sms(
+        self, phone: str, message: str, message_type: MessageType = MessageType.ALERT
+    ) -> dict:
         """Send SMS to a single recipient"""
         # Format phone number (Kenyan format)
         if phone.startswith("+"):
@@ -54,9 +56,9 @@ class SMSService:
             phone = "254" + phone[1:]
         if not phone.startswith("254"):
             phone = "254" + phone
-        
+
         msg_id = f"sms_{random.randint(100000, 999999)}"
-        
+
         # In production, integrate with actual SMS provider
         if self.provider == SMSProvider.DUMMY:
             # Simulate SMS sending
@@ -68,7 +70,7 @@ class SMSService:
                 "status": "sent",
                 "message": message,
                 "message_type": message_type.value,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         else:
             # Real provider integration would go here
@@ -79,15 +81,20 @@ class SMSService:
                 "status": "sent",
                 "message": message,
                 "message_type": message_type.value,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-        
+
         self.sent_messages.append(result)
         logger.info(f"SMS sent to {phone}: {message[:50]}...")
-        
+
         return result
-    
-    async def send_bulk_sms(self, phones: List[str], message: str, message_type: MessageType = MessageType.ALERT) -> dict:
+
+    async def send_bulk_sms(
+        self,
+        phones: List[str],
+        message: str,
+        message_type: MessageType = MessageType.ALERT,
+    ) -> dict:
         """Send SMS to multiple recipients"""
         results = []
         for phone in phones:
@@ -97,57 +104,72 @@ class SMSService:
             except Exception as e:
                 logger.error(f"Failed to send SMS to {phone}: {str(e)}")
                 results.append({"phone": phone, "success": False, "error": str(e)})
-        
+
         return {
             "total": len(phones),
             "successful": len([r for r in results if r.get("success")]),
             "failed": len([r for r in results if not r.get("success")]),
-            "results": results
+            "results": results,
         }
-    
-    async def send_violation_notice(self, phone: str, plate_number: str, violation_type: str, fine_amount: float, notice_id: str) -> dict:
+
+    async def send_violation_notice(
+        self,
+        phone: str,
+        plate_number: str,
+        violation_type: str,
+        fine_amount: float,
+        notice_id: str,
+    ) -> dict:
         """Send violation notice to vehicle owner"""
         message = f"NTSA: You have been issued a notice for {violation_type.replace('_', ' ').title()} on {datetime.now().strftime('%Y-%m-%d')}. Plate: {plate_number}. Fine: KES {int(fine_amount)}. Notice ID: {notice_id}. Pay within 30 days to avoid penalty."
         return await self.send_sms(phone, message, MessageType.VIOLATION)
-    
-    async def send_accident_alert(self, phone: str, severity: str, location: str) -> dict:
+
+    async def send_accident_alert(
+        self, phone: str, severity: str, location: str
+    ) -> dict:
         """Send accident alert"""
         message = f"NTSA ALERT: Accident reported at {location}. Severity: {severity.upper()}. Emergency services have been dispatched. For assistance, call 999."
         return await self.send_sms(phone, message, MessageType.ALERT)
-    
-    async def send_dispatch_notification(self, phone: str, team_name: str, location: str, eta: str) -> dict:
+
+    async def send_dispatch_notification(
+        self, phone: str, team_name: str, location: str, eta: str
+    ) -> dict:
         """Send dispatch notification to response team"""
         message = f"NTSA DISPATCH: {team_name} - Respond to {location}. ETA: {eta}. Check mobile app for details."
         return await self.send_sms(phone, message, MessageType.DISPATCH)
-    
+
     async def send_emergency_alert(self, phones: List[str], message: str) -> dict:
         """Send emergency alert to multiple recipients"""
         full_message = f"NTSA EMERGENCY ALERT: {message}. Stay safe. Call 999 for emergency services."
         return await self.send_bulk_sms(phones, full_message, MessageType.EMERGENCY)
-    
+
     async def send_reminder(self, phone: str, message: str) -> dict:
         """Send reminder notification"""
         full_message = f"NTSA REMINDER: {message}"
         return await self.send_sms(phone, full_message, MessageType.REMINDER)
-    
+
     async def send_verification_code(self, phone: str, code: str) -> dict:
         """Send verification code"""
         message = f"NTSA: Your verification code is {code}. This code expires in 10 minutes. Do not share this code."
         return await self.send_sms(phone, message, MessageType.VERIFICATION)
-    
+
     def get_message_history(self, limit: int = 100) -> List[dict]:
         """Get SMS message history"""
         return self.sent_messages[-limit:]
-    
+
     def get_statistics(self) -> dict:
         """Get SMS sending statistics"""
         return {
             "total_sent": len(self.sent_messages),
-            "successful": len([m for m in self.sent_messages if m.get("status") == "sent"]),
+            "successful": len(
+                [m for m in self.sent_messages if m.get("status") == "sent"]
+            ),
             "by_type": {
-                mt.value: len([m for m in self.sent_messages if m.get("message_type") == mt.value])
+                mt.value: len(
+                    [m for m in self.sent_messages if m.get("message_type") == mt.value]
+                )
                 for mt in MessageType
-            }
+            },
         }
 
 
@@ -169,14 +191,14 @@ async def send_violation_notification(violation_data: dict, phone: str) -> dict:
     """Send violation notification using template"""
     vtype = violation_data.get("violation_type", "speeding")
     template = VIOLATION_TEMPLATES.get(vtype, VIOLATION_TEMPLATES["speeding"])
-    
+
     message = template.format(
         date=datetime.now().strftime("%Y-%m-%d"),
         location=violation_data.get("location", "Unknown"),
         speed=violation_data.get("speed_detected", "N/A"),
         limit=violation_data.get("speed_limit", "N/A"),
         fine=violation_data.get("fine_amount", 0),
-        notice_id=violation_data.get("id", "N/A")
+        notice_id=violation_data.get("id", "N/A"),
     )
-    
+
     return await sms_service.send_sms(phone, message, MessageType.VIOLATION)

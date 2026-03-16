@@ -3,11 +3,20 @@ Kenya NTSA Road Safety - Database Layer
 SQLAlchemy-based database with SQLite for local development
 """
 
-from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Integer,
+    Float,
+    Boolean,
+    DateTime,
+    Text,
+)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, Session
+from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timezone
-from typing import Optional, List, Generator
+from typing import Generator
 import os
 import logging
 
@@ -23,19 +32,19 @@ if DATABASE_URL.startswith("sqlite"):
         connect_args={"check_same_thread": False},
         echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
         pool_pre_ping=True,  # Check connections before using
-        pool_recycle=3600,   # Recycle connections after 1 hour
+        pool_recycle=3600,  # Recycle connections after 1 hour
     )
 else:
     # Production PostgreSQL with optimized pool settings
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,           # Number of connections to keep open
-        max_overflow=30,        # Additional connections beyond pool_size
-        pool_timeout=30,        # Timeout for getting a connection from pool
-        pool_recycle=1800,     # Recycle connections every 30 minutes
-        pool_pre_ping=True,    # Check connections before using
+        pool_size=20,  # Number of connections to keep open
+        max_overflow=30,  # Additional connections beyond pool_size
+        pool_timeout=30,  # Timeout for getting a connection from pool
+        pool_recycle=1800,  # Recycle connections every 30 minutes
+        pool_pre_ping=True,  # Check connections before using
         echo=os.environ.get("SQL_ECHO", "false").lower() == "true",
-        future=True            # Use SQLAlchemy 2.0 style
+        future=True,  # Use SQLAlchemy 2.0 style
     )
 
 # Create session factory with expire_on_commit=False for better performance
@@ -43,7 +52,7 @@ SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine,
-    expire_on_commit=False  # Improves performance by not expiring objects
+    expire_on_commit=False,  # Improves performance by not expiring objects
 )
 
 # Create base class
@@ -53,7 +62,7 @@ Base = declarative_base()
 # ==================== DATABASE MODELS ====================
 class User(Base):
     __tablename__ = "users"
-    
+
     id = Column(String, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
@@ -73,7 +82,7 @@ class User(Base):
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
-    
+
     id = Column(String, primary_key=True, index=True)
     plate_number = Column(String, unique=True, index=True, nullable=False)
     vehicle_type = Column(String, nullable=False)
@@ -93,7 +102,7 @@ class Vehicle(Base):
 
 class Driver(Base):
     __tablename__ = "drivers"
-    
+
     id = Column(String, primary_key=True, index=True)
     license_number = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
@@ -108,7 +117,7 @@ class Driver(Base):
 
 class Accident(Base):
     __tablename__ = "accidents"
-    
+
     id = Column(String, primary_key=True, index=True)
     accident_type = Column(String, nullable=False)
     cause = Column(String, nullable=False)
@@ -130,7 +139,7 @@ class Accident(Base):
 
 class Violation(Base):
     __tablename__ = "violations"
-    
+
     id = Column(String, primary_key=True, index=True)
     violation_type = Column(String, nullable=False)
     plate_number = Column(String, index=True, nullable=False)
@@ -157,7 +166,7 @@ class Violation(Base):
 
 class Camera(Base):
     __tablename__ = "cameras"
-    
+
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
     location = Column(String, nullable=False)
@@ -173,7 +182,7 @@ class Camera(Base):
 
 class Team(Base):
     __tablename__ = "teams"
-    
+
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
     team_type = Column(String, nullable=False)
@@ -188,7 +197,7 @@ class Team(Base):
 
 class Alert(Base):
     __tablename__ = "alerts"
-    
+
     id = Column(String, primary_key=True, index=True)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
@@ -203,7 +212,7 @@ class Alert(Base):
 
 class CitizenReport(Base):
     __tablename__ = "citizen_reports"
-    
+
     id = Column(String, primary_key=True, index=True)
     report_type = Column(String, nullable=False)
     description = Column(Text, nullable=False)
@@ -220,7 +229,7 @@ class CitizenReport(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-    
+
     id = Column(String, primary_key=True, index=True)
     event = Column(String, nullable=False)
     user_id = Column(String, nullable=True)
@@ -248,16 +257,16 @@ def init_db():
 def seed_demo_data():
     """Seed demo data for development"""
     from passlib.context import CryptContext
-    
+
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    
+
     db = SessionLocal()
     try:
         # Check if data already exists
         if db.query(User).first():
             logger.info("Database already has data, skipping seed")
             return
-        
+
         # Create demo users
         users = [
             User(
@@ -273,7 +282,7 @@ def seed_demo_data():
                 phone="+254709932000",
                 status="active",
                 is_active=True,
-                is_verified=True
+                is_verified=True,
             ),
             User(
                 id="officer_001",
@@ -288,15 +297,15 @@ def seed_demo_data():
                 phone="+254700123456",
                 status="active",
                 is_active=True,
-                is_verified=True
+                is_verified=True,
             ),
         ]
-        
+
         db.add_all(users)
         db.commit()
-        
+
         logger.info("Demo data seeded successfully")
-        
+
     except Exception as e:
         logger.error(f"Error seeding data: {e}")
         db.rollback()
@@ -304,5 +313,15 @@ def seed_demo_data():
         db.close()
 
 
-# Initialize on import
-init_db()
+# Initialize on import only if explicitly requested (default: skip)
+if os.environ.get("INIT_DB", "0").lower() in {"1", "true", "yes"}:
+    init_db()
+    # Optional: seed demo data for development when explicitly requested
+    try:
+        seed_demo_data()
+    except Exception:
+        logger.warning("Failed to seed demo data (non-fatal in prod)")
+else:
+    logger.info(
+        "DB initialization skipped; migrations (Alembic) should manage schema in production."
+    )

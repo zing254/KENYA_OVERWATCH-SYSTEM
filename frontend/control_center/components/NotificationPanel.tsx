@@ -20,6 +20,30 @@ const defaultSounds: Record<string, string> = {
   speed_camera: '/sounds/speed_camera.mp3',
 }
 
+// Fallback beep when audio assets are not available in the environment
+const playBeep = (volume: number = 1.0) => {
+  if (typeof window === 'undefined' || volume <= 0) return
+  try {
+    const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.frequency.value = 880
+    osc.type = 'sine'
+    gain.gain.value = Math.max(0, Math.min(1, volume))
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    setTimeout(() => {
+      osc.stop()
+      ctx.close()
+    }, 120)
+  } catch {
+    // ignore if Web Audio API is not available
+  }
+}
+
 const playSound = (soundType: string, volume: number = 1.0, enabled: boolean = true) => {
   if (!enabled || typeof window === 'undefined') return
 
@@ -27,7 +51,16 @@ const playSound = (soundType: string, volume: number = 1.0, enabled: boolean = t
   if (soundPath) {
     const audio = new Audio(soundPath)
     audio.volume = Math.max(0, Math.min(1, volume))
-    audio.play().catch(e => console.error('Error playing sound:', e))
+    const playPromise = audio.play()
+    if (playPromise && typeof (playPromise as any).catch === 'function') {
+      playPromise.catch(() => {
+        // Fallback to a quick beep if the audio asset can't be played
+        playBeep(volume)
+      })
+    }
+  } else {
+    // Fallback beep if no asset is configured for this sound type
+    playBeep(volume)
   }
 }
 
