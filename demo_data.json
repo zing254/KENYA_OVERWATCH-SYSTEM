@@ -1,0 +1,676 @@
+{
+  "generated_at": "2026-03-16T15:00:14.958769",
+  "vehicles": [
+    {
+      "plate_number": "KDG 664B",
+      "vehicle_type": "motorcycle",
+      "make": "Mazda",
+      "model": "Demio",
+      "year": 2021,
+      "color": "White",
+      "owner_name": "Lucy Naliaka"
+    },
+    {
+      "plate_number": "KDF 114S",
+      "vehicle_type": "car",
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2020,
+      "color": "Blue",
+      "owner_name": "David Auma"
+    },
+    {
+      "plate_number": "KDF 621R",
+      "vehicle_type": "motorcycle",
+      "make": "Nissan",
+      "model": "Note",
+      "year": 2011,
+      "color": "White",
+      "owner_name": "George Naliaka"
+    },
+    {
+      "plate_number": "KDB 298C",
+      "vehicle_type": "car",
+      "make": "Toyota",
+      "model": "Hilux",
+      "year": 2021,
+      "color": "Silver",
+      "owner_name": "Catherine Maina"
+    },
+    {
+      "plate_number": "KDD 339J",
+      "vehicle_type": "motorcycle",
+      "make": "Volkswagen",
+      "model": "Tiguan",
+      "year": 2013,
+      "color": "Green",
+      "owner_name": "Ruth Adhiambo"
+    },
+    {
+      "plate_number": "KDC 695A",
+      "vehicle_type": "motorcycle",
+      "make": "Mazda",
+      "model": "Demio",
+      "year": 2019,
+      "color": "Blue",
+      "owner_name": "Alice Nasimiyu"
+    },
+    {
+      "plate_number": "KDB 116V",
+      "vehicle_type": "motorcycle",
+      "make": "Subaru",
+      "model": "Outback",
+      "year": 2015,
+      "color": "Grey",
+      "owner_name": "Mercy Njoroge"
+    },
+    {
+      "plate_number": "KDA 542D",
+      "vehicle_type": "truck",
+      "make": "Isuzu",
+      "model": "NPR",
+      "year": 2022,
+      "color": "Grey",
+      "owner_name": "Brian Wanza"
+    },
+    {
+      "plate_number": "KDF 679R",
+      "vehicle_type": "truck",
+      "make": "Toyota",
+      "model": "Corolla",
+      "year": 2024,
+      "color": "Brown",
+      "owner_name": "Lucy Njeri"
+    },
+    {
+      "plate_number": "KDF 192G",
+      "vehicle_type": "truck",
+      "make": "Subaru",
+      "model": "Impreza",
+      "year": 2015,
+      "color": "Grey",
+      "owner_name": "Mercy Muthoni"
+    },
+    {
+      "plate_number": "KDA 117L",
+      "vehicle_type": "truck",
+      "make": "Subaru",
+      "model": "Forester",
+      "year": 2016,
+      "color": "Grey",
+      "owner_name": "Lucy Naliaka"
+    },
+    {
+      "plate_number": "KDE 635C",
+      "vehicle_type": "truck",
+      "make": "Honda",
+      "model": "CR-V",
+      "year": 2023,
+      "color": "Silver",
+      "owner_name": "Samuel Wanjiku"
+    },
+    {
+      "plate_number": "KDJ 335H",
+      "vehicle_type": "truck",
+      "make": "Volkswagen",
+      "model": "Tiguan",
+      "year": 2020,
+      "color": "Brown",
+      "owner_name": "Rose Awino"
+    },
+    {
+      "plate_number": "KDF 654H",
+      "vehicle_type": "motorcycle",
+      "make": "Mercedes-Benz",
+      "model": "E-Class",
+      "year": 2019,
+      "color": "Black",
+      "owner_name": "Joyce Adhiambo"
+    },
+    {
+      "plate_number": "KDC 111D",
+      "vehicle_type": "bus",
+      "make": "Nissan",
+      "model": "Note",
+      "year": 2013,
+      "color": "White",
+      "owner_name": "Esther Wanza"
+    },
+    {
+      "plate_number": "KDJ 947Q",
+      "vehicle_type": "truck",
+      "make": "Toyota",
+      "model": "Hilux",
+      "year": 2010,
+      "color": "Grey",
+      "owner_name": "Daniel Auma"
+    },
+    {
+      "plate_number": "KDJ 151R",
+      "vehicle_type": "truck",
+      "make": "Mazda",
+      "model": "Demio",
+      "year": 2015,
+      "color": "White",
+      "owner_name": "Rose Onyango"
+    },
+    {
+      "plate_number": "KDF 539N",
+      "vehicle_type": "car",
+      "make": "Mazda",
+      "model": "Demio",
+      "year": 2022,
+      "color": "Green",
+      "owner_name": "Alice Onyango"
+    },
+    {
+      "plate_number": "KDC 549W",
+      "vehicle_type": "bus",
+      "make": "BMW",
+      "model": "X5",
+      "year": 2017,
+      "color": "Brown",
+      "owner_name": "Francis Maina"
+    },
+    {
+      "plate_number": "KDF 344R",
+      "vehicle_type": "bus",
+      "make": "BMW",
+      "model": "3 Series",
+      "year": 2010,
+      "color": "Blue",
+      "owner_name": "Rose Wanjiku"
+    }
+  ],
+  "drivers": [
+    {
+      "license_number": "DL740912",
+      "name": "Rose Naliaka",
+      "phone": "+254774224784",
+      "date_of_birth": "1994-06-15",
+      "status": "active",
+      "total_violations": 5
+    },
+    {
+      "license_number": "DL358040",
+      "name": "Joyce Kipchoge",
+      "phone": "+254731580218",
+      "date_of_birth": "1981-03-07",
+      "status": "active",
+      "total_violations": 5
+    },
+    {
+      "license_number": "DL651039",
+      "name": "Esther Simiyu",
+      "phone": "+254739516765",
+      "date_of_birth": "1995-06-10",
+      "status": "active",
+      "total_violations": 5
+    },
+    {
+      "license_number": "DL515316",
+      "name": "Grace Naliaka",
+      "phone": "+254796328968",
+      "date_of_birth": "1993-09-05",
+      "status": "active",
+      "total_violations": 1
+    },
+    {
+      "license_number": "DL752876",
+      "name": "Alice Auma",
+      "phone": "+254778412385",
+      "date_of_birth": "1973-02-28",
+      "status": "active",
+      "total_violations": 1
+    },
+    {
+      "license_number": "DL983432",
+      "name": "Alice Kariuki",
+      "phone": "+254785939639",
+      "date_of_birth": "1985-02-11",
+      "status": "active",
+      "total_violations": 2
+    },
+    {
+      "license_number": "DL571501",
+      "name": "George Nasimiyu",
+      "phone": "+254782526946",
+      "date_of_birth": "1994-09-23",
+      "status": "suspended",
+      "total_violations": 0
+    },
+    {
+      "license_number": "DL980828",
+      "name": "Faith Naliaka",
+      "phone": "+254798904975",
+      "date_of_birth": "1979-05-20",
+      "status": "suspended",
+      "total_violations": 1
+    },
+    {
+      "license_number": "DL554493",
+      "name": "Jane Muthoni",
+      "phone": "+254769768694",
+      "date_of_birth": "1997-08-19",
+      "status": "active",
+      "total_violations": 0
+    },
+    {
+      "license_number": "DL450709",
+      "name": "Joseph Kariuki",
+      "phone": "+254771591371",
+      "date_of_birth": "1996-04-26",
+      "status": "active",
+      "total_violations": 1
+    },
+    {
+      "license_number": "DL686364",
+      "name": "Joyce Akinyi",
+      "phone": "+254743121112",
+      "date_of_birth": "1988-09-20",
+      "status": "active",
+      "total_violations": 4
+    },
+    {
+      "license_number": "DL770552",
+      "name": "Esther Mwangi",
+      "phone": "+254733492374",
+      "date_of_birth": "1978-07-26",
+      "status": "active",
+      "total_violations": 2
+    },
+    {
+      "license_number": "DL302711",
+      "name": "Brian Njoroge",
+      "phone": "+254718324935",
+      "date_of_birth": "1991-12-08",
+      "status": "suspended",
+      "total_violations": 2
+    },
+    {
+      "license_number": "DL195808",
+      "name": "Daniel Wafula",
+      "phone": "+254761083240",
+      "date_of_birth": "1997-05-17",
+      "status": "suspended",
+      "total_violations": 5
+    },
+    {
+      "license_number": "DL850855",
+      "name": "Ruth Were",
+      "phone": "+254714060317",
+      "date_of_birth": "1998-08-24",
+      "status": "active",
+      "total_violations": 2
+    }
+  ],
+  "incidents": [
+    {
+      "id": "INC-6745F16C",
+      "type": "accident",
+      "location": "Embakasi - Pipeline",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.9,
+      "severity": "medium",
+      "status": "investigating",
+      "description": "Incident reported at Embakasi - Pipeline",
+      "created_at": "2026-03-15T13:00:14.955701"
+    },
+    {
+      "id": "INC-836A1039",
+      "type": "reckless",
+      "location": "Langata Road - Bomas",
+      "road_name": "Langata Road",
+      "latitude": -1.3556,
+      "longitude": 36.7664,
+      "severity": "high",
+      "status": "investigating",
+      "description": "Incident reported at Langata Road - Bomas",
+      "created_at": "2026-03-16T14:00:14.957249"
+    },
+    {
+      "id": "INC-6A6412C1",
+      "type": "reckless",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "high",
+      "status": "investigating",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-15T18:00:14.957460"
+    },
+    {
+      "id": "INC-1DBD8A4C",
+      "type": "accident",
+      "location": "Outer Ring Road - Donholm",
+      "road_name": "Outer Ring Road",
+      "latitude": -1.285,
+      "longitude": 36.889,
+      "severity": "low",
+      "status": "resolved",
+      "description": "Incident reported at Outer Ring Road - Donholm",
+      "created_at": "2026-03-14T20:00:14.957560"
+    },
+    {
+      "id": "INC-55F650DE",
+      "type": "accident",
+      "location": "Outer Ring Road - Donholm",
+      "road_name": "Outer Ring Road",
+      "latitude": -1.285,
+      "longitude": 36.889,
+      "severity": "medium",
+      "status": "investigating",
+      "description": "Incident reported at Outer Ring Road - Donholm",
+      "created_at": "2026-03-14T02:00:14.957657"
+    },
+    {
+      "id": "INC-FAE9E148",
+      "type": "flooding",
+      "location": "Eastleigh - 1st Avenue",
+      "road_name": "Eastleigh First Avenue",
+      "latitude": -1.27,
+      "longitude": 36.85,
+      "severity": "medium",
+      "status": "investigating",
+      "description": "Incident reported at Eastleigh - 1st Avenue",
+      "created_at": "2026-03-13T20:00:14.957775"
+    },
+    {
+      "id": "INC-FF3BFD3E",
+      "type": "road_hazard",
+      "location": "Thika Road - Roysambu",
+      "road_name": "Thika Superhighway",
+      "latitude": -1.2107,
+      "longitude": 36.8865,
+      "severity": "high",
+      "status": "resolved",
+      "description": "Incident reported at Thika Road - Roysambu",
+      "created_at": "2026-03-14T11:00:14.957856"
+    },
+    {
+      "id": "INC-16A3F34F",
+      "type": "speeding",
+      "location": "Langata Road - Bomas",
+      "road_name": "Langata Road",
+      "latitude": -1.3556,
+      "longitude": 36.7664,
+      "severity": "critical",
+      "status": "investigating",
+      "description": "Incident reported at Langata Road - Bomas",
+      "created_at": "2026-03-15T01:00:14.957907"
+    },
+    {
+      "id": "INC-3335A69D",
+      "type": "accident",
+      "location": "Ngong Road - Adams Arcade",
+      "road_name": "Ngong Road",
+      "latitude": -1.3012,
+      "longitude": 36.7801,
+      "severity": "high",
+      "status": "pending",
+      "description": "Incident reported at Ngong Road - Adams Arcade",
+      "created_at": "2026-03-15T17:00:14.957958"
+    },
+    {
+      "id": "INC-E49A5E01",
+      "type": "flooding",
+      "location": "Outer Ring Road - Donholm",
+      "road_name": "Outer Ring Road",
+      "latitude": -1.285,
+      "longitude": 36.889,
+      "severity": "low",
+      "status": "pending",
+      "description": "Incident reported at Outer Ring Road - Donholm",
+      "created_at": "2026-03-16T11:00:14.958011"
+    },
+    {
+      "id": "INC-F9B54A84",
+      "type": "reckless",
+      "location": "Kileleshwa - Valley Road",
+      "road_name": "Valley Road",
+      "latitude": -1.275,
+      "longitude": 36.79,
+      "severity": "high",
+      "status": "resolved",
+      "description": "Incident reported at Kileleshwa - Valley Road",
+      "created_at": "2026-03-16T05:00:14.958090"
+    },
+    {
+      "id": "INC-BC090F31",
+      "type": "reckless",
+      "location": "Outer Ring Road - Donholm",
+      "road_name": "Outer Ring Road",
+      "latitude": -1.285,
+      "longitude": 36.889,
+      "severity": "low",
+      "status": "resolved",
+      "description": "Incident reported at Outer Ring Road - Donholm",
+      "created_at": "2026-03-15T16:00:14.958230"
+    },
+    {
+      "id": "INC-CFF69B4B",
+      "type": "reckless",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "critical",
+      "status": "investigating",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-15T09:00:14.958353"
+    },
+    {
+      "id": "INC-F6BFCF41",
+      "type": "flooding",
+      "location": "CBD - Kenyatta Avenue",
+      "road_name": "Kenyatta Avenue",
+      "latitude": -1.2833,
+      "longitude": 36.8197,
+      "severity": "medium",
+      "status": "investigating",
+      "description": "Incident reported at CBD - Kenyatta Avenue",
+      "created_at": "2026-03-14T12:00:14.958403"
+    },
+    {
+      "id": "INC-0A84A05B",
+      "type": "reckless",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "low",
+      "status": "pending",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-16T01:00:14.958439"
+    },
+    {
+      "id": "INC-88083C87",
+      "type": "reckless",
+      "location": "Uhuru Highway",
+      "road_name": "Uhuru Highway",
+      "latitude": -1.2921,
+      "longitude": 36.8155,
+      "severity": "medium",
+      "status": "investigating",
+      "description": "Incident reported at Uhuru Highway",
+      "created_at": "2026-03-15T16:00:14.958480"
+    },
+    {
+      "id": "INC-ACCCA942",
+      "type": "road_hazard",
+      "location": "Kileleshwa - Valley Road",
+      "road_name": "Valley Road",
+      "latitude": -1.275,
+      "longitude": 36.79,
+      "severity": "medium",
+      "status": "pending",
+      "description": "Incident reported at Kileleshwa - Valley Road",
+      "created_at": "2026-03-16T01:00:14.958508"
+    },
+    {
+      "id": "INC-9CDF89FF",
+      "type": "road_hazard",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "high",
+      "status": "resolved",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-15T09:00:14.958532"
+    },
+    {
+      "id": "INC-1C7FBFB5",
+      "type": "speeding",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "medium",
+      "status": "resolved",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-13T15:00:14.958559"
+    },
+    {
+      "id": "INC-75E2BC1B",
+      "type": "speeding",
+      "location": "CBD - Kenyatta Avenue",
+      "road_name": "Kenyatta Avenue",
+      "latitude": -1.2833,
+      "longitude": 36.8197,
+      "severity": "critical",
+      "status": "pending",
+      "description": "Incident reported at CBD - Kenyatta Avenue",
+      "created_at": "2026-03-13T22:00:14.958589"
+    },
+    {
+      "id": "INC-2284C274",
+      "type": "speeding",
+      "location": "CBD - Kenyatta Avenue",
+      "road_name": "Kenyatta Avenue",
+      "latitude": -1.2833,
+      "longitude": 36.8197,
+      "severity": "medium",
+      "status": "resolved",
+      "description": "Incident reported at CBD - Kenyatta Avenue",
+      "created_at": "2026-03-14T21:00:14.958618"
+    },
+    {
+      "id": "INC-8DB65301",
+      "type": "flooding",
+      "location": "Outer Ring Road - Donholm",
+      "road_name": "Outer Ring Road",
+      "latitude": -1.285,
+      "longitude": 36.889,
+      "severity": "medium",
+      "status": "pending",
+      "description": "Incident reported at Outer Ring Road - Donholm",
+      "created_at": "2026-03-16T11:00:14.958638"
+    },
+    {
+      "id": "INC-EE8A1BA3",
+      "type": "speeding",
+      "location": "Mombasa Road Junction",
+      "road_name": "Mombasa Road (A109)",
+      "latitude": -1.33,
+      "longitude": 36.98,
+      "severity": "critical",
+      "status": "pending",
+      "description": "Incident reported at Mombasa Road Junction",
+      "created_at": "2026-03-16T07:00:14.958658"
+    },
+    {
+      "id": "INC-6B968E63",
+      "type": "flooding",
+      "location": "Waiyaki Way - Westlands",
+      "road_name": "Waiyaki Way",
+      "latitude": -1.2634,
+      "longitude": 36.809,
+      "severity": "critical",
+      "status": "investigating",
+      "description": "Incident reported at Waiyaki Way - Westlands",
+      "created_at": "2026-03-14T15:00:14.958679"
+    },
+    {
+      "id": "INC-5FD25E37",
+      "type": "accident",
+      "location": "Langata Road - Bomas",
+      "road_name": "Langata Road",
+      "latitude": -1.3556,
+      "longitude": 36.7664,
+      "severity": "high",
+      "status": "pending",
+      "description": "Incident reported at Langata Road - Bomas",
+      "created_at": "2026-03-15T19:00:14.958696"
+    },
+    {
+      "id": "INC-B58A5759",
+      "type": "accident",
+      "location": "CBD - Kenyatta Avenue",
+      "road_name": "Kenyatta Avenue",
+      "latitude": -1.2833,
+      "longitude": 36.8197,
+      "severity": "critical",
+      "status": "resolved",
+      "description": "Incident reported at CBD - Kenyatta Avenue",
+      "created_at": "2026-03-14T19:00:14.958707"
+    },
+    {
+      "id": "INC-9967D6E6",
+      "type": "reckless",
+      "location": "Waiyaki Way - Westlands",
+      "road_name": "Waiyaki Way",
+      "latitude": -1.2634,
+      "longitude": 36.809,
+      "severity": "critical",
+      "status": "investigating",
+      "description": "Incident reported at Waiyaki Way - Westlands",
+      "created_at": "2026-03-16T02:00:14.958718"
+    },
+    {
+      "id": "INC-AC75ED7E",
+      "type": "flooding",
+      "location": "South B - Hazina",
+      "road_name": "Mombasa Road",
+      "latitude": -1.31,
+      "longitude": 36.83,
+      "severity": "critical",
+      "status": "resolved",
+      "description": "Incident reported at South B - Hazina",
+      "created_at": "2026-03-13T22:00:14.958735"
+    },
+    {
+      "id": "INC-378F4F94",
+      "type": "reckless",
+      "location": "CBD - Kenyatta Avenue",
+      "road_name": "Kenyatta Avenue",
+      "latitude": -1.2833,
+      "longitude": 36.8197,
+      "severity": "high",
+      "status": "investigating",
+      "description": "Incident reported at CBD - Kenyatta Avenue",
+      "created_at": "2026-03-13T16:00:14.958746"
+    },
+    {
+      "id": "INC-BC45460D",
+      "type": "flooding",
+      "location": "Ngong Road - Adams Arcade",
+      "road_name": "Ngong Road",
+      "latitude": -1.3012,
+      "longitude": 36.7801,
+      "severity": "critical",
+      "status": "investigating",
+      "description": "Incident reported at Ngong Road - Adams Arcade",
+      "created_at": "2026-03-13T19:00:14.958757"
+    }
+  ],
+  "statistics": {
+    "total_vehicles": 20,
+    "total_drivers": 15,
+    "total_incidents": 30,
+    "active_incidents": 21,
+    "critical_incidents": 9
+  }
+}

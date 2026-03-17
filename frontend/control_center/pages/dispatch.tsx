@@ -5,7 +5,7 @@ import Layout from '@/components/Layout'
 import { 
   AlertTriangle, MapPin, Users, Clock, Phone, Radio, 
   CheckCircle, XCircle, ChevronRight, RefreshCw, 
-  Siren, Cross, Car, Truck, Search, Filter,
+  Siren, Plus, Car, Truck, Search, Filter,
   Navigation, Star, ArrowUpDown
 } from 'lucide-react'
 
@@ -179,7 +179,7 @@ export default function DispatchPage() {
   const getResponderTypeIcon = (type: string) => {
     switch (type) {
       case 'police': return <Car className="w-5 h-5" />
-      case 'ambulance': return <Cross className="w-5 h-5" />
+      case 'ambulance': return <Plus className="w-5 h-5" />
       case 'fire': return <Siren className="w-5 h-5" />
       case 'tow_truck': return <Truck className="w-5 h-5" />
       default: return <Car className="w-5 h-5" />

@@ -4101,13 +4101,30 @@ async def get_nearby_parking(
 
 # ==================== CITIZEN REPORTS ENHANCED ====================
 
+# In-memory storage for citizen reports
+CITIZEN_REPORTS_STORAGE = []
+REPORT_ID_COUNTER = [1000]
+
+
 @app.get("/api/citizen-reports")
 async def get_citizen_reports(
     status: Optional[str] = Query(None),
     limit: int = Query(50),
 ):
     """Get citizen reports"""
-    return {"reports": [], "total": 0}
+    reports = CITIZEN_REPORTS_STORAGE
+    if status:
+        reports = [r for r in reports if r.get("status") == status]
+    return {"reports": reports[-limit:], "total": len(CITIZEN_REPORTS_STORAGE)}
+
+
+@app.get("/api/citizen-reports/{report_id}")
+async def get_citizen_report_v2(report_id: str):
+    """Get specific citizen report"""
+    for report in CITIZEN_REPORTS_STORAGE:
+        if report["id"] == report_id:
+            return report
+    raise HTTPException(status_code=404, detail="Report not found")
 
 
 @app.post("/api/citizen-reports/submit")
@@ -4124,7 +4141,8 @@ async def submit_citizen_report(
     phone_number: Optional[str] = Body(None),
 ):
     """Submit a new citizen report"""
-    report_id = f"RPT-{uuid.uuid4().hex[:8].upper()}"
+    REPORT_ID_COUNTER[0] += 1
+    report_id = f"RPT-{REPORT_ID_COUNTER[0]:06d}"
     report = {
         "id": report_id,
         "type": type,
@@ -4136,9 +4154,41 @@ async def submit_citizen_report(
         "anonymous": anonymous,
         "status": "pending",
         "points_earned": 50,
+        "first_name": first_name,
+        "last_name": last_name,
+        "phone_number": phone_number,
         "created_at": utcnow().isoformat(),
     }
+    CITIZEN_REPORTS_STORAGE.append(report)
+    
+    # Notify control center via WebSocket
+    try:
+        await manager.broadcast({
+            "type": "new_citizen_report",
+            "report": report
+        })
+    except Exception:
+        pass
+    
     return report
+
+
+@app.put("/api/citizen-reports/{report_id}/status")
+async def update_citizen_report_status_v2(
+    report_id: str,
+    status: str = Body(...),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Update citizen report status (officer only)"""
+    from .roles import require_roles
+    require_roles(current_user, "admin", "officer")
+    
+    for report in CITIZEN_REPORTS_STORAGE:
+        if report["id"] == report_id:
+            report["status"] = status
+            report["updated_at"] = utcnow().isoformat()
+            return report
+    raise HTTPException(status_code=404, detail="Report not found")
 
 
 # ==================== CHAT SYSTEM ====================

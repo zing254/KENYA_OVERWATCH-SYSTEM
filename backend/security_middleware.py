@@ -106,10 +106,18 @@ def apply_security_middleware(app: FastAPI):
                 "PATCH",
                 "DELETE",
             } and request.url.path.startswith("/api/"):
-                # Exempt health and auth endpoints from RBAC
+                # Exempt health, auth, and public endpoints from RBAC
                 if request.url.path.startswith("/api/health"):
                     return await call_next(request)
                 if request.url.path.startswith("/api/v1/auth"):
+                    return await call_next(request)
+                if "/citizen-reports/submit" in request.url.path:
+                    return await call_next(request)
+                if "/chat/" in request.url.path:
+                    return await call_next(request)
+                if "/trivia/answer" in request.url.path:
+                    return await call_next(request)
+                if "/streaming/request" in request.url.path:
                     return await call_next(request)
                 role = request.headers.get("X-Role") or request.headers.get("x-role")
                 if role not in {"admin", "officer"}:
